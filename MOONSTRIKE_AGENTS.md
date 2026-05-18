@@ -486,5 +486,559 @@ src/
 
 ---
 
+## 10. Admin Dashboard — "Admin Terminal"
+
+The admin panel is a **separate application** from the storefront. It is called **"Admin Terminal"** and has its own login, layout, routing, and access control. It must never be accessible from the public storefront.
+
+---
+
+### 10.1 Admin Design System
+
+**Same dark theme as storefront, with these differences:**
+- **Layout:** Fixed left sidebar (not top navbar) + top header bar
+- **Sidebar width:** ~240px, persistent, never collapses on desktop
+- **Active nav item:** Purple background pill highlight
+- **Surface cards:** Slightly lighter than storefront (`#161828` range)
+- **Status colors:**
+  - `Active / Success` → Green dot / green badge
+  - `Pending / Scheduled` → Amber / orange
+  - `Draft` → Muted gray
+  - `Disputed / Critical` → Red / orange-red
+  - `Archived / Banned / Blocked` → Dark red / muted red
+  - `Refunded` → Gray
+- **Role badges:** Colored pill labels — `ADMIN` (purple), `BOOSTER` (cyan/teal), `EDITOR` (gray)
+- **LOGOUT text:** Red, always visible in top-right next to admin name
+
+**Global Admin Layout (every page):**
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  [Logo: MoonStrike / Admin Terminal]  [Search bar]  [🔔][?]  [Admin Alpha  LOGOUT  🖼]  │
+├──────────────┬──────────────────────────────────────────┤
+│  Sidebar     │  Page Content                            │
+│  Dashboard   │                                          │
+│  Users       │                                          │
+│  Games       │                                          │
+│  Services    │                                          │
+│  Transactions│                                          │
+│  Content     │                                          │
+│  Settings    │                                          │
+│  Logs        │                                          │
+│  Message     │                                          │
+│              │                                          │
+│ [Manage      │                                          │
+│  Server]     │                                          │
+├──────────────┴──────────────────────────────────────────┤
+│  Moon Strike © 2024 ... | Support | Privacy | API Docs | ● SYSTEM PULSE: STABLE  │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Global Admin Components:**
+- `<AdminSidebar>` — Logo + "Admin Terminal" sub-label, nav links with icons, "Manage Server" CTA at bottom (purple gradient)
+- `<AdminTopBar>` — Global command search (`Search commands, users or transactions...`) | Bell | Help | Admin name + LOGOUT + avatar
+- `<AdminFooter>` — Copyright | Support | Privacy Policy | API Docs | System Pulse status (green dot + "STABLE")
+- `<StatCard>` — KPI card with label, large number, trend arrow + percent, colored progress bar
+- `<DataTable>` — Sortable table with pagination (`Rows per page`, page numbers)
+- `<StatusBadge>` — Colored dot + text pill
+- `<ActionIcons>` — ✏️ Edit | 👁 View/Hide | 🗑 Delete | ⊘ Ban (per row)
+
+---
+
+### 10.2 Admin Login Page (`/admin/login`)
+
+**Purpose:** Secure entry point. Separate from storefront. Admin-only.
+
+**Layout:** Centered card on full dark background (no sidebar, no header)
+
+**Card contents:**
+- Title: `Moon Strike` (large, white bold)
+- Sub-label: `ADMIN TERMINAL` (uppercase, muted, letter-spaced)
+- Field: `Email Address` — placeholder `admin@moonstrike.io`
+- Field: `Password` — masked, eye toggle, `Forgot Password?` link (right-aligned, cyan)
+- Checkbox: `Remember this terminal session`
+- CTA: `Enter Terminal →` (full-width, purple)
+- Divider line
+- Help text: `Need assistance?` + `Contact System Admin` (cyan link)
+
+**Bottom security badges (below card):**
+- `🛡 2FA Protected` | `🛡 SSL Encrypted`
+
+**Rules:**
+- 2FA must be enforced for all admin accounts
+- Failed login attempts must be logged in Audit Logs
+- Session timeout after inactivity (configurable in Settings)
+
+---
+
+### 10.3 Admin Dashboard — Overview (`/admin/dashboard`)
+
+**Purpose:** Top-level operational snapshot. First screen after login.
+
+**Breadcrumb:** `Home > Dashboard`
+
+**Header:** `Operational Overview` | Date range selector: `Last 30 Days` | `Export CSV` button
+
+**KPI Cards (4-column row):**
+| Card | Value | Trend |
+|---|---|---|
+| TOTAL REVENUE | $124.5k | ▲ 12.5% |
+| ACTIVE USERS | 12,840 | ▲ 8.2% |
+| COMPLETED BOOSTS | 5,420 | ▲ 24.1% |
+| PENDING DISPUTES | 12 | ▼ 3% (red) |
+
+**Main content (2-column):**
+
+Left — `Traffic vs Performance` chart:
+- Subtitle: "Correlation between ad spend and user conversion."
+- Legend: Traffic (blue dot) | Sales (purple dot)
+- Chart area: line/area chart (empty placeholder in design)
+
+Right — `Top Selling Services` list:
+- 4 rows: icon | service name | category | revenue amount (cyan)
+- Examples: Diamond Rank Boost $42k, Legendary Skins Pack $38k, Coaching Sessions $21k, Account Protection $14k
+- `View All Services` button (outlined)
+
+**Recent Activity table (full width):**
+- Columns: TRANSACTION ID | CUSTOMER (avatar + username) | SERVICE | DATE | AMOUNT | STATUS
+- Status pills: `Paid` (green), `Pending` (amber), `Refunded` (gray)
+- Link: `View Transaction Log →` (top right of section)
+
+---
+
+### 10.4 Admin Users Page (`/admin/users`)
+
+**Purpose:** Manage all platform users — customers, boosters, editors, admins.
+
+**Breadcrumb:** `Management > Users`
+**Header:** `User Registry` | subtitle: "Manage permissions, monitor activity, and adjust user status across the network."
+**Controls:** `All Roles` dropdown filter | `+ ADD NEW USER` button (purple)
+
+**Table columns:** NAME | EMAIL | ROLE | STATUS | LAST LOGIN | ACTIONS
+
+**Role badge types:**
+- `ADMIN` — purple pill
+- `BOOSTER` — cyan/teal pill
+- `EDITOR` — gray pill
+- (implied) `CUSTOMER` — default/no badge
+
+**Status:** `● Active` (green) | `● Banned` (red, row text muted/strikethrough)
+
+**Row actions:** ✏️ Edit | 🕐 Activity history | ⊘ Ban/Suspend
+
+**Bottom stat cards (4-column):**
+| Stat | Value | Note |
+|---|---|---|
+| TOTAL USERS | 1,248 | ▲ 12% from last month |
+| ACTIVE BOOSTERS | 24 | ⓘ Current high demand |
+| PENDING VERIFICATIONS | 18 | ⚠ Needs action |
+| BANNED/FLAGGED | 7 | 🛡 Safety score: 98% |
+
+**User roles & permissions (inferred):**
+```
+ADMIN   → Full access to all Admin Terminal sections
+BOOSTER → Deliver services; visible to customers; can be reviewed
+EDITOR  → Manage Content section only
+CUSTOMER → Storefront only; no admin access
+```
+
+---
+
+### 10.5 Admin Games List Page (`/admin/games`)
+
+**Purpose:** Manage the game catalog. Add, edit, archive games and their genre classifications.
+
+**Header:** `Games list` | subtitle: "Manage game boosting, coaching, and item services."
+**CTA:** `+ Add New Service` (purple, top right)
+
+**Stat cards (2-column):**
+- TOTAL GAMES: 15 (▲ +12 this week)
+- TOTAL GENRES: 7 (across 14 titles)
+
+**Table:** Same structure as Services table (see 10.6) but scoped to games
+- Columns: SERVICE NAME | CATEGORY | BASE PRICE | STATUS | ACTIONS
+
+> **Agent Note:** The Games List currently uses the same table as Services. Future iteration should separate game metadata from service pricing. Games should have genre/type tags (MMORPG, MOBA, FPS, Battle Royale, etc.) instead of a base price. Pricing belongs on Services.
+
+**Filters:** All Services | Active | Draft | Filter Category dropdown
+
+---
+
+### 10.6 Admin Services List Page (`/admin/services`)
+
+**Purpose:** Full catalog management for all boosting services across all games.
+
+**Header:** `Service Catalog` | subtitle: "Manage game boosting, coaching, and item services."
+**CTA:** `+ Add New Service` (purple)
+
+**Stat cards (3-column):**
+| Stat | Value | Note |
+|---|---|---|
+| Total Services | 1,248 | ▲ +12 this week |
+| Active Boosts | 482 | Across 14 titles |
+| Avg Delivery Time | 3.4 hrs | 98% on-time rate |
+
+**Filters:** All Services | Active | Draft tabs + `Filter Category` dropdown
+**Right of filters:** `Showing 1-10 of 1,248`
+
+**Table columns:** SERVICE NAME (thumbnail + name + ID) | CATEGORY | BASE PRICE (cyan) | STATUS | ACTIONS
+- **Status values:** `● Active` | `● Draft` | `● Archived` (red)
+- **Row actions:** ✏️ Edit | 👁 Hide/Show toggle | 🗑 Delete
+- **Pagination:** Rows per page selector (10) | page numbers with `...` ellipsis
+
+---
+
+### 10.7 Admin Service CMS Page (`/admin/services/new` and `/admin/services/[id]/edit`)
+
+**Purpose:** Create or edit a boosting service. Full form with dynamic custom options.
+
+**Breadcrumb:** `MARKETPLACE / CREATE NEW SERVICE`
+**Header:** `Create New Service` | subtitle: "Deploy a new professional boosting or gaming service to the Moon Strike marketplace."
+**Top actions:** `Discard` (outlined) | `Deploy Service` (purple)
+
+**Left column — Main form:**
+
+1. **Basic Info card:**
+   - SERVICE NAME — text input (placeholder: "e.g. Radiant Rank Push")
+   - GAME SELECTION — dropdown (e.g. Valorant)
+   - CATEGORY — dropdown (e.g. Rank Boosting)
+
+2. **Custom Service Options card:**
+   - Header: `Custom Service Options` + `+ ADD NEW FIELD` link
+   - Dynamic field rows, each with:
+     - Field name input (e.g. "Current Rank", "Server Region", "Play with Pro")
+     - Field type dropdown (Number Input, Dropdown, Toggle)
+     - Required checkbox toggle
+     - 🗑 Delete row button
+   - Fields can be added/removed dynamically
+
+3. **Service Details card:**
+   - Rich text editor (B / I / List / Link toolbar)
+   - Textarea: "Describe the service, rules, and delivery expectations..."
+
+**Right column — Sidebar:**
+
+1. **Pricing & Tiers card:**
+   - BASE PRICE (USD) input: `$ 25.00`
+   - `⚡ Express Delivery` add-on: `+15%`
+   - `🔮 Premium Pro Tier` add-on: `+30%`
+
+2. **Thumbnail card:**
+   - Drag & drop zone with upload icon
+   - "DRAG & DROP OR BROWSE" text
+   - Note: "Recommended: 1200x1080 | 800Pixel"
+
+3. **Pro Tip card:**
+   - Tip text: "Adding a 'Play with Pro' toggle increases conversion by 24% on average. Make sure to define clear markup for premium tiers."
+
+---
+
+### 10.8 Admin Transactions Page (`/admin/transactions`)
+
+**Purpose:** Financial ledger — monitor all payments and manage disputes.
+
+**Breadcrumb:** `Management > Transactions`
+**Header:** `Financial Ledger` | subtitle: "Monitor and manage all platform payments and payouts."
+**CTA:** `Export Report` (outlined with download icon)
+
+**KPI cards (4-column):**
+| Card | Value | Note |
+|---|---|---|
+| TOTAL REVENUE | $124.5k | ▲ +12.4% this month |
+| PENDING PAYOUTS | $12k | ⏱ Next cycle in 4d |
+| SUCCESS RATE | 98.2% | ✅ High Efficiency |
+| NEW DISPUTES | 3 | ⚠ Action required |
+
+**Filters:**
+- Text search: `Filter by ID or Customer...`
+- Status dropdown: `All Status`
+- Date range: `Last 30 Days` (with calendar icon)
+
+**Table columns:** TXN ID | CUSTOMER (avatar + name + email) | SERVICE (colored link) | DATE | AMOUNT | METHOD | STATUS
+- **Methods:** `💳 Card` | `💳 PayPal` | `₿ Crypto`
+- **Status values:** `● SUCCESS` | `● PENDING` | `● DISPUTED` | `● REFUNDED`
+- **Pagination:** standard
+
+---
+
+### 10.9 Admin Content Page (`/admin/content`)
+
+**Purpose:** CMS for all storefront content — landing page sections, banners, game catalog entries, media.
+
+**Header:** `Content Library` | subtitle: "Manage and deploy cosmic assets across the Moon Strike ecosystem."
+**CTA:** `+ Add New Content` (purple)
+
+**Section tabs (top):**
+`LANDING PAGE SECTIONS` | `GAME CATALOG` | `PROMOTIONAL BANNERS` | `MEDIA LIBRARY`
+- Tab underline highlight on active
+- Right of tabs: grid/list view toggle icons
+
+**Table columns:** CONTENT ITEM (thumbnail + name + ID) | TYPE | STATUS | MODIFIED | ACTIONS
+
+**Content types (inferred from rows):**
+- `Hero Section` — full-width landing hero
+- `Banner` — promotional banner strip
+- `Grid` — game/service grid section
+- `Text Block` — body copy / CMS text
+
+**Status values:**
+- `● ACTIVE` (green) — live on storefront
+- `⏱ SCHEDULED` (amber) — will go live at date
+- `✏ DRAFT` (muted) — not published
+
+**Row actions:** ✏️ Edit | 👁 Preview | ⋮ More options (3-dot menu)
+
+**Pagination:** `Showing 4 of 128 assets` | page numbers
+
+---
+
+### 10.10 Admin Messages Page (`/admin/messages`)
+
+**Purpose:** Support inbox — admins manage all customer support conversations. Three-panel layout.
+
+**Layout:** Left sidebar (nav) | Middle panel (conversation list) | Right panel (active chat + user profile)
+
+**Middle Panel — Conversation List:**
+- Header: `Support` + green online indicator dot
+- Each thread row:
+  - Username + timestamp (relative, e.g. "2m ago")
+  - Thread subject/title (e.g. "Order #TRX-94821 - WoW Boost") — highlighted/linked
+  - Message preview (italic, truncated)
+- Thread statuses implied by subject:
+  - Order support, Refund requests, General questions
+
+**Right Panel — Active Chat:**
+
+Top bar:
+- User avatar + username + ticket ID (e.g. `Arthas_King99 #8842`)
+- Membership tier badge: `GOLD TIER MEMBER` (cyan)
+- ⋮ options menu
+
+Chat messages (bubble style):
+- Customer messages — left-aligned, dark bubble
+- Admin reply — right-aligned, purple gradient bubble
+- Timestamps below each bubble
+- File attachments displayed inline (filename + size + download icon)
+
+**Message composer (bottom):**
+- Toolbar: **B** / *I* / 🔗 Link / ≡ List / 😊 Emoji
+- Input: `Type a message to [username]...`
+- 📎 Attachment button | `Send ▶` button (purple)
+
+**Right Panel — User Profile sidebar:**
+
+- Label: `USER PROFILE`
+- Avatar (large)
+- Username: `Arthas_King99`
+- Location: `Europe / London`
+- Stats: ORDERS: 24 | SPENT: $1.2k
+
+- `RECENT ACTIVITY` section:
+  - Order rows: TXN ID | service name | status badge (`PROCESSING` amber, `COMPLETED` green)
+
+- `MANAGEMENT` section (admin actions):
+  - `Issue Refund` button (outlined)
+  - `Update Ticket` button (outlined)
+  - `Ban User` button (red/danger)
+
+---
+
+### 10.11 Admin Audit Logs Page (`/admin/logs`)
+
+**Purpose:** Real-time system audit trail — every admin action and system event logged.
+
+**Breadcrumb:** `System > Audit Logs`
+**Header:** `System Audit Trail` | subtitle: "Real-time monitoring of all administrative and system-level events."
+**CTA:** `Export CSV` (top right, outlined with download icon)
+
+**Filter bar (4 controls):**
+- DATE RANGE — dropdown (`Last 24 Hours`)
+- EVENT TYPE — dropdown (`All Events`)
+- USER FILTER — search input (`Any user...`)
+- `↺ RESET FILTERS` button
+
+**Table columns:** TIMESTAMP | USER (avatar + username) | ACTION | IP ADDRESS | STATUS
+
+**Status badge types:**
+- `SUCCESS` — green outlined badge
+- `CRITICAL` — red filled badge with icon (system/server events)
+- `BLOCKED` — amber/orange outlined badge
+
+**Example log events:**
+- `Admin Console Login` — SUCCESS
+- `Database Connection Timeout - Cluster A` — CRITICAL (system node, not a user)
+- `Modified User Permissions: valkyrie_77` — SUCCESS
+- `Unauthorized API request to /v1/payments/secret` — BLOCKED
+- `Created New Service: Galaxy_Elite_Pack` — SUCCESS
+
+**Pagination:** `Showing 1-5 of 1,248 events`
+
+**Bottom system stats (3 cards):**
+| Stat | Value |
+|---|---|
+| UPTIME PERFORMANCE | 99.998% |
+| BLOCKED THREATS | 142 Today |
+| ACTIVE ANOMALIES | 2 Pending |
+
+---
+
+### 10.12 Admin Settings Page (`/admin/settings`)
+
+**Purpose:** Platform-wide configuration and admin profile settings.
+
+**Header:** `Terminal Configuration` | subtitle: "Manage platform-wide settings and administrative preferences."
+
+**Card 1 — Profile Settings:**
+- Avatar display + `Upload New Avatar` button (purple)
+- File note: "JPG, PNG or GIF. Max size of 800K"
+- `Admin Display Name` text input
+- `Email Address` text input
+- `🔒 Change Security Password` link (cyan, with icon)
+
+**Card 2 — Application Settings:**
+- `Maintenance Mode` toggle (off by default)
+- Description: "Disable public access to the store front"
+
+**Bottom actions:**
+- `Save All Changes` (purple, primary)
+- `Discard` (outlined, secondary)
+
+---
+
+### 10.13 Admin Data Models (Additional)
+
+```ts
+AdminUser {
+  id: string
+  displayName: string       // "Admin Alpha"
+  email: string             // "alpha@moonstrike.admin"
+  role: "ADMIN" | "BOOSTER" | "EDITOR"
+  avatar: string
+  status: "Active" | "Banned"
+  lastLogin: Date
+  createdAt: Date
+}
+
+AuditLog {
+  id: string
+  timestamp: Date
+  userId: string | "SYSTEM_NODE"
+  userLabel: string
+  action: string
+  ipAddress: string
+  status: "SUCCESS" | "CRITICAL" | "BLOCKED"
+}
+
+SupportTicket {
+  id: string                // "#8842"
+  orderId?: string          // "TRX-94821"
+  userId: string
+  subject: string
+  status: "open" | "in_progress" | "resolved" | "refund_requested"
+  messages: Message[]
+  createdAt: Date
+  updatedAt: Date
+}
+
+Message {
+  id: string
+  ticketId: string
+  senderId: string
+  senderRole: "admin" | "customer"
+  content: string
+  attachments?: Attachment[]
+  sentAt: Date
+}
+
+Attachment {
+  filename: string
+  sizeBytes: number
+  url: string
+}
+
+ContentAsset {
+  id: string                // "MSC-8829"
+  name: string              // "Hero Section - Season 4"
+  type: "Hero Section" | "Banner" | "Grid" | "Text Block"
+  status: "ACTIVE" | "SCHEDULED" | "DRAFT"
+  thumbnail?: string
+  scheduledAt?: Date
+  modifiedAt: Date
+  createdBy: string
+}
+
+SystemSettings {
+  maintenanceMode: boolean
+  adminDisplayName: string
+  adminEmail: string
+  adminAvatar: string
+}
+```
+
+---
+
+### 10.14 Admin Routes
+
+```
+/admin/login                    → Admin Login
+/admin/dashboard                → Operational Overview
+/admin/users                    → User Registry
+/admin/users/new                → Add User
+/admin/users/[id]               → Edit User
+/admin/games                    → Games List
+/admin/games/new                → Add Game
+/admin/games/[id]/edit          → Edit Game
+/admin/services                 → Service Catalog
+/admin/services/new             → Create Service (CMS)
+/admin/services/[id]/edit       → Edit Service (CMS)
+/admin/transactions             → Financial Ledger
+/admin/content                  → Content Library
+/admin/content/new              → Add Content
+/admin/content/[id]/edit        → Edit Content
+/admin/messages                 → Support Inbox
+/admin/messages/[ticketId]      → Active Conversation
+/admin/logs                     → Audit Logs
+/admin/settings                 → Terminal Configuration
+```
+
+**Route guard rules:**
+- All `/admin/*` routes require authenticated admin session
+- 2FA must be verified before accessing any admin route
+- `EDITOR` role can only access `/admin/content`
+- `BOOSTER` role has no admin terminal access
+- Session timeout redirects to `/admin/login`
+
+---
+
+### 10.15 Admin Feature Progress Tracker
+
+```
+STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
+```
+
+| Feature | Status | Notes |
+|---|---|---|
+| Admin Login Page | ⬜ | Design ref: Admin_Dashboard_-_Login.png |
+| Admin Dashboard Overview | ⬜ | Design ref: Admin_Dashboard_-_Overview.png |
+| Admin Users List | ⬜ | Design ref: Admin_Dashboard_-_Users.png |
+| Admin Games List | ⬜ | Design ref: Admin_Games_List.png — needs genre refactor |
+| Admin Services List | ⬜ | Design ref: Admin_Services_List.png |
+| Admin Service CMS (Create/Edit) | ⬜ | Design ref: Admin_Services_List_CMS.png |
+| Admin Transactions | ⬜ | Design ref: Admin_Transactions_List.png |
+| Admin Content Library | ⬜ | Design ref: Admin_Contents_List.png |
+| Admin Messages / Support Chat | ⬜ | Design ref: Admin_Messages_List.png |
+| Admin Audit Logs | ⬜ | Design ref: Admin_Dashboard_-_Audit_Logs.png |
+| Admin Settings | ⬜ | Design ref: Admin_Settings_Page.png |
+| Admin Auth Guard (route protection) | ⬜ | All /admin/* routes |
+| 2FA enforcement | ⬜ | Required for all admin logins |
+| Admin sidebar component | ⬜ | Shared across all admin pages |
+| Admin top bar component | ⬜ | Shared across all admin pages |
+| System Pulse indicator | ⬜ | Live status in admin footer |
+| Maintenance Mode toggle | ⬜ | Disables public storefront |
+| CSV export (dashboard + logs + transactions) | ⬜ | |
+| Real-time support chat | ⬜ | WebSocket or polling TBD |
+| Audit log write (on every admin action) | ⬜ | Backend middleware |
+
+---
+
 *Last updated: [DATE] — Update PROGRESS.md when any feature status changes.*
 *Design references: all screenshots stored in /design-refs/ folder.*
