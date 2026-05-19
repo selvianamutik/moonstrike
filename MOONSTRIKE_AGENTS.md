@@ -385,42 +385,85 @@ Service {
   whatYouGet: Benefit[]
   // JSONB fields (Supabase PostgreSQL):
   options_schema: JSONB // Configurator fields — CLOSED TYPE SYSTEM (see ServiceOptionField below)
-  pricing: JSONB        // Base price + add-ons (see ServicePricing below)
+  pricing: JSONB        // Resolved from options_schema — no separate base price field.
+                        // Total price is always computed from selected options at runtime.
 }
 
-// ── Fixed Option Type System (5 types — closed, no arbitrary extensions) ──────
-// The admin CMS only offers these 5 types. The storefront has exactly 5 components.
+// ── Fixed Option Type System (extensible but controlled) ─────────────────────
+// Types are predefined — admins pick from a dropdown, never free-type a string.
+// Current types: single_choice, multiple_choice, scalar (+ more added over time).
+// Adding a NEW TYPE requires: define schema + build component + add to CMS dropdown = 1 code deploy.
+// Adding a NEW SERVICE using existing types = admin fills form, zero code deploy.
 
-ServiceOptionField =
-  | { type: "toggle_group";   label: string; values: string[]; required: boolean }
-    // Renders: pill selector, single-select. Example: KEY LEVEL → [+10] [+15] [+20]
-
-  | { type: "stepper";        label: string; min: number; max: number; default: number; required: boolean }
-    // Renders: − N + counter. Example: NUMBER OF RUNS → − 1 +
-
-  | { type: "checkbox_addon"; label: string; priceType: "flat"|"percent"; priceValue: number }
-    // Renders: checkbox with price modifier label. Example: VIP Traders (More Loot) +$15.00
-
-  | { type: "dropdown";       label: string; values: string[]; required: boolean }
-    // Renders: select/dropdown menu. Example: Server Region → USA | EU | Asia
-
-  | { type: "boolean";        label: string; description?: string }
-    // Renders: single on/off toggle. Example: Play with Pro
-
-ServicePricing {
-  base: number                  // 45.00
-  currency: string              // "USD"
-  addOns: ServiceOptionField[]  // only checkbox_addon type entries from options_schema
+ServiceOption {
+  label: string       // displayed field label, e.g. "Level up boost", "Number of runs"
+  required: boolean
+  type:
+    | "single_choice"   // pick exactly one option — total = selected option's price
+    | "multiple_choice" // pick one or more — total += each selected option's price
+    | "scalar"          // numeric quantity — total += quantity × pricePerUnit
+    // future types added here as the platform grows — each requires a dev implementation
+  options?: OptionItem[]    // used by single_choice and multiple_choice
+  min?: number              // used by scalar
+  max?: number              // used by scalar
+  pricePerUnit?: number     // used by scalar — e.g. 3 runs × $5 = $15
 }
+
+OptionItem {
+  label: string   // displayed label, e.g. "1–20", "21–40", "Loot bag", "Express"
+  price: number   // the price for this specific option
+}
+
+// ── Price calculation rule (one pure function, no exceptions) ─────────────────
+// single_choice   → total  = price of the one selected OptionItem
+// multiple_choice → total += price of each checked OptionItem
+// scalar          → total += selected quantity × pricePerUnit
+// All fields combine additively. There is no base price separate from the options —
+// the "base" price is whatever the first single_choice option resolves to.
 
 // ── Storefront renderer mapping (one component per type) ─────────────────────
-// "toggle_group"   → <ToggleGroup />
-// "stepper"        → <Stepper />
-// "checkbox_addon" → <AddonCheckbox />
-// "dropdown"       → <OptionDropdown />
-// "boolean"        → <BooleanToggle />
-// The configurator iterates options_schema[], picks the right component, tracks state,
-// and recalculates total price on every change.
+// "single_choice"   → <SingleChoice />   — pill/card grid, single select, shows price per option
+// "multiple_choice" → <MultiChoice />    — checklist, multi select, shows price per option
+// "scalar"          → <Scalar />         — slider or stepper, shows quantity × unit price
+// (future types)    → new component added alongside the type definition
+//
+// Renderer uses a lookup table — adding a new type = add one entry to the map.
+// Unknown types log a warning and render nothing (no crash).
+// Configurator iterates options_schema[], maps type → component, tracks state,
+// runs calcTotal() on every change, displays running total.
+
+// ── Example JSONB stored in Supabase ─────────────────────────────────────────
+// options_schema for a "Level Boost" service:
+// [
+//   {
+//     "type": "single_choice",
+//     "label": "Level up boost",
+//     "required": true,
+//     "options": [
+//       { "label": "1–20",  "price": 5  },
+//       { "label": "21–40", "price": 10 },
+//       { "label": "41–60", "price": 18 },
+//       { "label": "61–80", "price": 25 }
+//     ]
+//   },
+//   {
+//     "type": "multiple_choice",
+//     "label": "Add-ons",
+//     "required": false,
+//     "options": [
+//       { "label": "Loot bag",        "price": 5 },
+//       { "label": "Express delivery","price": 8 }
+//     ]
+//   },
+//   {
+//     "type": "scalar",
+//     "label": "Number of runs",
+//     "required": true,
+//     "min": 1,
+//     "max": 10,
+//     "pricePerUnit": 5
+//   }
+// ]
 
 Benefit {
   icon: string
@@ -513,7 +556,7 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 - [ ] **Currency conversion?** (Real-time API or static rates?)
 - [ ] **Booster/seller side?** (Is there a seller dashboard or only buyer-facing?)
 - [x] **JSON storage:** JSONB columns in Supabase PostgreSQL. `options_schema` and `pricing` are JSONB. Enables indexed queries on JSON fields if needed.
-- [x] **Service configurator renderer:** Uses a FIXED TYPE SYSTEM (5 closed option types). See §6 Service Option Types. Do NOT build a generic/arbitrary JSON renderer.
+- [x] **Service configurator renderer:** Uses a CONTROLLED TYPE SYSTEM — types are predefined (`single_choice`, `multiple_choice`, `scalar` + more over time), not free-form strings. Each option item carries its own price. Price calc is one pure `calcTotal()` function. New types require a dev implementation + code deploy. New services using existing types require zero code. Do NOT build a generic/arbitrary JSON renderer.
 
 ---
 
@@ -782,19 +825,19 @@ CUSTOMER → Storefront only; no admin access
 2. **Custom Service Options card (JSONB, fixed type system):**
    - Header: `Custom Service Options` + `+ ADD NEW FIELD` link
    - Dynamic field rows, each with:
-     - Field label input (e.g. "Current Rank", "Server Region", "Play with Pro")
-     - **Field type dropdown — exactly 5 choices (closed set):**
-       - `Toggle Group` → pill selector, single-select (e.g. key level choices)
-       - `Stepper` → quantity counter with min/max (e.g. number of runs)
-       - `Addon Checkbox` → checkbox with flat/percent price modifier
-       - `Dropdown` → select menu (e.g. server region)
-       - `Boolean` → single on/off toggle (e.g. play with pro)
-     - Required toggle (not available on Addon Checkbox — those are always optional)
-     - Price modifier inputs (shown only when Addon Checkbox is selected)
-     - 🗑 Delete row button
-   - Fields can be added/removed dynamically
+     - Field label input (e.g. "Level up boost", "Number of runs", "Add-ons")
+     - **Field type dropdown — predefined types (extensible, currently includes):**
+       - `Single Choice` → pick one option, each option has its own price. Selecting replaces the running total with that option's price. Example: Level 1–20 = $5, Level 21–40 = $10
+       - `Multiple Choice` → pick one or more options, each option has its own price, all selected prices stack additively. Example: Loot bag +$5, Express delivery +$8
+       - `Scalar` → numeric quantity via slider or stepper, has a price-per-unit. Total adds quantity × pricePerUnit. Example: 3 runs × $5 = $15
+       - *(more types can be added as the platform grows — each requires a dev to define the schema, build the component, and add it to this dropdown)*
+     - Required toggle
+     - Option rows (for Single/Multiple Choice): label input + price input per row, `+ Add option` button
+     - Unit price input (for Scalar): min, max, pricePerUnit fields
+     - 🗑 Delete field button
+   - Fields can be added/removed dynamically; options within each field can be added/removed
    - **Storage:** Saved as JSONB `options_schema` in Supabase PostgreSQL (see §6 data models)
-   - **Rendering:** Storefront reads `options_schema[]`, maps each `type` to its fixed component, tracks state, recalculates price
+   - **Rendering:** Storefront reads `options_schema[]`, maps `type` → component, runs `calcTotal()` on every user interaction
 
 3. **Service Details card:**
    - Rich text editor (B / I / List / Link toolbar)
