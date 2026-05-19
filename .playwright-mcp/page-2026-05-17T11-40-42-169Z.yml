@@ -1,0 +1,36 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - paragraph [ref=e5]: Competitive FPS
+        - heading "Valorant Rank Boost" [level=1] [ref=e6]
+        - paragraph [ref=e7]: Climb from your current rank to a target division with vetted high-MMR boosters.
+        - generic [ref=e8]:
+          - generic [ref=e9]:
+            - heading "Standard" [level=2] [ref=e10]
+            - paragraph [ref=e11]: $29
+          - generic [ref=e12]:
+            - heading "Express" [level=2] [ref=e13]
+            - paragraph [ref=e14]: $49
+          - generic [ref=e15]:
+            - heading "Premium" [level=2] [ref=e16]
+            - paragraph [ref=e17]: $69
+      - complementary [ref=e18]:
+        - paragraph [ref=e19]: Price calculator
+        - generic [ref=e20]:
+          - generic [ref=e21]:
+            - text: Current rank / level
+            - combobox "Current rank / level" [ref=e22]:
+              - option "Starter" [selected]
+              - option "Mid tier"
+              - option "High tier"
+          - generic [ref=e23]:
+            - text: Target
+            - combobox "Target" [ref=e24]:
+              - option "Next milestone" [selected]
+              - option "Elite milestone"
+              - option "Max reward"
+          - link "Order via WhatsApp" [ref=e25] [cursor=pointer]:
+            - /url: https://wa.me/6280000000000?text=Hi%20Moon%20Strike%2C%20I%20want%20to%20order%20Valorant%20Rank%20Boost.
+  - button "Open Next.js Dev Tools" [ref=e31] [cursor=pointer]:
+    - img [ref=e32]

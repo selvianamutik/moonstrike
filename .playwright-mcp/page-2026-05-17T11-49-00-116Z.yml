@@ -1,0 +1,90 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - link "Moon Strike" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - button "=" [ref=e6]
+      - button "$ USD ↔" [ref=e7]
+      - navigation [ref=e8]:
+        - link "▣ Services" [ref=e9] [cursor=pointer]:
+          - /url: /games
+          - generic [ref=e10]: ▣
+          - text: Services
+        - link "◇ About" [ref=e11] [cursor=pointer]:
+          - /url: "#about"
+          - generic [ref=e12]: ◇
+          - text: About
+        - link "♟ Profiles" [ref=e13] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e14]: ♟
+          - text: Profiles
+    - generic [ref=e15]:
+      - heading "Terms of Service" [level=1] [ref=e16]
+      - paragraph [ref=e17]: "Last Updated: October 26, 2024"
+      - generic [ref=e18]:
+        - complementary [ref=e19]:
+          - paragraph [ref=e20]: 1. Acceptance of Terms
+          - paragraph [ref=e21]: 2. User Conduct
+          - paragraph [ref=e22]: 3. Service Delivery
+          - paragraph [ref=e23]: 4. Limitation of Liability
+          - paragraph [ref=e24]: 5. Termination
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - heading "1. Acceptance of Terms" [level=2] [ref=e27]
+            - generic [ref=e28]:
+              - paragraph [ref=e29]: By accessing or using the Moon Strike marketplace, you agree to be bound by these Terms of Service. If you disagree with any part of the terms, you may not access the service.
+              - paragraph [ref=e30]: These Terms constitute a legally binding agreement between you and Moon Strike regarding your use of our gaming progression and marketplace services.
+          - generic [ref=e31]:
+            - heading "2. Service Delivery" [level=2] [ref=e32]
+            - generic [ref=e33]:
+              - paragraph [ref=e34]: Moon Strike commits to delivering services within the estimated timeframes provided at checkout. Delays caused by external factors are exempt from penalty.
+              - generic [ref=e35]:
+                - heading "♢ Delivery Guarantee" [level=3] [ref=e36]
+                - paragraph [ref=e37]: In the event of a critical failure to deliver, users are entitled to a full refund or service credit, subject to review by support.
+          - generic [ref=e38]:
+            - heading "3. Limitation of Liability" [level=2] [ref=e39]
+            - generic [ref=e40]:
+              - paragraph [ref=e41]: In no event shall Moon Strike be liable for any indirect, incidental, special, consequential or punitive damages.
+              - paragraph [ref=e42]: While we employ rigorous security measures, users accept inherent risks associated with third-party account access required for certain service types.
+    - generic [ref=e44]:
+      - generic [ref=e45]:
+        - link "Moon Strike" [ref=e46] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e47]:
+          - generic [ref=e48]:
+            - heading "Sitemap" [level=3] [ref=e49]
+            - list [ref=e50]:
+              - listitem [ref=e51]: Instagram
+              - listitem [ref=e52]: Youtube
+              - listitem [ref=e53]: Tiktok
+              - listitem [ref=e54]: X
+          - generic [ref=e55]:
+            - heading "Legal" [level=3] [ref=e56]
+            - list [ref=e57]:
+              - listitem [ref=e58]: Privacy Policy
+              - listitem [ref=e59]:
+                - link "Terms of Service" [ref=e60] [cursor=pointer]:
+                  - /url: /terms
+              - listitem [ref=e61]:
+                - link "Refund Policy" [ref=e62] [cursor=pointer]:
+                  - /url: /refund
+          - generic [ref=e63]:
+            - heading "Genres" [level=3] [ref=e64]
+            - list [ref=e65]:
+              - listitem [ref=e66]: Action RPG
+              - listitem [ref=e67]: tactical shooting
+              - listitem [ref=e68]: MMORPG
+              - listitem [ref=e69]: MOBA
+              - listitem [ref=e70]: Sports Action
+              - listitem [ref=e71]: Tactical Shooter
+          - generic [ref=e72]:
+            - heading "Social Media" [level=3] [ref=e73]
+            - list [ref=e74]:
+              - listitem [ref=e75]: Instagram
+              - listitem [ref=e76]: Youtube
+              - listitem [ref=e77]: Tiktok
+              - listitem [ref=e78]: X
+      - paragraph [ref=e79]: MoonStrike is not endorsed by, directly affiliated with, maintained, or sponsored by Blizzard Entertainment, Bungie, Electronic Arts, Grinding Gear Games, Activision Publishing, Square Enix Co., Valve, Battlestate Games, Wargaming.net Limited, Amazon Technologies, Jagex Limited, Riot Games, Smilegate RPG, Digital Extremes. Our service focuses on enhancing players' in-game skills and occasionally gifting in-game items to users.
+      - paragraph [ref=e80]: © 2024 Moon Strike. Dominate the Game.
+  - button "Open Next.js Dev Tools" [ref=e86] [cursor=pointer]:
+    - img [ref=e87]

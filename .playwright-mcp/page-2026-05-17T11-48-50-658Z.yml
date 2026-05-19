@@ -1,0 +1,52 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - link "← Cancel & Return" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - link "Moon Strike" [ref=e6] [cursor=pointer]:
+        - /url: /
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - heading "Secure Checkout" [level=1] [ref=e9]
+        - paragraph [ref=e10]: Complete your transaction to dominate the game.
+        - heading "Payment Method" [level=2] [ref=e11]
+        - generic [ref=e12]:
+          - button "▭ Credit Card" [ref=e13]
+          - button "▣ Paypal" [ref=e14]
+          - button "₿ Crypto" [ref=e15]
+        - generic [ref=e16]:
+          - heading "Card Details" [level=2] [ref=e17]
+          - generic [ref=e18]: Name on Card
+          - textbox "John Doe" [ref=e19]
+          - generic [ref=e20]: Card Number
+          - textbox "0000 0000 0000 0000" [ref=e21]
+          - generic [ref=e22]:
+            - generic [ref=e23]:
+              - generic [ref=e24]: Expiry Date
+              - textbox "MM/YY" [ref=e25]
+            - generic [ref=e26]:
+              - generic [ref=e27]: CVC
+              - textbox "123" [ref=e28]
+      - complementary [ref=e29]:
+        - heading "Order Summary" [level=2] [ref=e30]
+        - generic [ref=e31]:
+          - generic [ref=e33]:
+            - heading "WoW Mythic+ 15 Run" [level=3] [ref=e34]
+            - paragraph [ref=e35]: ↯ Immediate Start
+          - paragraph [ref=e36]: $45.00
+        - generic [ref=e37]:
+          - generic [ref=e38]: Subtotal
+          - generic [ref=e39]: $45.00
+        - generic [ref=e40]:
+          - generic [ref=e41]: Service Fee
+          - generic [ref=e42]: $2.50
+        - generic [ref=e43]:
+          - generic [ref=e44]: Taxes
+          - generic [ref=e45]: $0.00
+        - generic [ref=e46]:
+          - generic [ref=e47]: Total
+          - generic [ref=e48]: $47.50
+        - button "▣ Complete Purchase" [ref=e49]
+        - paragraph [ref=e50]: ♡ 256-bit SSL encrypted
+  - button "Open Next.js Dev Tools" [ref=e56] [cursor=pointer]:
+    - img [ref=e57]
