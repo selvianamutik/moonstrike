@@ -15,19 +15,34 @@
 
 ## 2. Design System
 
+### Color Palette
+
+#### Dark Mode (active — implement this)
+| Token | Hex | Usage |
+|---|---|---|
+| `--ms-primary` | `#050816` | Page background |
+| `--ms-secondary` | `#0F172A` | Card / surface background |
+| `--ms-accent` | `#172554` | Borders, hover states, subtle highlights |
+| `--ms-gradient-start` | `#8B5CF6` | Gradient from (purple) — CTAs, logo, active states |
+| `--ms-gradient-end` | `#22D3EE` | Gradient to (cyan) — prices, highlights, logo end |
+| `--ms-text-primary` | `#F1F5F9` | Headings, labels, primary content |
+| `--ms-text-secondary` | `#94A3B8` | Body text, descriptions, placeholders |
+
+**Gradient:** `linear-gradient(to right, #8B5CF6, #22D3EE)` — logo, primary CTAs, active nav, price highlights.
+
+#### Light Mode
+> **Status: Palette tokens will be provided by owner at a later date.**
+> DO NOT implement or guess light mode colors. Leave entirely unbuilt until tokens are explicitly provided.
+
 ### Theme
-- **Mode:** Dark only
-- **Background:** Deep navy / near-black (`#0d0f1a` range)
-- **Primary Accent:** Purple → Cyan gradient (used on CTAs, highlights, logo)
-- **Secondary Accent:** Cyan / Electric Blue (prices, highlights)
-- **Danger / Badge:** Red-orange (HOT badges, sale labels)
-- **Text:** White (headings), muted gray (body/descriptions)
-- **Cards:** Slightly lighter dark surface (`#141626` range), rounded corners, subtle border
+- **Mode:** Dark only (currently)
+- **Cards:** `--ms-secondary` background, `--ms-accent` border, rounded corners
+- **Danger / Badge:** `#EF4444` range — HOT badges, error states, ban/blocked UI
 
 ### Typography
-- Logo / Display: Bold, gradient purple-to-cyan
-- Headings: White, bold
-- Body: Muted gray, small/regular weight
+- Logo / Display: Bold, gradient `--ms-gradient-start` → `--ms-gradient-end`
+- Headings: `--ms-text-primary`, bold
+- Body: `--ms-text-secondary`, regular weight
 - Badges / Tags: Uppercase, small, colored pill shapes
 
 ### Components (Reusable)
@@ -340,22 +355,27 @@ Checkout
 ```ts
 Game {
   id: string
-  name: string          // "World of Warcraft"
+  name: string          // "World of Warcraft", "Dota 2", "Black Desert Online"
   slug: string          // "world-of-warcraft"
   image: string         // thumbnail URL
-  genres: string[]      // ["MMORPG", "PC"]
+  genre: string         // "MMORPG" | "MOBA" | "FPS" | "ACTION RPG" | "TACTICAL SHOOTER" | "BATTLE ROYALE"
+  platforms: string[]   // ["PC"] | ["PC", "Console"] | ["Cross-play"]
   description: string
   isTopTitle: boolean
+  status: "active" | "draft" | "archived"
+  // NOTE: Games do NOT have prices. Prices are on Services.
 }
 
 Service {
   id: string
-  gameId: string
+  gameId: string        // FK → Game (the game group this service belongs to)
   title: string         // "Mythic+ Dungeons Boost"
   slug: string
   image: string
   description: string
-  category: string      // "Dungeons" | "Powerleveling" | "Raid" | "Stories"
+  serviceCategory: string // "Dungeon" | "Leveling" | "Raid" | "Stories" | "Coaching" | "Rank Boost" | "Item Farm"
+  // NOTE: serviceCategory ≠ game genre. "Dungeon" is what the booster does; "MMORPG" is the game type.
+  status: "active" | "draft" | "archived"
   basePrice: number     // 45.00
   currency: string      // "USD"
   tags: string[]        // ["HOT", "NEW"]
@@ -363,9 +383,44 @@ Service {
   badges: string[]      // ["Starts in < 15 mins", "100% Completion"]
   requirements: string[]
   whatYouGet: Benefit[]
-  addOns: AddOn[]
-  options: ServiceOption[]  // key level choices, run count, etc.
+  // JSONB fields (Supabase PostgreSQL):
+  options_schema: JSONB // Configurator fields — CLOSED TYPE SYSTEM (see ServiceOptionField below)
+  pricing: JSONB        // Base price + add-ons (see ServicePricing below)
 }
+
+// ── Fixed Option Type System (5 types — closed, no arbitrary extensions) ──────
+// The admin CMS only offers these 5 types. The storefront has exactly 5 components.
+
+ServiceOptionField =
+  | { type: "toggle_group";   label: string; values: string[]; required: boolean }
+    // Renders: pill selector, single-select. Example: KEY LEVEL → [+10] [+15] [+20]
+
+  | { type: "stepper";        label: string; min: number; max: number; default: number; required: boolean }
+    // Renders: − N + counter. Example: NUMBER OF RUNS → − 1 +
+
+  | { type: "checkbox_addon"; label: string; priceType: "flat"|"percent"; priceValue: number }
+    // Renders: checkbox with price modifier label. Example: VIP Traders (More Loot) +$15.00
+
+  | { type: "dropdown";       label: string; values: string[]; required: boolean }
+    // Renders: select/dropdown menu. Example: Server Region → USA | EU | Asia
+
+  | { type: "boolean";        label: string; description?: string }
+    // Renders: single on/off toggle. Example: Play with Pro
+
+ServicePricing {
+  base: number                  // 45.00
+  currency: string              // "USD"
+  addOns: ServiceOptionField[]  // only checkbox_addon type entries from options_schema
+}
+
+// ── Storefront renderer mapping (one component per type) ─────────────────────
+// "toggle_group"   → <ToggleGroup />
+// "stepper"        → <Stepper />
+// "checkbox_addon" → <AddonCheckbox />
+// "dropdown"       → <OptionDropdown />
+// "boolean"        → <BooleanToggle />
+// The configurator iterates options_schema[], picks the right component, tracks state,
+// and recalculates total price on every change.
 
 Benefit {
   icon: string
@@ -450,13 +505,15 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 - [ ] **Frontend framework?** (Next.js / Nuxt / Remix / plain React?)
 - [ ] **CSS approach?** (Tailwind / CSS Modules / styled-components?)
 - [ ] **Backend?** (Node/Express, Laravel, Supabase, Firebase?)
-- [ ] **Database?** (PostgreSQL, MongoDB?)
+- [x] **Database:** Supabase PostgreSQL. Dynamic service fields stored as JSONB.
 - [ ] **Payment gateway?** (Stripe, PayPal, Crypto — which processor?)
 - [ ] **Auth provider?** (NextAuth, Supabase Auth, Clerk?)
 - [ ] **Image hosting?** (Cloudinary, S3, Supabase Storage?)
 - [ ] **TrustPilot?** (Real API integration or manual reviews?)
 - [ ] **Currency conversion?** (Real-time API or static rates?)
 - [ ] **Booster/seller side?** (Is there a seller dashboard or only buyer-facing?)
+- [x] **JSON storage:** JSONB columns in Supabase PostgreSQL. `options_schema` and `pricing` are JSONB. Enables indexed queries on JSON fields if needed.
+- [x] **Service configurator renderer:** Uses a FIXED TYPE SYSTEM (5 closed option types). See §6 Service Option Types. Do NOT build a generic/arbitrary JSON renderer.
 
 ---
 
@@ -645,27 +702,41 @@ CUSTOMER → Storefront only; no admin access
 
 ### 10.5 Admin Games List Page (`/admin/games`)
 
-**Purpose:** Manage the game catalog. Add, edit, archive games and their genre classifications.
+**Purpose:** Manage the game catalog — game titles, their genre/type classifications, and metadata.
 
-**Header:** `Games list` | subtitle: "Manage game boosting, coaching, and item services."
-**CTA:** `+ Add New Service` (purple, top right)
+> ⚠️ **IMPORTANT — Do NOT confuse these three things:**
+> - **Game Name** = the actual game title (e.g., World of Warcraft, Dota 2, League of Legends)
+> - **Game Genre/Type** = the gameplay category (e.g., ACTION RPG, MOBA, FPS, MMORPG, Battle Royale)
+> - **Service Category** = the type of boost within a game (e.g., Dungeon, Leveling, Raid, Stories)
+> These are three separate fields on three separate models. Never merge them.
+
+**Header:** `Games list` | subtitle: "Manage the game catalog and genre classifications."
+**CTA:** `+ Add New Game` (purple, top right)
 
 **Stat cards (2-column):**
 - TOTAL GAMES: 15 (▲ +12 this week)
 - TOTAL GENRES: 7 (across 14 titles)
 
-**Table:** Same structure as Services table (see 10.6) but scoped to games
-- Columns: SERVICE NAME | CATEGORY | BASE PRICE | STATUS | ACTIONS
+**Table columns:** GAME NAME (thumbnail + name + ID) | GENRE/TYPE | PLATFORM | STATUS | ACTIONS
+- **Genre/Type values:** `ACTION RPG` | `MOBA` | `FPS` | `MMORPG` | `TACTICAL SHOOTER` | `BATTLE ROYALE` | `LOOTER SHOOTER` | `SPORTS ACTION`
+- **Platform values:** `PC` | `Console` | `Cross-play`
+- **Status values:** `● Active` | `● Draft` | `● Archived`
+- **Row actions:** ✏️ Edit | 👁 Hide/Show | 🗑 Delete
 
-> **Agent Note:** The Games List currently uses the same table as Services. Future iteration should separate game metadata from service pricing. Games should have genre/type tags (MMORPG, MOBA, FPS, Battle Royale, etc.) instead of a base price. Pricing belongs on Services.
+> **Agent Note:** The original design had a BASE PRICE column on the Games table — this is incorrect and has been removed. Games do not have prices. Prices live on Services. The Games table shows genre/type instead.
 
-**Filters:** All Services | Active | Draft | Filter Category dropdown
+**Filters:** All | Active | Draft | Filter Genre dropdown
 
 ---
 
 ### 10.6 Admin Services List Page (`/admin/services`)
 
-**Purpose:** Full catalog management for all boosting services across all games.
+**Purpose:** Full catalog management for all boosting services, organized by game and service category.
+
+> ⚠️ **Terminology reminder:**
+> - **Game Group** = which game this service belongs to (WoW, Dota 2, LoL, BDO, etc.)
+> - **Service Category** = the type of boost (Dungeon, Leveling, Raid, Stories, Coaching, etc.)
+> These are two different filter axes. A service has both a game AND a category.
 
 **Header:** `Service Catalog` | subtitle: "Manage game boosting, coaching, and item services."
 **CTA:** `+ Add New Service` (purple)
@@ -677,10 +748,16 @@ CUSTOMER → Storefront only; no admin access
 | Active Boosts | 482 | Across 14 titles |
 | Avg Delivery Time | 3.4 hrs | 98% on-time rate |
 
-**Filters:** All Services | Active | Draft tabs + `Filter Category` dropdown
-**Right of filters:** `Showing 1-10 of 1,248`
+**Filters (two-axis):**
+- Status tabs: `All Services` | `Active` | `Draft`
+- `Filter Game` dropdown — filter by game group (WoW, LoL, BDO, Dota 2, etc.)
+- `Filter Category` dropdown — filter by service category (Dungeon, Leveling, Raid, Stories, etc.)
+- Right: `Showing 1-10 of 1,248`
 
-**Table columns:** SERVICE NAME (thumbnail + name + ID) | CATEGORY | BASE PRICE (cyan) | STATUS | ACTIONS
+**Service Category values (scope for this project):**
+`Dungeon` | `Leveling` | `Raid` | `Stories` | `Powerleveling` | `Rank Boost` | `Item Farm` | `Coaching` | `Placement Matches`
+
+**Table columns:** SERVICE NAME (thumbnail + name + ID) | GAME (game group) | SERVICE CATEGORY | BASE PRICE (cyan) | STATUS | ACTIONS
 - **Status values:** `● Active` | `● Draft` | `● Archived` (red)
 - **Row actions:** ✏️ Edit | 👁 Hide/Show toggle | 🗑 Delete
 - **Pagination:** Rows per page selector (10) | page numbers with `...` ellipsis
@@ -689,7 +766,7 @@ CUSTOMER → Storefront only; no admin access
 
 ### 10.7 Admin Service CMS Page (`/admin/services/new` and `/admin/services/[id]/edit`)
 
-**Purpose:** Create or edit a boosting service. Full form with dynamic custom options.
+**Purpose:** Create or edit a boosting service. Full form with dynamic custom options stored as JSON.
 
 **Breadcrumb:** `MARKETPLACE / CREATE NEW SERVICE`
 **Header:** `Create New Service` | subtitle: "Deploy a new professional boosting or gaming service to the Moon Strike marketplace."
@@ -699,17 +776,25 @@ CUSTOMER → Storefront only; no admin access
 
 1. **Basic Info card:**
    - SERVICE NAME — text input (placeholder: "e.g. Radiant Rank Push")
-   - GAME SELECTION — dropdown (e.g. Valorant)
-   - CATEGORY — dropdown (e.g. Rank Boosting)
+   - GAME SELECTION — dropdown (game group: WoW, LoL, BDO, Dota 2, etc.)
+   - SERVICE CATEGORY — dropdown (Dungeon, Leveling, Raid, Stories, etc.)
 
-2. **Custom Service Options card:**
+2. **Custom Service Options card (JSONB, fixed type system):**
    - Header: `Custom Service Options` + `+ ADD NEW FIELD` link
    - Dynamic field rows, each with:
-     - Field name input (e.g. "Current Rank", "Server Region", "Play with Pro")
-     - Field type dropdown (Number Input, Dropdown, Toggle)
-     - Required checkbox toggle
+     - Field label input (e.g. "Current Rank", "Server Region", "Play with Pro")
+     - **Field type dropdown — exactly 5 choices (closed set):**
+       - `Toggle Group` → pill selector, single-select (e.g. key level choices)
+       - `Stepper` → quantity counter with min/max (e.g. number of runs)
+       - `Addon Checkbox` → checkbox with flat/percent price modifier
+       - `Dropdown` → select menu (e.g. server region)
+       - `Boolean` → single on/off toggle (e.g. play with pro)
+     - Required toggle (not available on Addon Checkbox — those are always optional)
+     - Price modifier inputs (shown only when Addon Checkbox is selected)
      - 🗑 Delete row button
    - Fields can be added/removed dynamically
+   - **Storage:** Saved as JSONB `options_schema` in Supabase PostgreSQL (see §6 data models)
+   - **Rendering:** Storefront reads `options_schema[]`, maps each `type` to its fixed component, tracks state, recalculates price
 
 3. **Service Details card:**
    - Rich text editor (B / I / List / Link toolbar)
@@ -721,6 +806,7 @@ CUSTOMER → Storefront only; no admin access
    - BASE PRICE (USD) input: `$ 25.00`
    - `⚡ Express Delivery` add-on: `+15%`
    - `🔮 Premium Pro Tier` add-on: `+30%`
+   - **Storage:** Pricing and add-ons stored as JSON in the `pricing` field
 
 2. **Thumbnail card:**
    - Drag & drop zone with upload icon
@@ -729,6 +815,30 @@ CUSTOMER → Storefront only; no admin access
 
 3. **Pro Tip card:**
    - Tip text: "Adding a 'Play with Pro' toggle increases conversion by 24% on average. Make sure to define clear markup for premium tiers."
+
+---
+
+### 10.7b Admin Service Detail Preview Page (`/admin/services/[id]/preview`)
+
+**Purpose:** Full-page preview of how the service detail page will look on the storefront, rendered with draft/unpublished data. Allows admin to verify the layout before deploying.
+
+**Behavior:**
+- Renders the exact same layout as the public Service Detail Page (§3.4)
+- Uses draft data — not live data — so unpublished changes are visible
+- Read-only — no buy/checkout functionality
+- Banner or ribbon at top: `⚠ PREVIEW MODE — This service is not yet published` (amber)
+- Button: `← Back to Editor` | `Deploy Now` (purple)
+
+**What is previewed:**
+- Service title, description, badges (Starts in X mins, Completion %)
+- Service image / thumbnail
+- "What You Get" benefit cards (rendered from JSON)
+- Requirements checklist
+- Configure Your Run sidebar — rendered from `options_schema` JSON (interactive but non-purchasing)
+- Pricing breakdown with add-ons
+- "Why Choose Us" section
+
+> ✅ **Confirmed:** Full separate route (`/admin/services/[id]/preview`), not a modal or panel. Must consume the exact same rendering components as the public storefront. What admins see = what customers see.
 
 ---
 
@@ -1020,9 +1130,10 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 | Admin Login Page | ⬜ | Design ref: Admin_Dashboard_-_Login.png |
 | Admin Dashboard Overview | ⬜ | Design ref: Admin_Dashboard_-_Overview.png |
 | Admin Users List | ⬜ | Design ref: Admin_Dashboard_-_Users.png |
-| Admin Games List | ⬜ | Design ref: Admin_Games_List.png — needs genre refactor |
+| Admin Games List | ⬜ | Design ref: Admin_Games_List.png — GENRE/TYPE column, not price |
 | Admin Services List | ⬜ | Design ref: Admin_Services_List.png |
-| Admin Service CMS (Create/Edit) | ⬜ | Design ref: Admin_Services_List_CMS.png |
+| Admin Service CMS (Create/Edit) | ⬜ | Design ref: Admin_Services_List_CMS.png — JSON options_schema |
+| Admin Service Detail Preview | ⬜ | /admin/services/[id]/preview — full storefront render in draft mode |
 | Admin Transactions | ⬜ | Design ref: Admin_Transactions_List.png |
 | Admin Content Library | ⬜ | Design ref: Admin_Contents_List.png |
 | Admin Messages / Support Chat | ⬜ | Design ref: Admin_Messages_List.png |
