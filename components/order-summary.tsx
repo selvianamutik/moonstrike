@@ -1,0 +1,50 @@
+import Link from "next/link";
+import { PlaceholderAsset } from "@/components/asset-image";
+
+type OrderSummaryProps = {
+  ctaHref?: string;
+  ctaLabel?: string;
+  rows: Array<{
+    label: string;
+    value: string;
+  }>;
+  serviceName: string;
+  serviceMeta: string;
+  total: string;
+};
+
+export function OrderSummary({ ctaHref, ctaLabel, rows, serviceName, serviceMeta, total }: OrderSummaryProps) {
+  const ctaClassName = "mt-8 flex h-14 w-full items-center justify-center rounded-md bg-gradient-to-r from-[var(--primary)] to-[#c7b4ff] text-lg font-black";
+
+  return (
+    <aside className="h-fit rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] p-8 shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
+      <h2 className="border-b border-[var(--border)] pb-5 text-2xl font-black">Order Summary</h2>
+      <div className="flex gap-4 border-b border-[var(--border)] py-7">
+        <PlaceholderAsset alt="Order item preview" className="h-20 w-20 rounded-md" imageClassName="p-3" />
+        <div className="flex-1">
+          <h3 className="font-bold">{serviceName}</h3>
+          <p className="mono mt-1 text-xs text-[var(--accent)]">{serviceMeta}</p>
+        </div>
+        <p className="font-bold">{total}</p>
+      </div>
+      {rows.map((row) => (
+        <div key={row.label} className="mt-6 flex justify-between text-[var(--muted)]">
+          <span>{row.label}</span>
+          <span className="text-white">{row.value}</span>
+        </div>
+      ))}
+      <div className="mt-8 flex items-center justify-between border-t border-[var(--border)] pt-7">
+        <span className="font-bold">Total</span>
+        <span className="text-4xl font-black text-[var(--accent)] drop-shadow-[0_0_12px_rgba(51,217,255,0.7)]">
+          {total}
+        </span>
+      </div>
+      {ctaHref && ctaLabel ? (
+        <Link href={ctaHref} className={ctaClassName}>
+          {ctaLabel}
+        </Link>
+      ) : null}
+      <p className="mono mt-6 text-center text-xs uppercase text-[var(--muted)]">256-bit SSL encrypted</p>
+    </aside>
+  );
+}

@@ -1,0 +1,58 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - link "← Cancel & Return" [ref=e5] [cursor=pointer]:
+        - /url: /cart
+      - link "Moon Strike" [ref=e6] [cursor=pointer]:
+        - /url: /
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - heading "Secure Checkout" [level=1] [ref=e9]
+        - paragraph [ref=e10]: Complete your transaction to dominate the game.
+        - heading "Payment Method" [level=2] [ref=e11]
+        - generic [ref=e12]:
+          - button "Credit Card" [ref=e13]
+          - button "PayPal" [ref=e14]
+          - button "Crypto" [ref=e15]
+        - generic [ref=e16]:
+          - heading "Card Details" [level=2] [ref=e17]
+          - generic [ref=e18]: Name on Card
+          - textbox "John Doe" [ref=e19]
+          - generic [ref=e20]: Card Number
+          - textbox "0000 0000 0000 0000" [ref=e21]
+          - generic [ref=e22]:
+            - generic [ref=e23]:
+              - generic [ref=e24]: Expiry Date
+              - textbox "MM/YY" [ref=e25]
+            - generic [ref=e26]:
+              - generic [ref=e27]: CVC
+              - textbox "123" [ref=e28]
+      - complementary [ref=e29]:
+        - heading "Order Summary" [level=2] [ref=e30]
+        - generic [ref=e31]:
+          - img "Order item preview" [ref=e33]
+          - generic [ref=e35]:
+            - heading "2 configured services" [level=3] [ref=e36]
+            - paragraph [ref=e37]: Immediate Start
+          - paragraph [ref=e38]: $175.68
+        - generic [ref=e39]:
+          - generic [ref=e40]: Subtotal
+          - generic [ref=e41]: $176.00
+        - generic [ref=e42]:
+          - generic [ref=e43]: Service Fee
+          - generic [ref=e44]: $9.68
+        - generic [ref=e45]:
+          - generic [ref=e46]: Discount
+          - generic [ref=e47]: "-$10.00"
+        - generic [ref=e48]:
+          - generic [ref=e49]: Taxes
+          - generic [ref=e50]: $0.00
+        - generic [ref=e51]:
+          - generic [ref=e52]: Total
+          - generic [ref=e53]: $175.68
+        - link "Complete Purchase" [ref=e54] [cursor=pointer]:
+          - /url: /orders/MS-2401
+        - paragraph [ref=e55]: 256-bit SSL encrypted
+  - button "Open Next.js Dev Tools" [ref=e61] [cursor=pointer]:
+    - img [ref=e62]
+  - alert [ref=e65]

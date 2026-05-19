@@ -1,0 +1,155 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - link "Moon Strike" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - button "=" [ref=e6]
+      - button "$ USD ↔" [ref=e7]
+      - navigation [ref=e8]:
+        - link "▣ Services" [ref=e9] [cursor=pointer]:
+          - /url: /games
+          - generic [ref=e10]: ▣
+          - text: Services
+        - link "◇ About" [ref=e11] [cursor=pointer]:
+          - /url: "#about"
+          - generic [ref=e12]: ◇
+          - text: About
+        - link "♟ Profiles" [ref=e13] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e14]: ♟
+          - text: Profiles
+    - generic [ref=e15]:
+      - generic [ref=e16]:
+        - heading "All Services" [level=1] [ref=e17]
+        - generic [ref=e18]: ⌕ Search games, services...
+      - generic [ref=e19]:
+        - heading "title" [level=2] [ref=e20]
+        - generic [ref=e21]:
+          - generic [ref=e22]:
+            - button "USA" [ref=e23]
+            - button "EUROPE" [ref=e24]
+          - paragraph [ref=e25]: Want to custom order?
+      - generic [ref=e26]:
+        - button "←" [ref=e27]
+        - button "Hot Offers ♨" [ref=e28]
+        - button "Dungeons" [ref=e29]
+        - button "Powerleveling" [ref=e30]
+        - button "Raid" [ref=e31]
+        - button "Stories" [ref=e32]
+        - button "→" [ref=e33]
+      - generic [ref=e34]:
+        - article [ref=e35]:
+          - generic [ref=e37]: HOT
+          - generic [ref=e38]:
+            - heading "Ranked Placement" [level=3] [ref=e39]
+            - paragraph [ref=e40]: Climb from your current rank to a target division with vetted high-MMR boosters.
+            - generic [ref=e41]:
+              - generic [ref=e42]: $29.00
+              - link "Buy Now" [ref=e43] [cursor=pointer]:
+                - /url: /services/valorant-rank-boost
+        - article [ref=e44]:
+          - generic [ref=e46]: HOT
+          - generic [ref=e47]:
+            - heading "Flawless Trials" [level=3] [ref=e48]
+            - paragraph [ref=e49]: Book guided raid clears, exotic farming, and weekly pinnacle progression.
+            - generic [ref=e50]:
+              - generic [ref=e51]: $39.00
+              - link "Buy Now" [ref=e52] [cursor=pointer]:
+                - /url: /services/destiny-2-raid-clear
+        - article [ref=e53]:
+          - generic [ref=e55]: HOT
+          - generic [ref=e56]:
+            - heading "Mythic+ 15 Run" [level=3] [ref=e57]
+            - paragraph [ref=e58]: Secure timed dungeon runs with keystone level selection and loot preferences.
+            - generic [ref=e59]:
+              - generic [ref=e60]: $24.00
+              - link "Buy Now" [ref=e61] [cursor=pointer]:
+                - /url: /services/wow-mythic-plus
+        - article [ref=e62]:
+          - generic [ref=e64]: HOT
+          - generic [ref=e65]:
+            - heading "Leveling 1-70" [level=3] [ref=e66]
+            - paragraph [ref=e67]: Fast rank progression for busy players who need reliable win-rate support.
+            - generic [ref=e68]:
+              - generic [ref=e69]: $19.00
+              - link "Buy Now" [ref=e70] [cursor=pointer]:
+                - /url: /services/mobile-legends-rank
+        - article [ref=e71]:
+          - generic [ref=e73]: HOT
+          - generic [ref=e74]:
+            - heading "Coaching Session" [level=3] [ref=e75]
+            - paragraph [ref=e76]: Mechanics review, ranked strategy, legend selection, and VOD feedback.
+            - generic [ref=e77]:
+              - generic [ref=e78]: $35.00
+              - link "Buy Now" [ref=e79] [cursor=pointer]:
+                - /url: /services/apex-legends-coaching
+        - article [ref=e80]:
+          - generic [ref=e82]: HOT
+          - generic [ref=e83]:
+            - heading "Rare Loot Farm" [level=3] [ref=e84]
+            - paragraph [ref=e85]: Targeted farming for rare drops, cosmetics, and event-limited rewards.
+            - generic [ref=e86]:
+              - generic [ref=e87]: $45.00
+              - link "Buy Now" [ref=e88] [cursor=pointer]:
+                - /url: /services/rare-item-farming
+        - article [ref=e89]:
+          - generic [ref=e91]: HOT
+          - generic [ref=e92]:
+            - heading "Ranked Placement" [level=3] [ref=e93]
+            - paragraph [ref=e94]: Climb from your current rank to a target division with vetted high-MMR boosters.
+            - generic [ref=e95]:
+              - generic [ref=e96]: $29.00
+              - link "Buy Now" [ref=e97] [cursor=pointer]:
+                - /url: /services/valorant-rank-boost
+        - article [ref=e98]:
+          - generic [ref=e100]: HOT
+          - generic [ref=e101]:
+            - heading "Flawless Trials" [level=3] [ref=e102]
+            - paragraph [ref=e103]: Book guided raid clears, exotic farming, and weekly pinnacle progression.
+            - generic [ref=e104]:
+              - generic [ref=e105]: $39.00
+              - link "Buy Now" [ref=e106] [cursor=pointer]:
+                - /url: /services/destiny-2-raid-clear
+    - generic [ref=e108]:
+      - generic [ref=e109]:
+        - link "Moon Strike" [ref=e110] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e111]:
+          - generic [ref=e112]:
+            - heading "Sitemap" [level=3] [ref=e113]
+            - list [ref=e114]:
+              - listitem [ref=e115]: Instagram
+              - listitem [ref=e116]: Youtube
+              - listitem [ref=e117]: Tiktok
+              - listitem [ref=e118]: X
+          - generic [ref=e119]:
+            - heading "Legal" [level=3] [ref=e120]
+            - list [ref=e121]:
+              - listitem [ref=e122]: Privacy Policy
+              - listitem [ref=e123]:
+                - link "Terms of Service" [ref=e124] [cursor=pointer]:
+                  - /url: /terms
+              - listitem [ref=e125]:
+                - link "Refund Policy" [ref=e126] [cursor=pointer]:
+                  - /url: /refund
+          - generic [ref=e127]:
+            - heading "Genres" [level=3] [ref=e128]
+            - list [ref=e129]:
+              - listitem [ref=e130]: Action RPG
+              - listitem [ref=e131]: tactical shooting
+              - listitem [ref=e132]: MMORPG
+              - listitem [ref=e133]: MOBA
+              - listitem [ref=e134]: Sports Action
+              - listitem [ref=e135]: Tactical Shooter
+          - generic [ref=e136]:
+            - heading "Social Media" [level=3] [ref=e137]
+            - list [ref=e138]:
+              - listitem [ref=e139]: Instagram
+              - listitem [ref=e140]: Youtube
+              - listitem [ref=e141]: Tiktok
+              - listitem [ref=e142]: X
+      - paragraph [ref=e143]: MoonStrike is not endorsed by, directly affiliated with, maintained, or sponsored by Blizzard Entertainment, Bungie, Electronic Arts, Grinding Gear Games, Activision Publishing, Square Enix Co., Valve, Battlestate Games, Wargaming.net Limited, Amazon Technologies, Jagex Limited, Riot Games, Smilegate RPG, Digital Extremes. Our service focuses on enhancing players' in-game skills and occasionally gifting in-game items to users.
+      - paragraph [ref=e144]: © 2024 Moon Strike. Dominate the Game.
+  - button "Open Next.js Dev Tools" [ref=e150] [cursor=pointer]:
+    - img [ref=e151]
+  - alert [ref=e154]

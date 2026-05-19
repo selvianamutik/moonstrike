@@ -1,0 +1,84 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - link "Moon Strike" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e6]: MVP preview
+    - generic [ref=e7]:
+      - paragraph [ref=e8]: User system / phase 2
+      - heading "Order dashboard foundation" [level=1] [ref=e9]
+      - generic [ref=e10]:
+        - article [ref=e11]:
+          - heading "Active Orders" [level=2] [ref=e12]
+          - paragraph [ref=e13]: Placeholder route prepared for authenticated dashboard work after Supabase/Auth decisions.
+        - article [ref=e14]:
+          - heading "Purchase History" [level=2] [ref=e15]
+          - paragraph [ref=e16]: Placeholder route prepared for authenticated dashboard work after Supabase/Auth decisions.
+        - article [ref=e17]:
+          - heading "Support Tickets" [level=2] [ref=e18]
+          - paragraph [ref=e19]: Placeholder route prepared for authenticated dashboard work after Supabase/Auth decisions.
+    - generic [ref=e20]:
+      - heading "Why Choose Us?" [level=2] [ref=e21]
+      - img "Moon Strike benefits preview" [ref=e23]
+      - generic [ref=e25]:
+        - article [ref=e26]:
+          - generic [ref=e27]: $
+          - generic [ref=e28]:
+            - heading "benefits 1" [level=3] [ref=e29]
+            - paragraph [ref=e30]: deskripsi
+        - article [ref=e31]:
+          - generic [ref=e32]: $
+          - generic [ref=e33]:
+            - heading "benefits 2" [level=3] [ref=e34]
+            - paragraph [ref=e35]: deskripsi
+        - article [ref=e36]:
+          - generic [ref=e37]: $
+          - generic [ref=e38]:
+            - heading "benefits 3" [level=3] [ref=e39]
+            - paragraph [ref=e40]: deskripsi
+      - generic [ref=e41]:
+        - heading "Up & Running in 4 Simple steps" [level=2] [ref=e42]
+        - paragraph [ref=e43]: Deskripsi
+      - generic [ref=e44]:
+        - article [ref=e45]:
+          - generic [ref=e47]:
+            - heading "1. Choose Your Service" [level=3] [ref=e48]
+            - paragraph [ref=e49]: Pick the service you need - leveling, gear, raids, or anything else. Customize options to fit your goals.
+        - article [ref=e50]:
+          - generic [ref=e52]:
+            - heading "2. We Log Into Your Account" [level=3] [ref=e53]
+            - paragraph [ref=e54]: Share your account credentials securely. Our professional boosters get to work immediately after verification.
+        - article [ref=e55]:
+          - generic [ref=e57]:
+            - heading "3. Receive Daily Progress Updates" [level=3] [ref=e58]
+            - paragraph [ref=e59]: Stay in the loop with real-time progress reports. Chat with your booster directly via our support system.
+        - article [ref=e60]:
+          - generic [ref=e62]:
+            - heading "4. Enjoy the Result" [level=3] [ref=e63]
+            - paragraph [ref=e64]: Service done. Log back in and dominate. Your character is ready - fully leveled, geared, and unstoppable.
+      - generic [ref=e65]:
+        - heading "Rating TrustPilot" [level=2] [ref=e66]
+        - generic [ref=e67]:
+          - button "‹" [ref=e68]
+          - article [ref=e69]:
+            - heading "Nama user" [level=3] [ref=e70]
+            - paragraph [ref=e72]: Komentar
+          - article [ref=e73]:
+            - heading "Nama user" [level=3] [ref=e74]
+            - paragraph [ref=e76]: Komentar
+          - article [ref=e77]:
+            - heading "Nama user" [level=3] [ref=e78]
+            - paragraph [ref=e80]: Komentar
+          - article [ref=e81]:
+            - heading "Nama user" [level=3] [ref=e82]
+            - paragraph [ref=e84]: Komentar
+          - button "›" [ref=e85]
+      - generic [ref=e86]:
+        - img "PayPal" [ref=e87]
+        - img "Mastercard" [ref=e88]
+        - img "Apple Pay" [ref=e89]
+        - img "Google Pay" [ref=e90]
+        - img "Stripe" [ref=e91]
+  - button "Open Next.js Dev Tools" [ref=e97] [cursor=pointer]:
+    - img [ref=e98]
+  - alert [ref=e101]

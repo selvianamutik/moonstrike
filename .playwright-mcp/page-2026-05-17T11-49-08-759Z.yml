@@ -1,0 +1,109 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - link "Moon Strike" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - button "=" [ref=e6]
+      - button "$ USD ↔" [ref=e7]
+      - navigation [ref=e8]:
+        - link "▣ Services" [ref=e9] [cursor=pointer]:
+          - /url: /games
+          - generic [ref=e10]: ▣
+          - text: Services
+        - link "◇ About" [ref=e11] [cursor=pointer]:
+          - /url: "#about"
+          - generic [ref=e12]: ◇
+          - text: About
+        - link "♟ Profiles" [ref=e13] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e14]: ♟
+          - text: Profiles
+    - generic [ref=e15]:
+      - heading "Refund Policy" [level=1] [ref=e16]
+      - paragraph [ref=e17]: "Effective Date: October 24, 2024"
+      - article [ref=e18]:
+        - generic [ref=e19]:
+          - heading "⌁1. Overview" [level=2] [ref=e20]
+          - generic [ref=e21]:
+            - paragraph [ref=e22]: At Moon Strike, we prioritize a fair and transparent ecosystem for all gamers and service providers. This Refund Policy outlines the conditions under which refunds are granted.
+            - paragraph [ref=e23]: By engaging in transactions on our platform, you agree to the terms set forth in this policy.
+        - generic [ref=e24]:
+          - heading "♦2. The Escrow Process" [level=2] [ref=e25]
+          - generic [ref=e26]:
+            - paragraph [ref=e27]: To ensure security for both buyers and sellers, funds are held in a secure Escrow account upon initiation of a service.
+            - generic [ref=e28]:
+              - heading "Escrow Timelines:" [level=3] [ref=e29]
+              - list [ref=e30]:
+                - listitem [ref=e31]:
+                  - generic [ref=e32]: ●
+                  - text: Funds are locked in Escrow immediately upon order placement.
+                - listitem [ref=e33]:
+                  - generic [ref=e34]: ●
+                  - text: Upon service delivery, the buyer has 48 hours to review and approve the work.
+                - listitem [ref=e35]:
+                  - generic [ref=e36]: ●
+                  - text: If approved, funds are released to the seller instantly.
+        - generic [ref=e37]:
+          - heading "↻3. Eligibility for Refunds" [level=2] [ref=e38]
+          - generic [ref=e39]:
+            - paragraph [ref=e40]: "Refunds are generally processed back to the original payment method. You may be eligible under the following circumstances:"
+            - generic [ref=e41]:
+              - heading "Non-Delivery of Service" [level=3] [ref=e42]
+              - paragraph [ref=e43]: If the order meets this condition, a full or partial refund may be initiated after review.
+            - generic [ref=e44]:
+              - heading "Service Not as Described" [level=3] [ref=e45]
+              - paragraph [ref=e46]: If the order meets this condition, a full or partial refund may be initiated after review.
+            - generic [ref=e47]:
+              - heading "Mutual Cancellation" [level=3] [ref=e48]
+              - paragraph [ref=e49]: If the order meets this condition, a full or partial refund may be initiated after review.
+        - generic [ref=e50]:
+          - heading "☊4. Dispute Resolution" [level=2] [ref=e51]
+          - generic [ref=e52]:
+            - paragraph [ref=e53]: If an issue arises regarding a completed service, you must open a dispute within the 48-hour review period. Our moderation team will review evidence from both parties.
+            - paragraph [ref=e54]: "Note: Once funds have been released from Escrow, Moon Strike can no longer guarantee a refund."
+      - generic [ref=e55]:
+        - paragraph [ref=e56]: Have questions about a specific transaction?
+        - generic [ref=e57]: Contact Support
+    - generic [ref=e59]:
+      - generic [ref=e60]:
+        - link "Moon Strike" [ref=e61] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e62]:
+          - generic [ref=e63]:
+            - heading "Sitemap" [level=3] [ref=e64]
+            - list [ref=e65]:
+              - listitem [ref=e66]: Instagram
+              - listitem [ref=e67]: Youtube
+              - listitem [ref=e68]: Tiktok
+              - listitem [ref=e69]: X
+          - generic [ref=e70]:
+            - heading "Legal" [level=3] [ref=e71]
+            - list [ref=e72]:
+              - listitem [ref=e73]: Privacy Policy
+              - listitem [ref=e74]:
+                - link "Terms of Service" [ref=e75] [cursor=pointer]:
+                  - /url: /terms
+              - listitem [ref=e76]:
+                - link "Refund Policy" [ref=e77] [cursor=pointer]:
+                  - /url: /refund
+          - generic [ref=e78]:
+            - heading "Genres" [level=3] [ref=e79]
+            - list [ref=e80]:
+              - listitem [ref=e81]: Action RPG
+              - listitem [ref=e82]: tactical shooting
+              - listitem [ref=e83]: MMORPG
+              - listitem [ref=e84]: MOBA
+              - listitem [ref=e85]: Sports Action
+              - listitem [ref=e86]: Tactical Shooter
+          - generic [ref=e87]:
+            - heading "Social Media" [level=3] [ref=e88]
+            - list [ref=e89]:
+              - listitem [ref=e90]: Instagram
+              - listitem [ref=e91]: Youtube
+              - listitem [ref=e92]: Tiktok
+              - listitem [ref=e93]: X
+      - paragraph [ref=e94]: MoonStrike is not endorsed by, directly affiliated with, maintained, or sponsored by Blizzard Entertainment, Bungie, Electronic Arts, Grinding Gear Games, Activision Publishing, Square Enix Co., Valve, Battlestate Games, Wargaming.net Limited, Amazon Technologies, Jagex Limited, Riot Games, Smilegate RPG, Digital Extremes. Our service focuses on enhancing players' in-game skills and occasionally gifting in-game items to users.
+      - paragraph [ref=e95]: © 2024 Moon Strike. Dominate the Game.
+  - button "Open Next.js Dev Tools" [ref=e101] [cursor=pointer]:
+    - img [ref=e102]
+  - alert [ref=e105]

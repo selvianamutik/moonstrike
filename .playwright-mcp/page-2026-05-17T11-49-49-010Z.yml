@@ -1,0 +1,134 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - link "Moon Strike" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - button "$ USD ↔" [ref=e6]
+      - navigation [ref=e7]:
+        - link "♟ Profiles" [ref=e8] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e9]: ♟
+          - text: Profiles
+    - generic [ref=e10]:
+      - generic [ref=e11]:
+        - paragraph [ref=e12]: ▱ World of Warcraft
+        - heading "Mythic+ Dungeons Boost" [level=1] [ref=e13]
+        - paragraph [ref=e14]: Dominate the leaderboards and secure top-tier loot. Our professional teams guarantee swift and efficient Mythic+ clears, helping you achieve your desired keystone level without the grind.
+        - generic [ref=e15]:
+          - generic [ref=e16]: ◷ Starts in < 15 mins
+          - generic [ref=e17]: ✺ 100% Completion
+        - heading "What You Get" [level=2] [ref=e19]
+        - generic [ref=e20]:
+          - article [ref=e21]:
+            - generic [ref=e22]:
+              - generic [ref=e23]: ⚚
+              - generic [ref=e24]:
+                - heading "Great Vault Reward" [level=3] [ref=e25]
+                - paragraph [ref=e26]: Guaranteed highest item level gear in your weekly Great Vault based on the key completed.
+          - article [ref=e27]:
+            - generic [ref=e28]:
+              - generic [ref=e29]: ◇
+              - generic [ref=e30]:
+                - heading "End of Dungeon Loot" [level=3] [ref=e31]
+                - paragraph [ref=e32]: A chance to receive high ilvl gear drops directly from the dungeon completion chest.
+          - article [ref=e33]:
+            - generic [ref=e34]:
+              - generic [ref=e35]: ↗
+              - generic [ref=e36]:
+                - heading "Mythic+ Score" [level=3] [ref=e37]
+                - paragraph [ref=e38]: Significant boost to your Raider.IO score, making it easier to join PUGs in the future.
+          - article [ref=e39]:
+            - generic [ref=e40]:
+              - generic [ref=e41]: ₿
+              - generic [ref=e42]:
+                - heading "Flightstones & Crests" [level=3] [ref=e43]
+                - paragraph [ref=e44]: Farm essential currency needed to upgrade your current PvE gear to higher tiers.
+        - heading "Requirements" [level=2] [ref=e45]
+        - list [ref=e46]:
+          - listitem [ref=e47]:
+            - generic [ref=e48]: ◎
+            - text: Level 70 Character
+          - listitem [ref=e49]:
+            - generic [ref=e50]: ◎
+            - text: Active WoW Subscription
+          - listitem [ref=e51]:
+            - generic [ref=e52]: ◎
+            - text: No specific item level required for self-play.
+        - heading "Why should you choose us" [level=2] [ref=e54]
+      - complementary [ref=e55]:
+        - heading "Configure Your Run" [level=2] [ref=e56]
+        - paragraph [ref=e57]: Key Level
+        - generic [ref=e58]:
+          - button "+10" [ref=e59]
+          - button "+15" [ref=e60]
+          - button "+20" [ref=e61]
+        - paragraph [ref=e62]: Number of Runs
+        - generic [ref=e63]:
+          - generic [ref=e64]: −
+          - generic [ref=e65]: "1"
+          - generic [ref=e66]: ＋
+        - generic [ref=e67]:
+          - generic [ref=e68]:
+            - generic [ref=e69]:
+              - checkbox "VIP Traders (More Loot) + $15.00" [ref=e70]
+              - text: VIP Traders (More Loot)
+            - generic [ref=e71]: + $15.00
+          - generic [ref=e72]:
+            - generic [ref=e73]:
+              - checkbox "Express Delivery + 20%" [checked] [ref=e74]
+              - text: Express Delivery
+            - generic [ref=e75]: + 20%
+        - paragraph [ref=e77]: more settings
+        - paragraph [ref=e79]:
+          - text: Required items/
+          - text: skills unlock
+        - generic [ref=e80]:
+          - paragraph [ref=e81]: $USD ↔
+          - generic [ref=e82]:
+            - generic [ref=e83]: Total Price
+            - generic [ref=e84]: $24.00
+          - link "Buy Now" [ref=e85] [cursor=pointer]:
+            - /url: /checkout
+    - generic [ref=e87]:
+      - generic [ref=e88]:
+        - link "Moon Strike" [ref=e89] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e90]:
+          - generic [ref=e91]:
+            - heading "Sitemap" [level=3] [ref=e92]
+            - list [ref=e93]:
+              - listitem [ref=e94]: Instagram
+              - listitem [ref=e95]: Youtube
+              - listitem [ref=e96]: Tiktok
+              - listitem [ref=e97]: X
+          - generic [ref=e98]:
+            - heading "Legal" [level=3] [ref=e99]
+            - list [ref=e100]:
+              - listitem [ref=e101]: Privacy Policy
+              - listitem [ref=e102]:
+                - link "Terms of Service" [ref=e103] [cursor=pointer]:
+                  - /url: /terms
+              - listitem [ref=e104]:
+                - link "Refund Policy" [ref=e105] [cursor=pointer]:
+                  - /url: /refund
+          - generic [ref=e106]:
+            - heading "Genres" [level=3] [ref=e107]
+            - list [ref=e108]:
+              - listitem [ref=e109]: Action RPG
+              - listitem [ref=e110]: tactical shooting
+              - listitem [ref=e111]: MMORPG
+              - listitem [ref=e112]: MOBA
+              - listitem [ref=e113]: Sports Action
+              - listitem [ref=e114]: Tactical Shooter
+          - generic [ref=e115]:
+            - heading "Social Media" [level=3] [ref=e116]
+            - list [ref=e117]:
+              - listitem [ref=e118]: Instagram
+              - listitem [ref=e119]: Youtube
+              - listitem [ref=e120]: Tiktok
+              - listitem [ref=e121]: X
+      - paragraph [ref=e122]: MoonStrike is not endorsed by, directly affiliated with, maintained, or sponsored by Blizzard Entertainment, Bungie, Electronic Arts, Grinding Gear Games, Activision Publishing, Square Enix Co., Valve, Battlestate Games, Wargaming.net Limited, Amazon Technologies, Jagex Limited, Riot Games, Smilegate RPG, Digital Extremes. Our service focuses on enhancing players' in-game skills and occasionally gifting in-game items to users.
+      - paragraph [ref=e123]: © 2024 Moon Strike. Dominate the Game.
+  - button "Open Next.js Dev Tools" [ref=e129] [cursor=pointer]:
+    - img [ref=e130]
+  - alert [ref=e133]
