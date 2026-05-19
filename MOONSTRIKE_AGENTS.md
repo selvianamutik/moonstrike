@@ -224,9 +224,9 @@
 **Left — Payment Form:**
 1. **Header:** `Secure Checkout` | subtitle: "Complete your transaction to dominate the game."
 2. **Payment Method selector** — 3 tab cards with icon + label:
-   - `CREDIT CARD` (selected/active — purple border)
-   - `PAYPAL`
-   - `CRYPTO`
+   - `CREDIT CARD` (selected/active — purple border) → handled by **Stripe**
+   - `PAYPAL` → handled by **Stripe** (Stripe supports PayPal as a payment method)
+   - `CRYPTO` → handled by **NowPayments**
 3. **Card Details form** (shown when Credit Card active):
    - Name on Card (text input)
    - Card Number (formatted: 0000 0000 0000 0000, card icon right)
@@ -488,16 +488,37 @@ Order {
   id: string
   serviceId: string
   userId: string
-  addOns: string[]
-  selectedOptions: Record<string, string>
-  basePrice: number
+  selectedOptions: Record<string, any>  // resolved from options_schema at purchase time
+  subtotal: number
   serviceFee: number
   taxes: number
   total: number
-  status: "pending" | "in_progress" | "completed" | "disputed" | "refunded"
+  currency: string
+
+  // Payment provider fields — stored at checkout, used for refunds
+  paymentProvider: "stripe" | "nowpayments"
+  stripePaymentIntentId: string | null  // set when provider = "stripe" — used for Stripe refund API
+  nowpaymentsPaymentId: string | null   // set when provider = "nowpayments" — used for NowPayments refund API
+  cryptoRefundAddress: string | null    // customer-provided wallet address — required for crypto refunds only
+                                        // collected when customer submits a refund request for a crypto order
+
+  // Order state machine (see §11 for full diagram and transition rules)
+  // No escrow — refunds handled directly via payment gateway API
+  status:
+    | "pending_payment"   // order created, payment not yet confirmed
+    | "confirmed"         // payment cleared, admin notified, service in progress
+    | "delivered"         // admin marked as delivered, customer notified
+    | "completed"         // customer confirmed or admin closed — terminal
+    | "refund_requested"  // customer opened refund request
+    | "refunded"          // admin approved and issued refund via gateway — terminal
+
+  deliveredAt: Date | null         // set when admin marks delivered
+  refundRequestedAt: Date | null   // set when customer opens refund request
+
   region: "USA" | "EUROPE"
   startType: "immediate" | "scheduled"
   createdAt: Date
+  updatedAt: Date
 }
 
 Review {
@@ -521,6 +542,7 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 
 | Feature | Status | Notes |
 |---|---|---|
+| **STOREFRONT** | | |
 | Landing Page UI | ⬜ | Design ref: Moon_Strike_Landing_Page.png |
 | Games Page UI | ⬜ | Design ref: Moon_Strike_Game.png |
 | Services Page UI | ⬜ | Design ref: Moon_Strike_Services.png |
@@ -539,24 +561,53 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 | Currency toggle (global) | ⬜ | |
 | Region toggle (global) | ⬜ | |
 | TrustPilot integration | ⬜ | API TBD |
-| Search (global) | ⬜ | |
+| Search (global) | ⬜ | Mixed results — services + games in card view |
+| Cart | ⬜ | Same service purchasable multiple times |
+| Customer auth & profiles | ⚠️ | ⚠️ TBD — do not build until designed |
+| Order tracking page | ⚠️ | ⚠️ TBD — do not build until designed |
+| Notifications | ⚠️ | ⚠️ TBD — provider and triggers pending |
+| Currency conversion | ⚠️ | ⚠️ TBD — provider pending |
+| Privacy Policy page | ⚠️ | ⚠️ TBD — content pending |
+| Mobile / responsive layouts | ⚠️ | ⚠️ TBD — all designs currently desktop only |
 
 ---
 
-## 8. Open Questions (Fill Before Building)
+## 8. Decisions & Open Questions
 
-- [ ] **Frontend framework?** (Next.js / Nuxt / Remix / plain React?)
-- [ ] **CSS approach?** (Tailwind / CSS Modules / styled-components?)
-- [ ] **Backend?** (Node/Express, Laravel, Supabase, Firebase?)
-- [x] **Database:** Supabase PostgreSQL. Dynamic service fields stored as JSONB.
-- [ ] **Payment gateway?** (Stripe, PayPal, Crypto — which processor?)
-- [ ] **Auth provider?** (NextAuth, Supabase Auth, Clerk?)
-- [ ] **Image hosting?** (Cloudinary, S3, Supabase Storage?)
-- [ ] **TrustPilot?** (Real API integration or manual reviews?)
-- [ ] **Currency conversion?** (Real-time API or static rates?)
-- [ ] **Booster/seller side?** (Is there a seller dashboard or only buyer-facing?)
-- [x] **JSON storage:** JSONB columns in Supabase PostgreSQL. `options_schema` and `pricing` are JSONB. Enables indexed queries on JSON fields if needed.
-- [x] **Service configurator renderer:** Uses a CONTROLLED TYPE SYSTEM — types are predefined (`single_choice`, `multiple_choice`, `scalar` + more over time), not free-form strings. Each option item carries its own price. Price calc is one pure `calcTotal()` function. New types require a dev implementation + code deploy. New services using existing types require zero code. Do NOT build a generic/arbitrary JSON renderer.
+> Legend: ✅ Confirmed | ⚠️ TBD — do not implement until specified | ❓ Needs explanation / design decision
+
+---
+
+### Stack
+| Item | Status | Decision |
+|---|---|---|
+| Frontend framework | ⚠️ TBD | — |
+| CSS approach | ⚠️ TBD | — |
+| Backend | ⚠️ TBD | — |
+| Database | ✅ | Supabase PostgreSQL — dynamic fields as JSONB |
+| Auth provider | ⚠️ TBD | — |
+| Image hosting | ⚠️ TBD | — |
+| Payment gateway | ✅ | Stripe (card + PayPal) + NowPayments (crypto) |
+
+---
+
+### Features
+| Feature | Status | Decision |
+|---|---|---|
+| Customer auth & profiles | ⚠️ TBD | Required before any order flow can be built |
+| Order tracking page (storefront) | ⚠️ TBD | Required — design pending |
+| Booster workflow | ✅ | No separate booster role. Admin acts as both administrator and booster. |
+| Order state machine | ✅ | No escrow — admin = booster, refunds via payment gateway. See §11 |
+| Search | ✅ | Returns a mixed card view showing both related services AND games. Single results page. |
+| Cart | ✅ | Cart exists. Same service can be added more than once (e.g. buy 3× Mythic runs separately). |
+| Notifications | ⚠️ TBD | Email and/or in-app — provider and trigger events not yet decided |
+| Review / Rating | ✅ | TrustPilot API integration — real, not manual |
+| Crypto refund wallet | ✅ | NowPayments requires customer wallet address — collected at refund request time |
+| Currency conversion | ⚠️ TBD | Real-time API or static rates — provider not yet chosen |
+| Privacy Policy page | ⚠️ TBD | Required (linked in footer) — content pending |
+| Mobile / responsive | ⚠️ TBD | All designs currently desktop — breakpoints and mobile layouts pending |
+| Rate limiting | ✅ | Documented in §12 below |
+| JSON configurator renderer | ✅ | Controlled type system — see §6 data models |
 
 ---
 
@@ -906,9 +957,21 @@ CUSTOMER → Storefront only; no admin access
 - Status dropdown: `All Status`
 - Date range: `Last 30 Days` (with calendar icon)
 
-**Table columns:** TXN ID | CUSTOMER (avatar + name + email) | SERVICE (colored link) | DATE | AMOUNT | METHOD | STATUS
-- **Methods:** `💳 Card` | `💳 PayPal` | `₿ Crypto`
-- **Status values:** `● SUCCESS` | `● PENDING` | `● DISPUTED` | `● REFUNDED`
+**Table columns:** TXN ID | CUSTOMER (avatar + name + email) | SERVICE (colored link) | DATE | AMOUNT | METHOD | STATUS | ACTIONS
+- **Methods (mapped from `paymentProvider`):**
+  - `💳 Card` → Stripe (card)
+  - `💳 PayPal` → Stripe (PayPal)
+  - `₿ Crypto` → NowPayments
+- **Status values:** `● SUCCESS` | `● PENDING` | `● REFUND REQUESTED` | `● REFUNDED`
+- **Row action — `Issue Refund` button behaviour (context-aware, no manual routing):**
+
+| Scenario | Button state | Behaviour on click |
+|---|---|---|
+| Stripe order (card/PayPal) | Active | Calls Stripe refund API with `stripePaymentIntentId` automatically |
+| Crypto order — wallet address not yet provided | Disabled + tooltip: "Awaiting wallet address from customer" | Blocked — does nothing until address is stored |
+| Crypto order — wallet address provided | Active | Calls NowPayments refund API with `nowpaymentsPaymentId` + `cryptoRefundAddress` automatically |
+
+- Admin never manually selects which API to call — routing is fully automatic based on `order.paymentProvider`.
 - **Pagination:** standard
 
 ---
@@ -1170,6 +1233,7 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 
 | Feature | Status | Notes |
 |---|---|---|
+| **ADMIN** | | |
 | Admin Login Page | ⬜ | Design ref: Admin_Dashboard_-_Login.png |
 | Admin Dashboard Overview | ⬜ | Design ref: Admin_Dashboard_-_Overview.png |
 | Admin Users List | ⬜ | Design ref: Admin_Dashboard_-_Users.png |
@@ -1191,6 +1255,198 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 | CSV export (dashboard + logs + transactions) | ⬜ | |
 | Real-time support chat | ⬜ | WebSocket or polling TBD |
 | Audit log write (on every admin action) | ⬜ | Backend middleware |
+| **SYSTEM** | | |
+| Order state machine | ⬜ | See §11 — no escrow, direct refund via payment gateway |
+| Rate limiting | ⬜ | See §12 — depends on framework chosen |
+| TrustPilot API integration | ⬜ | Real API — not manual reviews |
+| Stripe integration (card + PayPal) | ⬜ | Checkout + auto-routed refund API |
+| NowPayments integration (crypto) | ⬜ | Checkout + auto-routed refund API — wallet address collected at refund request |
+| Refund router (backend) | ⬜ | Reads `paymentProvider` → routes to Stripe or NowPayments automatically |
+| Crypto wallet address collection | ⬜ | Storefront prompt when crypto order hits `refund_requested` status |
+| Issue Refund button (context-aware) | ⬜ | Disabled + tooltip when crypto wallet address pending; active otherwise |
+
+---
+
+---
+
+## 11. Order State Machine
+
+> ✅ **Escrow system removed.** Since admin = booster and MoonStrike controls both the
+> platform and service delivery, escrow is unnecessary. MoonStrike is a direct service
+> business, not a third-party marketplace. Refunds are issued manually by admin directly
+> through the payment gateway (Stripe/PayPal have built-in refund APIs).
+> The Refund Policy page content remains the same from the customer's perspective.
+
+### Order State Diagram
+
+```
+[Customer pays]
+      │
+      ▼
+┌──────────────────┐
+│  pending_payment │  Order created, awaiting payment confirmation
+└────────┬─────────┘
+         │ payment gateway webhook confirms charge
+         ▼
+┌──────────────────┐
+│   confirmed      │  Payment cleared. Admin notified. Service begins.
+└────────┬─────────┘
+         │ admin marks service as delivered
+         ▼
+┌──────────────────┐
+│   delivered      │  Customer notified. Order considered complete.
+└────────┬─────────┘
+         │
+    ┌────┴────────────────────┐
+    │                         │
+customer satisfied     customer requests refund
+    ▼                         ▼
+┌───────────┐          ┌──────────────┐
+│ completed │          │ refund_       │  Admin reviews and issues
+└───────────┘          │ requested    │  refund via payment gateway
+                       └──────┬───────┘
+                              │
+                   ┌──────────┴──────────┐
+                   │                     │
+             refund approved       refund denied
+                   ▼                     ▼
+            ┌──────────┐          ┌──────────┐
+            │ refunded │          │ completed│
+            └──────────┘          └──────────┘
+```
+
+### Transition Rules
+| From | To | Trigger | Who |
+|---|---|---|---|
+| `pending_payment` | `confirmed` | Payment gateway webhook | System |
+| `confirmed` | `delivered` | Admin marks as delivered | Admin |
+| `delivered` | `completed` | Customer confirms or no dispute raised | Customer / Admin |
+| `delivered` | `refund_requested` | Customer requests refund | Customer |
+| `refund_requested` | `refunded` | Admin approves and issues via payment gateway | Admin |
+| `refund_requested` | `completed` | Admin denies refund request | Admin |
+
+### Rules
+- `completed` and `refunded` are terminal states — no further transitions.
+- All state transitions must be written to the Audit Log.
+- `serviceFee` refundability on approved refunds — ⚠️ TBD.
+- No automated cron jobs or time-based auto-transitions needed (simpler than escrow).
+
+### Refund API Behaviour by Provider
+
+**Stripe (card + PayPal):**
+```
+stripe.refunds.create({ payment_intent: order.stripePaymentIntentId })
+```
+- Money returns to original card or PayPal automatically.
+- Customer does nothing — fully passive.
+- Refund amount calculated at original purchase rate.
+
+**NowPayments (crypto):**
+```
+POST /v1/refunds { payment_id: order.nowpaymentsPaymentId, address: order.cryptoRefundAddress }
+```
+- ⚠️ Requires customer wallet address — crypto cannot be reversed automatically.
+- `cryptoRefundAddress` must be collected from customer when they submit the refund request.
+- Refund amount converted at rate **at the time of refund** (not purchase time) — NowPayments handles conversion.
+- The Refund Policy page must inform crypto customers of this wallet address requirement.
+
+### Refund Flow Difference (Stripe vs Crypto)
+
+```
+STRIPE (card / PayPal)              NOWPAYMENTS (crypto)
+──────────────────────              ────────────────────
+Customer requests refund            Customer requests refund
+        ↓                                   ↓
+order.status → refund_requested     order.status → refund_requested
+        ↓                                   ↓
+Admin reviews in dashboard          System prompts customer:
+        ↓                           "Please provide your wallet address"
+Admin clicks Issue Refund                   ↓
+        ↓                           Customer submits wallet address
+Backend reads paymentProvider               ↓
+= "stripe"                          order.cryptoRefundAddress saved
+        ↓                                   ↓
+Stripe API called automatically     Admin reviews in dashboard
+        ↓                                   ↓
+order.status → refunded             Issue Refund button becomes active
+                                            ↓
+                                    Admin clicks Issue Refund
+                                            ↓
+                                    Backend reads paymentProvider
+                                    = "nowpayments"
+                                            ↓
+                                    NowPayments API called with
+                                    paymentId + walletAddress
+                                            ↓
+                                    order.status → refunded
+```
+
+### Backend Routing Logic (pseudocode)
+```ts
+async function issueRefund(orderId: string) {
+  const order = await db.orders.findById(orderId)
+
+  if (order.paymentProvider === "stripe") {
+    await stripe.refunds.create({
+      payment_intent: order.stripePaymentIntentId
+    })
+  }
+
+  if (order.paymentProvider === "nowpayments") {
+    if (!order.cryptoRefundAddress) {
+      throw new Error("AWAITING_WALLET_ADDRESS")
+      // → button stays disabled in admin UI
+    }
+    await nowpayments.refunds.create({
+      payment_id: order.nowpaymentsPaymentId,
+      address:    order.cryptoRefundAddress
+    })
+  }
+
+  await db.orders.update(orderId, { status: "refunded" })
+  await auditLog.write({ action: "REFUND_ISSUED", orderId, provider: order.paymentProvider })
+}
+```
+
+---
+
+## 12. Rate Limiting
+
+> Rate limiting caps how many requests one IP or user can make in a time window.
+> Prevents brute force attacks, scraping, fraud, and server overload.
+> **Anonymous and non-admin users get the strictest limits** — they are the highest risk.
+
+### User Tiers
+
+```
+Anonymous (no session)   →  Strictest limits — unknown, untrusted
+Authenticated customer   →  Moderate limits — known but untrusted for payments
+Admin                    →  Relaxed limits — trusted, but still protected
+```
+
+### Protected Endpoints & Limits
+
+| Endpoint | Anonymous | Customer | Admin | Reason |
+|---|---|---|---|---|
+| `POST /admin/login` | 5 / 15 min / IP | — | 10 / 15 min / IP | Brute force prevention |
+| `GET /api/search` | 15 / 1 min / IP | 40 / 1 min / user | unlimited | Scraping prevention |
+| `GET /api/games` | 20 / 1 min / IP | 60 / 1 min / user | unlimited | Scraping prevention |
+| `GET /api/services` | 20 / 1 min / IP | 60 / 1 min / user | unlimited | Scraping prevention |
+| `POST /api/checkout` | blocked entirely | 5 / 1 min / user | unlimited | Must be logged in to buy |
+| `POST /api/orders` | blocked entirely | 3 / 1 min / user | unlimited | Duplicate order prevention |
+| `POST /api/refunds` | blocked entirely | 2 / 1 hour / user | unlimited | Abuse prevention |
+| Payment webhooks | signature check only | — | — | Replay attack prevention |
+
+### Rules
+- Anonymous users cannot access any `/api/orders`, `/api/checkout`, or `/api/refunds` — these require authentication.
+- Rate limit violations → HTTP 429 response + entry written to Audit Logs with status `BLOCKED`.
+- IP bans (repeated violations) visible in Admin Dashboard Audit Logs.
+- Payment webhook endpoints validate provider signature (Stripe/PayPal) — IP-based limiting does not apply here.
+
+### Implementation
+- ⚠️ TBD — specific library depends on framework chosen.
+- Options: Supabase built-in API gateway limits, Upstash Redis rate limiting, or framework middleware.
+- Exact limits above are starting estimates — tune after launch with real traffic data.
 
 ---
 
