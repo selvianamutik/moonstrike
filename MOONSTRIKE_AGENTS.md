@@ -368,26 +368,45 @@ Game {
 
 Service {
   id: string
-  gameId: string        // FK → Game (the game group this service belongs to)
-  title: string         // "Mythic+ Dungeons Boost"
+  gameId: string          // FK → Game (the game group this service belongs to)
+  title: string           // "Mythic+ Dungeons Boost"
   slug: string
   image: string
   description: string
   serviceCategory: string // "Dungeon" | "Leveling" | "Raid" | "Stories" | "Coaching" | "Rank Boost" | "Item Farm"
   // NOTE: serviceCategory ≠ game genre. "Dungeon" is what the booster does; "MMORPG" is the game type.
   status: "active" | "draft" | "archived"
-  basePrice: number     // 45.00
-  currency: string      // "USD"
-  tags: string[]        // ["HOT", "NEW"]
-  region: string[]      // ["USA", "EUROPE"]
-  badges: string[]      // ["Starts in < 15 mins", "100% Completion"]
+  isHotOffer: boolean     // when true → service appears in HOT OFFERS category on Services page
+
+  // Base price — flat fee ALWAYS charged regardless of option selections
+  // Admin sets both currencies manually. No conversion — independent values.
+  basePriceUSD: number    // e.g. 45.00
+  basePriceEUR: number    // e.g. 40.00
+
+  region: string[]        // ["USA", "EUROPE"]
+  badges: string[]        // ["Starts in < 15 mins", "100% Completion"]
   requirements: string[]
   whatYouGet: Benefit[]
+
   // JSONB fields (Supabase PostgreSQL):
-  options_schema: JSONB // Configurator fields — CLOSED TYPE SYSTEM (see ServiceOptionField below)
-  pricing: JSONB        // Resolved from options_schema — no separate base price field.
-                        // Total price is always computed from selected options at runtime.
+  // options_schema stores the configurator fields (see ServiceOption below)
+  // Each OptionItem and scalar field carries both USD and EUR prices
+  options_schema: JSONB
 }
+
+// ── Pricing model ─────────────────────────────────────────────────────────────
+// Total USD = basePriceUSD + sum of all selected option pricesUSD
+// Total EUR = basePriceEUR + sum of all selected option pricesEUR
+// Each currency is calculated independently — no conversion between them.
+// Display currency is determined by customer's selected currency in storefront.
+// Charge currency matches display currency (Stripe supports both; NowPayments converts to crypto).
+//
+// Example:
+//   basePriceUSD: 45   basePriceEUR: 40
+//   + Level 21-40:     +10 USD  +15 EUR
+//   + Express:         + 8 USD  + 7 EUR
+//   ─────────────────────────────────────
+//   Total:              63 USD   62 EUR
 
 // ── Fixed Option Type System (extensible but controlled) ─────────────────────
 // Types are predefined — admins pick from a dropdown, never free-type a string.
@@ -404,22 +423,25 @@ ServiceOption {
     | "scalar"          // numeric quantity — total += quantity × pricePerUnit
     // future types added here as the platform grows — each requires a dev implementation
   options?: OptionItem[]    // used by single_choice and multiple_choice
-  min?: number              // used by scalar
-  max?: number              // used by scalar
-  pricePerUnit?: number     // used by scalar — e.g. 3 runs × $5 = $15
+  min?: number                  // used by scalar
+  max?: number                  // used by scalar
+  pricePerUnitUSD?: number      // used by scalar — e.g. 3 runs × $5 USD = $15 USD
+  pricePerUnitEUR?: number      // used by scalar — e.g. 3 runs × €4 EUR = €12 EUR
 }
 
 OptionItem {
-  label: string   // displayed label, e.g. "1–20", "21–40", "Loot bag", "Express"
-  price: number   // the price for this specific option
+  label: string       // displayed label, e.g. "1–20", "21–40", "Loot bag", "Express"
+  priceUSD: number    // e.g. 10.00
+  priceEUR: number    // e.g. 15.00 — set manually by admin, independent of USD
 }
 
 // ── Price calculation rule (one pure function, no exceptions) ─────────────────
-// single_choice   → total  = price of the one selected OptionItem
-// multiple_choice → total += price of each checked OptionItem
-// scalar          → total += selected quantity × pricePerUnit
-// All fields combine additively. There is no base price separate from the options —
-// the "base" price is whatever the first single_choice option resolves to.
+// total = basePriceUSD (or EUR) — always charged, flat, non-optional
+//       + single_choice   → + priceUSD/EUR of the one selected OptionItem
+//       + multiple_choice → + priceUSD/EUR of each checked OptionItem
+//       + scalar          → + (quantity × pricePerUnitUSD/EUR)
+// Calculate USD total and EUR total independently using their respective price fields.
+// Never convert between currencies at runtime — use the stored value directly.
 
 // ── Storefront renderer mapping (one component per type) ─────────────────────
 // "single_choice"   → <SingleChoice />   — pill/card grid, single select, shows price per option
@@ -430,9 +452,11 @@ OptionItem {
 // Renderer uses a lookup table — adding a new type = add one entry to the map.
 // Unknown types log a warning and render nothing (no crash).
 // Configurator iterates options_schema[], maps type → component, tracks state,
-// runs calcTotal() on every change, displays running total.
+// runs calcTotal(currency) on every change — passing "USD" or "EUR" based on
+// customer's active currency selection. Displays running total in selected currency.
 
 // ── Example JSONB stored in Supabase ─────────────────────────────────────────
+// Service row: basePriceUSD: 45, basePriceEUR: 40, isHotOffer: true
 // options_schema for a "Level Boost" service:
 // [
 //   {
@@ -440,10 +464,10 @@ OptionItem {
 //     "label": "Level up boost",
 //     "required": true,
 //     "options": [
-//       { "label": "1–20",  "price": 5  },
-//       { "label": "21–40", "price": 10 },
-//       { "label": "41–60", "price": 18 },
-//       { "label": "61–80", "price": 25 }
+//       { "label": "1–20",  "priceUSD": 5,  "priceEUR": 4  },
+//       { "label": "21–40", "priceUSD": 10, "priceEUR": 15 },
+//       { "label": "41–60", "priceUSD": 18, "priceEUR": 22 },
+//       { "label": "61–80", "priceUSD": 25, "priceEUR": 30 }
 //     ]
 //   },
 //   {
@@ -451,8 +475,8 @@ OptionItem {
 //     "label": "Add-ons",
 //     "required": false,
 //     "options": [
-//       { "label": "Loot bag",        "price": 5 },
-//       { "label": "Express delivery","price": 8 }
+//       { "label": "Loot bag",         "priceUSD": 5, "priceEUR": 4 },
+//       { "label": "Express delivery", "priceUSD": 8, "priceEUR": 7 }
 //     ]
 //   },
 //   {
@@ -461,9 +485,15 @@ OptionItem {
 //     "required": true,
 //     "min": 1,
 //     "max": 10,
-//     "pricePerUnit": 5
+//     "pricePerUnitUSD": 5,
+//     "pricePerUnitEUR": 4
 //   }
 // ]
+//
+// Example total for customer selecting "21-40", "Loot bag", 2 runs, viewing in USD:
+//   basePriceUSD(45) + level(10) + lootbag(5) + runs(2×5=10) = $70 USD
+// Same order in EUR:
+//   basePriceEUR(40) + level(15) + lootbag(4) + runs(2×4=8)  = €67 EUR
 
 Benefit {
   icon: string
@@ -581,13 +611,27 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 ### Stack
 | Item | Status | Decision |
 |---|---|---|
-| Frontend framework | ⚠️ TBD | — |
-| CSS approach | ⚠️ TBD | — |
-| Backend | ⚠️ TBD | — |
+| Frontend framework | ✅ | Next.js |
+| CSS approach | ✅ | Tailwind CSS |
+| Backend | ✅ | Supabase |
 | Database | ✅ | Supabase PostgreSQL — dynamic fields as JSONB |
-| Auth provider | ⚠️ TBD | — |
-| Image hosting | ⚠️ TBD | — |
-| Payment gateway | ✅ | Stripe (card + PayPal) + NowPayments (crypto) |
+| Auth provider | ✅ | Supabase Auth |
+| Image hosting | ⚠️ TBD | Cloudflare Images recommended (global CDN, auto WebP/AVIF, resizing) — deciding later |
+| Payment gateway | ✅ | Stripe (card + PayPal + Google Pay + Apple Pay) + NowPayments (crypto) |
+| Currency | ✅ | Fixed values — admin manually sets USD and EUR prices per service/option. No conversion API. |
+
+---
+
+### APIs & Third Parties
+| Service | Status | Notes |
+|---|---|---|
+| Stripe | ✅ | Card, PayPal, Google Pay, Apple Pay — all via Stripe. Single integration. |
+| NowPayments | ✅ | Crypto payments + refund API (requires customer wallet address) |
+| TrustPilot | ✅ | Read-only API — displays existing reviews. Customers review on TrustPilot directly. |
+| Google Sheets API | ⚠️ TBD | Writes customer service data — exact trigger and fields to be defined |
+| Google Pay | ✅ | Handled via Stripe — not a separate API |
+| Apple Pay | ✅ | Handled via Stripe — not a separate API |
+| Currency converter | ✅ | Not needed — fixed USD + EUR values set manually by admin per service |
 
 ---
 
@@ -872,6 +916,9 @@ CUSTOMER → Storefront only; no admin access
    - SERVICE NAME — text input (placeholder: "e.g. Radiant Rank Push")
    - GAME SELECTION — dropdown (game group: WoW, LoL, BDO, Dota 2, etc.)
    - SERVICE CATEGORY — dropdown (Dungeon, Leveling, Raid, Stories, etc.)
+   - HOT OFFER — checkbox (boolean)
+     - When checked → `isHotOffer: true` → service appears in HOT OFFERS tab on Services page
+     - When unchecked → service only appears in its own category tab
 
 2. **Custom Service Options card (JSONB, fixed type system):**
    - Header: `Custom Service Options` + `+ ADD NEW FIELD` link
@@ -883,8 +930,9 @@ CUSTOMER → Storefront only; no admin access
        - `Scalar` → numeric quantity via slider or stepper, has a price-per-unit. Total adds quantity × pricePerUnit. Example: 3 runs × $5 = $15
        - *(more types can be added as the platform grows — each requires a dev to define the schema, build the component, and add it to this dropdown)*
      - Required toggle
-     - Option rows (for Single/Multiple Choice): label input + price input per row, `+ Add option` button
-     - Unit price input (for Scalar): min, max, pricePerUnit fields
+     - Option rows (for Single/Multiple Choice): label input + two price inputs per row (`$ USD` and `€ EUR`), `+ Add option` button
+       - Example row: `Level 21-40` | `$ 10.00` | `€ 15.00`
+     - Unit price input (for Scalar): min, max, `$ pricePerUnitUSD`, `€ pricePerUnitEUR` fields
      - 🗑 Delete field button
    - Fields can be added/removed dynamically; options within each field can be added/removed
    - **Storage:** Saved as JSONB `options_schema` in Supabase PostgreSQL (see §6 data models)
@@ -897,10 +945,11 @@ CUSTOMER → Storefront only; no admin access
 **Right column — Sidebar:**
 
 1. **Pricing & Tiers card:**
-   - BASE PRICE (USD) input: `$ 25.00`
-   - `⚡ Express Delivery` add-on: `+15%`
-   - `🔮 Premium Pro Tier` add-on: `+30%`
-   - **Storage:** Pricing and add-ons stored as JSON in the `pricing` field
+   - BASE PRICE — two inputs side by side:
+     - `$ USD` input (e.g. 45.00) — always charged flat fee in USD
+     - `€ EUR` input (e.g. 40.00) — always charged flat fee in EUR
+   - Both values stored as `basePriceUSD` and `basePriceEUR` on the Service model
+   - Base price is a flat fee always added to the total — option prices stack on top
 
 2. **Thumbnail card:**
    - Drag & drop zone with upload icon
@@ -1447,6 +1496,54 @@ Admin                    →  Relaxed limits — trusted, but still protected
 - ⚠️ TBD — specific library depends on framework chosen.
 - Options: Supabase built-in API gateway limits, Upstash Redis rate limiting, or framework middleware.
 - Exact limits above are starting estimates — tune after launch with real traffic data.
+
+---
+
+---
+
+## 13. Issues & Open Problems Summary
+
+> Items here are known gaps that must be resolved before the relevant feature can be built.
+> Status: 🔴 Blocks build | 🟠 Causes confusion during build | 🟡 Decide before scaling
+
+---
+
+### 🔴 Blocks Build
+
+| # | Issue | Affected Area | Status |
+|---|---|---|---|
+| 1 | **Cart data model undefined** — `Order` has one `serviceId` but cart supports multiple items and repeat purchases. Need a `CartItem` / `OrderItem` model. | Cart, Checkout, Order | ⚠️ TBD |
+| 2 | **Cart + scalar overlap** — "2 runs" achievable via scalar option OR adding service twice. Produces different orders, same outcome. Needs a defined rule. | Cart, Service Options | ⚠️ TBD |
+| 3 | **Search spec incomplete** — "related" is undefined. No zero-results state. Real-time vs. on-submit unclear. Scope of fields searched (title only? description?) undefined. | Search | ⚠️ TBD |
+| 4 | **No "orders to fulfill" queue** — Admin = booster but no dedicated view for pending orders that need action. Dashboard shows recent activity but no prioritized work queue. | Admin Dashboard | ⚠️ TBD |
+| 5 | **Customer auth & profiles not designed** — Required before any order flow, cart, or refund request can be built on the storefront. | Auth, Storefront | ⚠️ TBD |
+| 6 | **Order tracking page not designed** — Customers have no way to see order status post-purchase without this. Crypto refund wallet prompt also depends on this page. | Storefront | ⚠️ TBD |
+
+---
+
+### 🟠 Causes Confusion During Build
+
+| # | Issue | Affected Area | Status |
+|---|---|---|---|
+| 7 | **`options_schema` snapshot at purchase time** — If admin edits a service's options after orders exist, historical orders display incorrectly. Decide: snapshot full schema at purchase, or just selections. | Order, Service CMS | ⚠️ TBD |
+| 8 | **Service fee amount undefined** — Checkout shows `$2.50` fee but calculation never defined. Flat? Percentage? Per item or per checkout? Admin-configurable or hardcoded? | Checkout, Order | ⚠️ TBD |
+| 9 | **TrustPilot API is read-only** — Cannot submit reviews through the site. Customers must go to TrustPilot directly. Post-order review prompt must redirect externally, not collect in-app. | Reviews, Post-order flow | ✅ Confirmed — redirect only |
+| 10 | **Notifications undefined** — Order state machine has multiple points requiring customer notification (confirmed, delivered, crypto wallet prompt). Without this, crypto refund flow breaks silently. | Notifications, Refund flow | ⚠️ TBD |
+| 11 | **Google Sheets API trigger undefined** — Confirmed integration but what data gets written, when, and by what event is not specified. | Google Sheets integration | ⚠️ TBD |
+
+---
+
+### 🟡 Decide Before Scaling
+
+| # | Issue | Affected Area | Status |
+|---|---|---|---|
+| 12 | **Order cancellation missing** — No `cancelled` state. Can customer cancel after `confirmed` but before `delivered`? If yes, is refund automatic? | Order state machine | ⚠️ TBD |
+| 13 | **Service fee per item vs. per checkout** — Multi-item cart: is fee charged once or per item? | Checkout, Cart | ⚠️ TBD |
+| 14 | **Admin Messages scope** — Is it support-only or does it also handle order status updates? Two different inbox designs if combined. | Admin Messages | ⚠️ TBD |
+| 15 | **NowPayments webhook verification** — Needs signature validation middleware same as Stripe. Not yet documented in implementation plan. | Backend, Security | ⬜ Not started |
+| 16 | **Image hosting provider** — Cloudflare Images recommended (CDN + optimization). Decision pending. | Infrastructure | ⚠️ TBD |
+| 17 | **Mobile / responsive layouts** — All designs are desktop only. Breakpoints and mobile layouts undefined. | All pages | ⚠️ TBD |
+| 18 | **Privacy Policy page** — Linked in footer on every page. Content and design pending. | Legal | ⚠️ TBD |
 
 ---
 
