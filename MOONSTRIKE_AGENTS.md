@@ -100,17 +100,19 @@
 
 2. **Hero / Promo Banner**
 
-   **Dark mode:**
+   **Dark mode** *(CMS-editable — `hero` block, shared with light mode)*:
    - Label: `LIMITED TIME OFFER`
    - Headline: `Level Up Your Game with Seasonal Discounts`
    - Subtext: "Join the elite. Get up to 30% off all premium boosting bundles this weekend."
    - CTA Button: `Get your discount` (purple→cyan gradient)
+   - Reads from: label, headline, subtext, CTA text/link, background image fields
 
-   **Light mode (different layout):**
+   **Light mode (different layout)** *(same `hero` block, different rendering)*:
    - Left: Featured game card with image, `NEW UPDATE` teal badge, game title, description, `Learn More` CTA (dark navy)
    - Right: Upcoming services sidebar — 3 stacked rows each with thumbnail, status tag (`FEATURED` / `COMING SOON`), service name
    - Hero is a carousel (left/right arrow navigation)
-   - No seasonal discount banner — replaced with featured game spotlight
+   - Reads from: slides array field in the same hero block
+   - Same DB record as dark mode hero — theme switches layout, not content
 
 3. **Game Filter + Grid**
    - Category tab strip: `ALL GAMES | ACTION RPG | TACTICAL SHOOTING | LOOTER SHOOTING` (scrollable, with left/right arrows)
@@ -123,18 +125,19 @@
    - Horizontal cards (4 visible): thumbnail, title, short desc, price, `Buy Now` button
    - Example offers: Mythic+ 15 Run ($24.99), Flawless Trials ($39.99), Ranked Placement ($19.00), Leveling 1-70 ($45.00)
 
-5. **Trust Stats Bar**
+5. **Trust Stats Bar** *(CMS-editable — Stats Bar block)*
    - 4 stats in a row: `50K+ GAMES BOOSTED` | `99.9% SUCCESS RATE` | `24/7 ACTIVE SUPPORT` | `TOP 1% PRO PLAYERS`
+   - Values and labels editable via Content CMS
 
-6. **Why Choose Us**
+6. **Why Choose Us** *(CMS-editable — Benefits Section block)*
    - Section header: `Why Choose Us ?` (with colored "Choose Us")
-   - Full-width media block (image or video embed placeholder)
-   - 3 benefit items below with icon + label + description
+   - Full-width media block (image or video embed placeholder) — editable via Media Library
+   - 3 benefit items below with icon + label + description — all editable via CMS
 
-7. **How It Works — "Up & Running in 4 Simple Steps"**
+7. **How It Works — "Up & Running in 4 Simple Steps"** *(CMS-editable — Steps Section block)*
    - Section header with colored `4`
    - Sub-label: `(Desktop)`
-   - 4 numbered steps with description, laid out in a 2x2 or diagonal visual:
+   - 4 numbered steps with description, laid out in a 2x2 or diagonal visual — all editable via CMS:
      1. Choose Your Service
      2. We Log Into Your Account
      3. Receive Daily Progress Updates
@@ -169,11 +172,13 @@
    - Title: `All Services`
    - Search input: `Search games, services...` (right-aligned)
 
-3. **Featured Game Banner**
-   - Wide card with game art background
+3. **Featured Game Banner** *(CMS-editable — Promotional Banner)*
+   - Wide card with game art background — image from Media Library
    - Left: Game title (large, white)
    - Right: `USA | EUROPE` region toggle
    - Link below toggle: region-specific sub-text/link
+   - Banner content managed via Content CMS → Promotional Banners tab
+   - Supports scheduling (e.g. seasonal events go live automatically)
 
 4. **Service Category Tabs**
    - Pills: `HOT OFFERS 🔥 | DUNGEONS | POWERLEVELING | RAID | STORIES` (scrollable with arrows)
@@ -1260,32 +1265,106 @@ CUSTOMER → Storefront only; no admin access (Supabase Auth — storefront)
 
 ### 10.10 Admin Content Page (`/admin/content`)
 
-**Purpose:** CMS for all storefront content — landing page sections, banners, game catalog entries, media.
+**Purpose:** CMS for all editable storefront content blocks — landing page sections, promotional banners, and media assets.
 
-**Header:** `Content Library` | subtitle: "Manage and deploy cosmic assets across the Moon Strike ecosystem."
+> ⚠️ `GAME CATALOG` tab removed — games are managed in `/admin/games`. Having both causes confusion.
+> ⚠️ `HOT OFFERS` section is NOT managed here — it is auto-populated from `isHotOffer: true` on Services. Admin checks the Hot Offer checkbox in `/admin/services` CMS to control which services appear.
+> ✅ **Light and dark mode share the same content assets.** There is ONE set of content blocks and ONE Media Library. Theme only changes CSS/styling and layout presentation — not the underlying content data. Agents must NOT create separate content entries per theme.
+
+**Header:** `Content Library` | subtitle: "Manage and deploy content across the Moon Strike storefront."
 **CTA:** `+ Add New Content` (purple)
 
-**Section tabs (top):**
-`LANDING PAGE SECTIONS` | `GAME CATALOG` | `PROMOTIONAL BANNERS` | `MEDIA LIBRARY`
+**Section tabs (top) — 3 tabs only:**
+`LANDING PAGE SECTIONS` | `PROMOTIONAL BANNERS` | `MEDIA LIBRARY`
 - Tab underline highlight on active
-- Right of tabs: grid/list view toggle icons
+- Right of tabs: grid / list view toggle icons
 
 **Table columns:** CONTENT ITEM (thumbnail + name + ID) | TYPE | STATUS | MODIFIED | ACTIONS
 
-**Content types (inferred from rows):**
-- `Hero Section` — full-width landing hero
-- `Banner` — promotional banner strip
-- `Grid` — game/service grid section
-- `Text Block` — body copy / CMS text
-
 **Status values:**
-- `● ACTIVE` (green) — live on storefront
-- `⏱ SCHEDULED` (amber) — will go live at date
-- `✏ DRAFT` (muted) — not published
+- `● ACTIVE` (green) — live on storefront immediately
+- `⏱ SCHEDULED` (amber) — goes live at a set date/time
+- `✏ DRAFT` (muted) — saved but not published
 
 **Row actions:** ✏️ Edit | 👁 Preview | ⋮ More options (3-dot menu)
 
-**Pagination:** `Showing 4 of 128 assets` | page numbers
+**Pagination:** standard
+
+---
+
+#### Tab 1 — Landing Page Sections
+
+All editable blocks on the landing page. Each block has a fixed slot on the page — admin edits content within it, not the layout.
+
+| Content Block | CMS Type | What Admin Can Edit |
+|---|---|---|
+| Hero | `hero` | Label, headline, subtext, CTA text, CTA link, background image, slides (for carousel view) |
+| Trust Stats Bar | `stats_bar` | 4 stat labels and values (e.g. "50K+ GAMES BOOSTED") |
+| Why Choose Us | `benefits_section` | Media (image/video), 3 benefit icon + title + description |
+| How It Works | `steps_section` | 4 step titles and descriptions |
+
+> **Agent note — Hero block (shared, one record):**
+> There is ONE hero block in the DB. Dark mode and light mode both read from it.
+> Dark mode renders it as a promo banner (label + headline + CTA).
+> Light mode renders it as a featured game carousel (slides).
+> Same content fields feed both layouts — theme determines presentation only.
+> Admin edits once, both modes reflect the update.
+
+**Content item edit form (per block type):**
+
+`hero` fields — covers both dark mode promo banner and light mode carousel:
+- Label text (e.g. "LIMITED TIME OFFER", "FEATURED & RECOMMENDED")
+- Headline
+- Subtext / description
+- CTA Button text
+- CTA Button link (internal route or external URL)
+- Background image → from Media Library picker
+- Slides (ordered list, used by light mode carousel view):
+  - Each slide: image (Media Library) | badge text | title | description | CTA text | CTA link
+- Dark mode uses: label + headline + subtext + CTA + background image
+- Light mode uses: slides array + label
+
+`stats_bar` fields:
+- 4 stat entries (fixed count): value + label each
+- Example: value="50K+" label="GAMES BOOSTED"
+
+`benefits_section` fields:
+- Media: image or video URL (from Media Library)
+- 3 benefit entries: icon picker + title + description
+
+`steps_section` fields:
+- 4 step entries (fixed count): step title + description each
+
+---
+
+#### Tab 2 — Promotional Banners
+
+Banners that appear across the storefront (Services page featured banner, seasonal sale strips, etc.)
+
+| Field | Type |
+|---|---|
+| Banner title | Text |
+| Banner image | Media Library picker |
+| Region tag | `USA` / `EUROPE` / `Both` |
+| Link (optional) | Internal route or external URL |
+| Status | Active / Scheduled / Draft |
+| Schedule date | Date-time picker (shown when Scheduled) |
+
+> Promotional banners are separate from the landing page hero. They appear on the Services page featured slot and can be scheduled for seasonal events (e.g. "Cyber Monday Sale").
+
+---
+
+#### Tab 3 — Media Library
+
+Central asset store for all CMS images and videos.
+
+| Feature | Detail |
+|---|---|
+| Upload | Drag & drop or browse — image (JPG, PNG, WebP, GIF) or video URL |
+| CDN | Served via image hosting provider (⚠️ TBD — Cloudflare Images recommended) |
+| Usage tracking | Shows which content blocks reference each asset |
+| Search | Filter by filename or type |
+| Actions | Copy URL | Replace | Delete (blocked if asset is in use) |
 
 ---
 
@@ -1454,16 +1533,63 @@ Attachment {
   url: string
 }
 
-ContentAsset {
-  id: string                // "MSC-8829"
-  name: string              // "Hero Section - Season 4"
-  type: "Hero Section" | "Banner" | "Grid" | "Text Block"
+// ── Content Blocks (Landing Page Sections) ───────────────────────────────────
+// Each block type maps to a fixed slot on the storefront landing page.
+// Admin edits content within the slot — not the layout or position.
+
+ContentBlock {
+  id: string
+  name: string              // "Hero - Season 4", "Stats Bar - Oct 2024"
+  type:
+    | "hero"                // shared hero block — dark mode renders as promo banner,
+                            // light mode renders as featured carousel. ONE record, both themes.
+    | "stats_bar"           // 4 trust stats (50K+ games boosted, etc.)
+    | "benefits_section"    // Why Choose Us — media + 3 benefits
+    | "steps_section"       // How It Works — 4 steps
   status: "ACTIVE" | "SCHEDULED" | "DRAFT"
-  thumbnail?: string
+  data: JSONB               // block fields (see Content CMS §10.10 — same data, theme controls rendering)
+  thumbnail?: string        // preview image for CMS list view
+  scheduledAt?: Date        // set when status = SCHEDULED
+  modifiedAt: Date
+  createdBy: string
+
+  // KEY RULE: One ContentBlock record per block type.
+  // Theme = CSS/layout switch only. Never duplicate a block for each theme.
+}
+
+// ── Media Library — shared across ALL themes ──────────────────────────────────
+// One uploaded asset serves both dark and light mode.
+// Never upload separate versions of the same image for each theme.
+// Theme-specific appearance handled purely via CSS (filters, overlays, etc.) if needed.
+
+// ── Promotional Banners ───────────────────────────────────────────────────────
+PromoBanner {
+  id: string
+  name: string
+  image: string             // Media Library URL
+  region: "USA" | "EUROPE" | "BOTH"
+  link?: string             // optional CTA link
+  status: "ACTIVE" | "SCHEDULED" | "DRAFT"
   scheduledAt?: Date
   modifiedAt: Date
   createdBy: string
 }
+
+// ── Media Library ─────────────────────────────────────────────────────────────
+MediaAsset {
+  id: string
+  filename: string
+  url: string               // CDN URL (Cloudflare Images or TBD provider)
+  type: "image" | "video"
+  sizeBytes: number
+  usedIn: string[]          // IDs of ContentBlocks or PromoBanners referencing this asset
+  uploadedAt: Date
+  uploadedBy: string
+}
+
+// NOTE: Hot Offers section has NO content model.
+// It is auto-populated by querying Service WHERE isHotOffer = true.
+// Managed entirely from /admin/services — no CMS entry needed.
 
 SystemSettings {
   maintenanceMode: boolean
@@ -1543,7 +1669,11 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 | Admin Service CMS (Create/Edit) | ⬜ | Design ref: Admin_Services_List_CMS.png — JSON options_schema |
 | Admin Service Detail Preview | ⬜ | /admin/services/[id]/preview — full storefront render in draft mode |
 | Admin Transactions | ⬜ | Design ref: Admin_Transactions_List.png |
-| Admin Content Library | ⬜ | Design ref: Admin_Contents_List.png |
+| Admin Content Library | ⬜ | 3 tabs: Landing Page Sections, Promotional Banners, Media Library (Game Catalog tab removed) |
+| Landing Page CMS blocks | ⬜ | Hero (shared), Stats Bar, Benefits, Steps — one record per block, both themes |
+| Promotional Banners CMS | ⬜ | Services page banner + seasonal — schedulable |
+| Media Library CMS | ⬜ | Upload, CDN serve, usage tracking, delete guard |
+| Hot Offers auto-population | ⬜ | Query Service WHERE isHotOffer = true — no CMS entry |
 | Admin Messages / Support Chat | ⬜ | Design ref: Admin_Messages_List.png |
 | Admin Audit Logs | ⬜ | Design ref: Admin_Dashboard_-_Audit_Logs.png |
 | Admin Settings | ⬜ | Design ref: Admin_Settings_Page.png |
