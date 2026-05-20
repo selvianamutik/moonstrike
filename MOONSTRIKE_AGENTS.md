@@ -269,8 +269,6 @@
 - Field: `Email Address`
 - Field: `Password` — masked, eye toggle
 - Link: `Forgot Password?` (right-aligned, cyan/yellow depending on mode)
-- Divider: `or continue with`
-- Button: `Continue with Google` (Google icon + text, outlined)
 - CTA: `Login` (full-width, primary color)
 - Bottom: `Don't have an account?` → `Register` link
 
@@ -279,14 +277,12 @@
 - Field: `Email Address`
 - Field: `Password`
 - Field: `Confirm Password`
-- Divider: `or continue with`
-- Button: `Continue with Google` (Google icon, outlined)
 - CTA: `Create Account` (full-width, primary color)
 - Bottom: `Already have an account?` → `Login` link
 
 **Implementation:**
-- Email/password: Supabase Auth `signUp` / `signInWithPassword`
-- Google OAuth: Supabase Auth `signInWithOAuth({ provider: 'google' })` — built-in, no extra API
+- Email/password only: Supabase Auth `signUp` / `signInWithPassword`
+- No Google OAuth — email auth only
 - On success: redirect to previous page or `/profile`
 - Auth state persisted via Supabase session (JWT + refresh token)
 
@@ -299,7 +295,7 @@
 **Layout:** Left sidebar (profile info) + main content area (tabbed)
 
 **Left Sidebar:**
-- Avatar (from Google OAuth or default)
+- Avatar (default or user-uploaded)
 - Username
 - Email
 - Member since date
@@ -773,14 +769,14 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 | TrustPilot integration | ⬜ | API TBD |
 | Search (global) | ⬜ | Service titles only — image + title card view, no games, zero-state message |
 | Cart | ⬜ | CartItem model defined — same service = new CartItem, account details via chat |
-| Customer Login page | ⬜ | Email/password + Google OAuth via Supabase Auth |
-| Customer Register page | ⬜ | Email/password + Google OAuth via Supabase Auth |
+| Customer Login page | ⬜ | Email/password only — no Google OAuth |
+| Customer Register page | ⬜ | Email/password only — no Google OAuth |
 | Customer Profile page | ⬜ | Order History + Transaction History tabs |
 | Order History (profile) | ⬜ | Filter tabs, status badges, View Detail |
 | Order Detail (profile) | ⬜ | Options breakdown, timeline, refund request button |
 | Refund request button | ⬜ | Any non-terminal status, admin reviews before acting |
 | Global Chat Bubble | ⬜ | Fixed bottom-right, all storefront pages, Supabase Realtime |
-| Notifications | ⚠️ | ⚠️ TBD — provider and triggers pending |
+| Notifications | ⬜ | In-app bell (storefront + admin) + email for customers. See §13.1 |
 | Currency display (USD/EUR) | ⬜ | Fixed values, no conversion — toggle in navbar |
 | Privacy Policy page | ⚠️ | ⚠️ TBD — content pending |
 | Mobile / responsive layouts | ⚠️ | ⚠️ TBD — all designs currently desktop only |
@@ -825,7 +821,7 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 ### Features
 | Feature | Status | Decision |
 |---|---|---|
-| Customer auth & profiles | ⚠️ TBD | Required before any order flow can be built |
+| Customer auth & profiles | ✅ | Email/password only via Supabase Auth. No Google OAuth. |
 | Order tracking page (storefront) | ⚠️ TBD | Required — design pending |
 | Booster workflow | ✅ | No separate booster role. Admin acts as both administrator and booster. |
 | Order state machine | ✅ | No escrow — admin = booster, refunds via payment gateway. See §11 |
@@ -1910,7 +1906,7 @@ Admin                    →  Relaxed limits — trusted, but still protected
 | 7 | **`options_schema` snapshot at purchase time** — If admin edits a service's options after orders exist, historical orders display incorrectly. Decide: snapshot full schema at purchase, or just selections. | Order, Service CMS | ⚠️ TBD |
 | 8 | **Service fee amount undefined** — Checkout shows `$2.50` fee but calculation never defined. Flat? Percentage? Per item or per checkout? Admin-configurable or hardcoded? | Checkout, Order | ⚠️ TBD |
 | 9 | **TrustPilot API is read-only** — Reviews fetched from TrustPilot at runtime, not stored in DB. No Review model or table needed. Post-order prompt redirects customer to TrustPilot externally. | Reviews, Post-order flow | ✅ Confirmed — no DB storage |
-| 10 | **Notifications undefined** — Order state machine has multiple points requiring customer notification (confirmed, delivered, crypto wallet prompt). Without this, crypto refund flow breaks silently. | Notifications, Refund flow | ⚠️ TBD |
+| 10 | **Notifications undefined** — Order state machine has multiple points requiring customer notification (confirmed, delivered, crypto wallet prompt). Without this, crypto refund flow breaks silently. | Notifications, Refund flow | ✅ Resolved — see §13.1 |
 | 11 | **Google Sheets API trigger undefined** — Confirmed integration but what data gets written, when, and by what event is not specified. | Google Sheets integration | ⚠️ TBD |
 
 ---
@@ -1927,6 +1923,31 @@ Admin                    →  Relaxed limits — trusted, but still protected
 | 17 | **Mobile / responsive layouts** — All designs are desktop only. Breakpoints and mobile layouts undefined. | All pages | ⚠️ TBD |
 | 19 | **Light mode hero layout differs from dark mode** — Light mode hero is a featured game carousel, not a promo banner. These are two different components, not just a color swap. Both need to be built. | Landing Page | ⬜ Noted |
 | 18 | **Privacy Policy page** — Linked in footer on every page. Content and design pending. | Legal | ⚠️ TBD |
+
+---
+
+## 13.1 Resolved Decisions
+
+### Notifications (resolves issue #10)
+
+**Customer — in-app bell + email:**
+| Trigger | Notification |
+|---|---|
+| `confirmed` | None — customer checks order status/detail page |
+| `confirmed → delivered` | "Your boost is complete!" |
+| `refund_requested → refunded` | "Your refund has been approved and is being processed." |
+| `refund_requested → completed` (denied) | "Your refund request has been denied." |
+
+**Admin — in-app bell only (no email):**
+| Trigger | Notification |
+|---|---|
+| `pending_payment → confirmed` (new order paid) | "New order received — [service name]" |
+| `→ refund_requested` | "Refund requested — [order ID]" |
+
+**In-App Bell (storefront navbar + admin top bar):**
+- Bell icon with unread counter badge
+- Clicking opens a notification feed/dropdown
+- Notifications marked as read on open/click
 
 ---
 
