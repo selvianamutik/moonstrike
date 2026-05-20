@@ -30,14 +30,38 @@
 
 **Gradient:** `linear-gradient(to right, #8B5CF6, #22D3EE)` — logo, primary CTAs, active nav, price highlights.
 
-#### Light Mode
-> **Status: Palette tokens will be provided by owner at a later date.**
-> DO NOT implement or guess light mode colors. Leave entirely unbuilt until tokens are explicitly provided.
+#### Light Mode (confirmed — implement when toggled)
+| Token | Hex | Usage |
+|---|---|---|
+| `--ms-lm-bg-page` | `#F3F6FF` | Page background |
+| `--ms-lm-bg-card` | `#FFFFFF` | Card / surface background |
+| `--ms-lm-bg-navbar` | `#FFFFFD` | Navbar background |
+| `--ms-lm-navy-dark` | `#0E2D4A` | Darkest navy — primary headings, logo text |
+| `--ms-lm-navy-mid` | `#10385C` | Medium navy — section headings, strong text |
+| `--ms-lm-slate` | `#22374C` | Dark slate — body text, secondary labels |
+| `--ms-lm-teal` | `#117680` | Teal — badges, tags, secondary accents (replaces cyan from dark mode) |
+| `--ms-lm-yellow-pale` | `#F4DE92` | Pale yellow — hover states, subtle highlights |
+| `--ms-lm-yellow-mid` | `#F4D159` | Medium yellow — secondary CTA backgrounds |
+| `--ms-lm-yellow-primary` | `#F3C623` | Golden yellow — PRIMARY accent (replaces purple gradient in dark mode) |
+| `--ms-lm-purple` | `#794BB8` | Purple — decorative elements, step indicators (darker shade of dark mode gradient-start) |
+
+> ⚠️ These are extracted from the provided design — verify exact values against source design files before finalizing.
+
+**Key differences from dark mode:**
+- Primary CTA color changes from purple→cyan gradient to **golden yellow `#F3C623`**
+- "Buy Now" buttons, active tabs, highlighted text all use yellow instead of purple
+- Background is light blue-white instead of deep navy
+- Text hierarchy inverts: dark navy on light background
+- Teal `#117680` replaces cyan as the secondary accent
+- Purple `#794BB8` is demoted to decorative/illustrative use only (step shapes, etc.)
+- Logo in light mode: golden yellow (`#F3C623`) instead of purple→cyan gradient
 
 ### Theme
-- **Mode:** Dark only (currently)
-- **Cards:** `--ms-secondary` background, `--ms-accent` border, rounded corners
-- **Danger / Badge:** `#EF4444` range — HOT badges, error states, ban/blocked UI
+- **Modes:** Dark (default) + Light (toggle available — tokens confirmed above)
+- **Dark cards:** `--ms-secondary` background, `--ms-accent` border, rounded corners
+- **Light cards:** `--ms-lm-bg-card` (`#FFFFFF`) background, light border
+- **Danger / Badge:** `#EF4444` range — HOT badges, error states, ban/blocked UI (both modes)
+- **Mode toggle:** Currency selector area in navbar (visible in light mode screenshot as `€ Euro ⇄` pill)
 
 ### Typography
 - Logo / Display: Bold, gradient `--ms-gradient-start` → `--ms-gradient-end`
@@ -46,14 +70,18 @@
 - Badges / Tags: Uppercase, small, colored pill shapes
 
 ### Components (Reusable)
-- `<Navbar>` — Logo | Hamburger | Search bar | USD selector + flag | Services (active tab) | About | Profiles
+- `<Navbar>` — Logo | Hamburger | Search bar | Currency selector (USD/EUR + flag) | Services (active tab) | About | Profiles
 - `<GameCard>` — Image thumbnail | Genre tags | Game name | Short description
-- `<ServiceCard>` — Image | HOT badge (conditional) | Title | Description | Price | "Buy Now" button (purple gradient)
+- `<ServiceCard>` — Image | HOT badge (conditional) | Title | Description | Price | "Buy Now" button
+  - Dark mode: purple→cyan gradient button
+  - Light mode: golden yellow `#F3C623` button with dark text
 - `<CategoryTabs>` — Scrollable horizontal pill tabs with arrow nav
+  - Dark mode active tab: purple fill | Light mode active tab: yellow `#F3C623` fill
 - `<Footer>` — Logo | Sitemap | Legal | Genres | Social Media columns + disclaimer text
 - `<StarRating>` — 5-star display with username and comment (TrustPilot style)
 - `<RegionSelector>` — USA / EUROPE toggle pills
-- `<Badge>` — HOT, NEW, SALE — colored small corner labels on cards
+- `<Badge>` — HOT, NEW UPDATE, COMING SOON, FEATURED — colored small corner/inline labels on cards
+- `<ThemeToggle>` — switches between dark and light mode; persisted in user preference
 
 ---
 
@@ -70,10 +98,18 @@
 1. **Navbar** (global component)
 
 2. **Hero / Promo Banner**
+
+   **Dark mode:**
    - Label: `LIMITED TIME OFFER`
    - Headline: `Level Up Your Game with Seasonal Discounts`
    - Subtext: "Join the elite. Get up to 30% off all premium boosting bundles this weekend."
-   - CTA Button: `Get your discount` (purple)
+   - CTA Button: `Get your discount` (purple→cyan gradient)
+
+   **Light mode (different layout):**
+   - Left: Featured game card with image, `NEW UPDATE` teal badge, game title, description, `Learn More` CTA (dark navy)
+   - Right: Upcoming services sidebar — 3 stacked rows each with thumbnail, status tag (`FEATURED` / `COMING SOON`), service name
+   - Hero is a carousel (left/right arrow navigation)
+   - No seasonal discount banner — replaced with featured game spotlight
 
 3. **Game Filter + Grid**
    - Category tab strip: `ALL GAMES | ACTION RPG | TACTICAL SHOOTING | LOOTER SHOOTING` (scrollable, with left/right arrows)
@@ -551,15 +587,12 @@ Order {
   updatedAt: Date
 }
 
-Review {
-  id: string
-  userId: string
-  userName: string
-  rating: number        // 1-5
-  comment: string
-  serviceId?: string
-  source: "trustpilot" | "internal"
-}
+// ── Reviews ───────────────────────────────────────────────────────────────────
+// Reviews are NOT stored in the database.
+// TrustPilot API fetches reviews directly from TrustPilot at runtime.
+// Customers write reviews on TrustPilot's platform directly — not through MoonStrike.
+// Post-order flow redirects customer to TrustPilot to leave a review (external link).
+// No Review model, no review table, no review endpoints needed.
 ```
 
 ---
@@ -599,6 +632,8 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 | Currency conversion | ⚠️ | ⚠️ TBD — provider pending |
 | Privacy Policy page | ⚠️ | ⚠️ TBD — content pending |
 | Mobile / responsive layouts | ⚠️ | ⚠️ TBD — all designs currently desktop only |
+| Light mode theme | ⬜ | Tokens confirmed — implement as CSS variable swap on `<html data-theme="light">` |
+| Theme toggle (dark/light) | ⬜ | Persisted in user preference / localStorage |
 
 ---
 
@@ -811,29 +846,28 @@ Right — `Top Selling Services` list:
 **Table columns:** NAME | EMAIL | ROLE | STATUS | LAST LOGIN | ACTIONS
 
 **Role badge types:**
-- `ADMIN` — purple pill
-- `BOOSTER` — cyan/teal pill
-- `EDITOR` — gray pill
-- (implied) `CUSTOMER` — default/no badge
+- `ADMIN` — purple pill (admin terminal users only)
+- `CUSTOMER` — no badge (storefront users — managed separately via Supabase Auth)
+
+> ⚠️ The original design shows BOOSTER and EDITOR role badges — these are removed.
+> Only one admin role exists. Admin terminal and storefront auth are separate systems.
 
 **Status:** `● Active` (green) | `● Banned` (red, row text muted/strikethrough)
 
 **Row actions:** ✏️ Edit | 🕐 Activity history | ⊘ Ban/Suspend
 
-**Bottom stat cards (4-column):**
+**Bottom stat cards — update labels to reflect single role:**
 | Stat | Value | Note |
 |---|---|---|
 | TOTAL USERS | 1,248 | ▲ 12% from last month |
-| ACTIVE BOOSTERS | 24 | ⓘ Current high demand |
-| PENDING VERIFICATIONS | 18 | ⚠ Needs action |
+| ACTIVE ORDERS | 24 | orders currently in progress |
+| PENDING REFUNDS | 18 | ⚠ Needs action |
 | BANNED/FLAGGED | 7 | 🛡 Safety score: 98% |
 
-**User roles & permissions (inferred):**
+**User roles & permissions:**
 ```
-ADMIN   → Full access to all Admin Terminal sections
-BOOSTER → Deliver services; visible to customers; can be reviewed
-EDITOR  → Manage Content section only
-CUSTOMER → Storefront only; no admin access
+ADMIN    → Full access to all Admin Terminal sections (Supabase Auth — admin)
+CUSTOMER → Storefront only; no admin access (Supabase Auth — storefront)
 ```
 
 ---
@@ -1174,13 +1208,14 @@ Chat messages (bubble style):
 ```ts
 AdminUser {
   id: string
-  displayName: string       // "Admin Alpha"
-  email: string             // "alpha@moonstrike.admin"
-  role: "ADMIN" | "BOOSTER" | "EDITOR"
+  displayName: string   // "Admin Alpha"
+  email: string         // "alpha@moonstrike.admin"
+  role: "ADMIN"         // only one role — all admin terminal users are admins
   avatar: string
-  status: "Active" | "Banned"
   lastLogin: Date
   createdAt: Date
+  // NOTE: No BOOSTER or EDITOR roles. Admin = booster. No partial-access roles needed.
+  // Supabase Auth handles admin session — separate from storefront customer auth.
 }
 
 AuditLog {
@@ -1527,7 +1562,7 @@ Admin                    →  Relaxed limits — trusted, but still protected
 |---|---|---|---|
 | 7 | **`options_schema` snapshot at purchase time** — If admin edits a service's options after orders exist, historical orders display incorrectly. Decide: snapshot full schema at purchase, or just selections. | Order, Service CMS | ⚠️ TBD |
 | 8 | **Service fee amount undefined** — Checkout shows `$2.50` fee but calculation never defined. Flat? Percentage? Per item or per checkout? Admin-configurable or hardcoded? | Checkout, Order | ⚠️ TBD |
-| 9 | **TrustPilot API is read-only** — Cannot submit reviews through the site. Customers must go to TrustPilot directly. Post-order review prompt must redirect externally, not collect in-app. | Reviews, Post-order flow | ✅ Confirmed — redirect only |
+| 9 | **TrustPilot API is read-only** — Reviews fetched from TrustPilot at runtime, not stored in DB. No Review model or table needed. Post-order prompt redirects customer to TrustPilot externally. | Reviews, Post-order flow | ✅ Confirmed — no DB storage |
 | 10 | **Notifications undefined** — Order state machine has multiple points requiring customer notification (confirmed, delivered, crypto wallet prompt). Without this, crypto refund flow breaks silently. | Notifications, Refund flow | ⚠️ TBD |
 | 11 | **Google Sheets API trigger undefined** — Confirmed integration but what data gets written, when, and by what event is not specified. | Google Sheets integration | ⚠️ TBD |
 
@@ -1543,6 +1578,7 @@ Admin                    →  Relaxed limits — trusted, but still protected
 | 15 | **NowPayments webhook verification** — Needs signature validation middleware same as Stripe. Not yet documented in implementation plan. | Backend, Security | ⬜ Not started |
 | 16 | **Image hosting provider** — Cloudflare Images recommended (CDN + optimization). Decision pending. | Infrastructure | ⚠️ TBD |
 | 17 | **Mobile / responsive layouts** — All designs are desktop only. Breakpoints and mobile layouts undefined. | All pages | ⚠️ TBD |
+| 19 | **Light mode hero layout differs from dark mode** — Light mode hero is a featured game carousel, not a promo banner. These are two different components, not just a color swap. Both need to be built. | Landing Page | ⬜ Noted |
 | 18 | **Privacy Policy page** — Linked in footer on every page. Content and design pending. | Legal | ⚠️ TBD |
 
 ---
