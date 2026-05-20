@@ -82,6 +82,7 @@
 - `<RegionSelector>` — USA / EUROPE toggle pills
 - `<Badge>` — HOT, NEW UPDATE, COMING SOON, FEATURED — colored small corner/inline labels on cards
 - `<ThemeToggle>` — switches between dark and light mode; persisted in user preference
+- `<SearchResults>` — service cards only (image + title). No games. Triggered on submit, not real-time. Zero state: "No services found for [query]" message.
 
 ---
 
@@ -251,7 +252,121 @@
 
 ---
 
-### 3.5 Secure Checkout Page (`/checkout`)
+### 3.5 Customer Login & Register Page (`/login` and `/register`)
+
+**Purpose:** Authenticate existing customers or create new accounts. Two methods: Email/password and Google OAuth.
+
+**Layout:** Centered card on full dark/light background (no navbar, no footer — isolated auth flow)
+
+**Login Card:**
+- Logo: `Moon Strike` + tagline
+- Tab toggle: `Login` | `Register` (switches form below)
+- Field: `Email Address`
+- Field: `Password` — masked, eye toggle
+- Link: `Forgot Password?` (right-aligned, cyan/yellow depending on mode)
+- Divider: `or continue with`
+- Button: `Continue with Google` (Google icon + text, outlined)
+- CTA: `Login` (full-width, primary color)
+- Bottom: `Don't have an account?` → `Register` link
+
+**Register Card (same layout, different fields):**
+- Field: `Username`
+- Field: `Email Address`
+- Field: `Password`
+- Field: `Confirm Password`
+- Divider: `or continue with`
+- Button: `Continue with Google` (Google icon, outlined)
+- CTA: `Create Account` (full-width, primary color)
+- Bottom: `Already have an account?` → `Login` link
+
+**Implementation:**
+- Email/password: Supabase Auth `signUp` / `signInWithPassword`
+- Google OAuth: Supabase Auth `signInWithOAuth({ provider: 'google' })` — built-in, no extra API
+- On success: redirect to previous page or `/profile`
+- Auth state persisted via Supabase session (JWT + refresh token)
+
+---
+
+### 3.6 Customer Profile Page (`/profile`)
+
+**Purpose:** Customer's personal hub — view orders, transactions, and account settings.
+
+**Layout:** Left sidebar (profile info) + main content area (tabbed)
+
+**Left Sidebar:**
+- Avatar (from Google OAuth or default)
+- Username
+- Email
+- Member since date
+- Quick stats: Total Orders | Total Spent (USD or EUR based on preference)
+- `Edit Profile` link
+- `Logout` button
+
+**Main Content — Tab Navigation:**
+`ORDER HISTORY` | `TRANSACTION HISTORY`
+
+---
+
+**Tab 1 — Order History:**
+- Default tab
+- Filter tabs: `All` | `In Progress` | `Delivered` | `Completed` | `Refund Requested` | `Refunded`
+- Sort: newest first (default)
+- Each order row (card style):
+  - Service thumbnail + name
+  - Selected options summary (e.g. "Level 21–40 · Express delivery")
+  - Order date
+  - Amount (USD or EUR)
+  - Status badge
+  - `View Details` button
+
+**Order Detail (modal or sub-page `/profile/orders/[id]`):**
+- Service name + thumbnail
+- Full selected options breakdown with prices
+- Price breakdown: base + options + service fee + total
+- Order timeline: placed → confirmed → delivered → completed
+- Current status badge
+- `Open Support Chat` button → opens chat bubble focused on this order reference
+- `Request Refund` button — always visible, any non-terminal status
+  - On click: confirmation dialog "Are you sure? Admin will review your request."
+  - Sets `order.status` → `refund_requested`, sets `refundRequestedAt`
+  - If `paymentProvider = "nowpayments"`: shows wallet address input field before confirming
+
+---
+
+**Tab 2 — Transaction History:**
+- List of all payments made
+- Each row: TXN ID | Service name | Date | Amount | Method (Card/PayPal/Crypto) | Status
+- Read-only — no actions
+
+---
+
+### 3.7 Global Chat Bubble (all storefront pages)
+
+**Purpose:** Customer ↔ Admin support chat. Always accessible regardless of current page. Single general support thread per customer.
+
+**Behavior:**
+- Fixed position: bottom-right corner of every storefront page
+- Collapsed state: circular button with chat icon + unread message count badge (red dot)
+- Expanded state: chat panel slides up (320px wide, 480px tall)
+- Does NOT navigate away from current page — overlay only
+
+**Chat Panel (expanded):**
+- Header: `Support` | `Moon Strike` sub-label | minimize button (×)
+- Same thread as Admin Messages page — customer sees their full history
+- Message bubbles: customer (right, primary color) | admin (left, dark surface)
+- File attachment support (same as admin messages)
+- Composer: text input + 📎 attach + Send button
+- Typing indicator when admin is responding
+
+**Implementation notes:**
+- Same data source as Admin Messages — `SupportTicket` + `Message` models
+- Real-time updates via Supabase Realtime (WebSocket subscription on the ticket's messages)
+- Unread count: messages where `senderRole = "admin"` and not yet seen by customer
+- Chat bubble renders on all `/` storefront routes — excluded from `/admin/*` and `/login`, `/register`
+
+---
+
+### 3.8 Secure Checkout Page (`/checkout`)
 
 **Purpose:** Complete a purchase. Supports multiple payment methods.
 
@@ -282,7 +397,7 @@
 
 ---
 
-### 3.6 Refund Policy Page (`/refund-policy`)
+### 3.9 Refund Policy Page (`/refund-policy`)
 
 **Purpose:** Explain the refund and escrow process. Builds buyer trust.
 
@@ -300,7 +415,7 @@
 
 ---
 
-### 3.7 Terms of Service Page (`/terms-of-service`)
+### 3.10 Terms of Service Page (`/terms-of-service`)
 
 **Purpose:** Legal agreement between Moon Strike and users.
 
@@ -320,7 +435,7 @@
 
 ---
 
-### 3.8 Quick Select — Game & Service Mega Menu (Global Component)
+### 3.11 Quick Select — Game & Service Mega Menu (Global Component)
 
 **Trigger:** Clicking the hamburger menu or "Services" nav item
 **Purpose:** Fast navigation to any game's service category without going through full pages
@@ -550,8 +665,34 @@ ServiceOption {
   values: string[]      // ["+10", "+15", "+20"]
 }
 
+Cart {
+  id: string
+  userId: string          // FK → Supabase Auth user
+  createdAt: Date
+  updatedAt: Date
+  // Cart has many CartItems. Each CartItem = one future Order.
+  // Same service can appear as multiple CartItems (e.g. same boost for two different accounts).
+  // Account-specific details are NOT stored — communicated via support chat after purchase.
+}
+
+CartItem {
+  id: string
+  cartId: string          // FK → Cart
+  serviceId: string       // FK → Service
+  selectedOptions: Record<string, any>   // user's current selections (label → value)
+  optionsSchemaSnapshot: JSONB           // full snapshot of options_schema at add-to-cart time
+                                         // prevents price/option drift if admin edits service later
+  priceUSD: number        // calculated total in USD at add-to-cart time (base + options)
+  priceEUR: number        // calculated total in EUR at add-to-cart time
+  addedAt: Date
+  // NOTE: Each CartItem becomes exactly one Order on checkout.
+  // Two identical CartItems = two separate Orders = two separate chat threads.
+  // No quantity field — add the service again to get another item.
+}
+
 Order {
   id: string
+  cartItemId: string      // FK → CartItem (preserves what was purchased)
   serviceId: string
   userId: string
   selectedOptions: Record<string, any>  // resolved from options_schema at purchase time
@@ -579,7 +720,8 @@ Order {
     | "refunded"          // admin approved and issued refund via gateway — terminal
 
   deliveredAt: Date | null         // set when admin marks delivered
-  refundRequestedAt: Date | null   // set when customer opens refund request
+  refundRequestedAt: Date | null   // set when customer taps refund request button
+                                   // available on any non-terminal status — admin reviews before acting
 
   region: "USA" | "EUROPE"
   startType: "immediate" | "scheduled"
@@ -624,12 +766,17 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 | Currency toggle (global) | ⬜ | |
 | Region toggle (global) | ⬜ | |
 | TrustPilot integration | ⬜ | API TBD |
-| Search (global) | ⬜ | Mixed results — services + games in card view |
-| Cart | ⬜ | Same service purchasable multiple times |
-| Customer auth & profiles | ⚠️ | ⚠️ TBD — do not build until designed |
-| Order tracking page | ⚠️ | ⚠️ TBD — do not build until designed |
+| Search (global) | ⬜ | Service titles only — image + title card view, no games, zero-state message |
+| Cart | ⬜ | CartItem model defined — same service = new CartItem, account details via chat |
+| Customer Login page | ⬜ | Email/password + Google OAuth via Supabase Auth |
+| Customer Register page | ⬜ | Email/password + Google OAuth via Supabase Auth |
+| Customer Profile page | ⬜ | Order History + Transaction History tabs |
+| Order History (profile) | ⬜ | Filter tabs, status badges, View Detail |
+| Order Detail (profile) | ⬜ | Options breakdown, timeline, refund request button |
+| Refund request button | ⬜ | Any non-terminal status, admin reviews before acting |
+| Global Chat Bubble | ⬜ | Fixed bottom-right, all storefront pages, Supabase Realtime |
 | Notifications | ⚠️ | ⚠️ TBD — provider and triggers pending |
-| Currency conversion | ⚠️ | ⚠️ TBD — provider pending |
+| Currency display (USD/EUR) | ⬜ | Fixed values, no conversion — toggle in navbar |
 | Privacy Policy page | ⚠️ | ⚠️ TBD — content pending |
 | Mobile / responsive layouts | ⚠️ | ⚠️ TBD — all designs currently desktop only |
 | Light mode theme | ⬜ | Tokens confirmed — implement as CSS variable swap on `<html data-theme="light">` |
@@ -1059,7 +1206,59 @@ CUSTOMER → Storefront only; no admin access (Supabase Auth — storefront)
 
 ---
 
-### 10.9 Admin Content Page (`/admin/content`)
+### 10.9 Admin Order Management Page (`/admin/orders` and `/admin/orders/[id]`)
+
+**Purpose:** Central queue for all customer orders. Admin reviews, updates status, and manages fulfillment.
+
+**Header:** `Order Management` | subtitle: "Track, fulfill, and manage all customer service orders."
+**CTA:** `Export CSV` (top right)
+
+**Summary stat cards (4-column):**
+| Card | Value | Note |
+|---|---|---|
+| TOTAL ORDERS | — | All time |
+| IN PROGRESS | — | Needs attention |
+| PENDING REFUNDS | — | ⚠ Action required |
+| COMPLETED TODAY | — | |
+
+**Filter tabs:** `All Orders` | `Confirmed` | `In Progress` | `Delivered` | `Completed` | `Refund Requested` | `Refunded`
+
+**Default sort:** Newest first (by `createdAt`). Sortable by status, amount.
+
+**Table columns:** ORDER ID | CUSTOMER (avatar + name) | SERVICE | OPTIONS SUMMARY | DATE | AMOUNT (USD) | STATUS | ACTIONS
+- **Options summary:** compact display of selected options e.g. "Level 21–40 · Express · 2 runs"
+- **Status badges:** same colors as Order state machine (§11)
+- **Row actions:** 👁 View Detail
+
+---
+
+**Order Detail Page (`/admin/orders/[id]`):**
+
+**Breadcrumb:** `Orders > #TRX-XXXXX`
+
+**Left column — Order Info:**
+- Service thumbnail + name + link to service
+- Customer name + avatar + link to user profile
+- Full selected options breakdown with per-option prices (USD + EUR)
+- Price breakdown: base + options + service fee + total (both currencies)
+- Order timeline visual: placed → confirmed → delivered → completed
+- Timestamps for each completed state
+
+**Right column — Actions panel:**
+- Current status badge (large)
+- **Status update buttons** (context-aware — only valid next states shown):
+  - `confirmed` → `Mark as Delivered` button (primary)
+  - `refund_requested` → `Approve Refund` (danger/red) | `Deny Refund` (outlined)
+- `Open Chat` button → links to Admin Messages filtered to this customer
+- **Refund panel** (shown when `refund_requested`):
+  - Payment method display (Card / PayPal / Crypto)
+  - If Crypto: wallet address field (pre-filled if customer provided it, editable)
+  - `Issue Refund` button (auto-routes to Stripe or NowPayments API — see §11)
+- Order metadata: payment provider, TXN ID, region, created/updated timestamps
+
+---
+
+### 10.10 Admin Content Page (`/admin/content`)
 
 **Purpose:** CMS for all storefront content — landing page sections, banners, game catalog entries, media.
 
@@ -1090,7 +1289,7 @@ CUSTOMER → Storefront only; no admin access (Supabase Auth — storefront)
 
 ---
 
-### 10.10 Admin Messages Page (`/admin/messages`)
+### 10.11 Admin Messages Page (`/admin/messages`)
 
 **Purpose:** Support inbox — admins manage all customer support conversations. Three-panel layout.
 
@@ -1141,7 +1340,7 @@ Chat messages (bubble style):
 
 ---
 
-### 10.11 Admin Audit Logs Page (`/admin/logs`)
+### 10.12 Admin Audit Logs Page (`/admin/logs`)
 
 **Purpose:** Real-time system audit trail — every admin action and system event logged.
 
@@ -1180,7 +1379,7 @@ Chat messages (bubble style):
 
 ---
 
-### 10.12 Admin Settings Page (`/admin/settings`)
+### 10.13 Admin Settings Page (`/admin/settings`)
 
 **Purpose:** Platform-wide configuration and admin profile settings.
 
@@ -1203,7 +1402,7 @@ Chat messages (bubble style):
 
 ---
 
-### 10.13 Admin Data Models (Additional)
+### 10.14 Admin Data Models (Additional)
 
 ```ts
 AdminUser {
@@ -1276,9 +1475,23 @@ SystemSettings {
 
 ---
 
-### 10.14 Admin Routes
+### 10.15 Admin Routes
 
 ```
+# Storefront routes
+/                               → Landing Page
+/games                          → Games Page
+/services                       → Services Page
+/services/[game]/[slug]         → Service Detail
+/checkout                       → Checkout
+/login                          → Customer Login
+/register                       → Customer Register
+/profile                        → Customer Profile (Order History tab default)
+/profile/orders/[id]            → Order Detail
+/refund-policy                  → Refund Policy
+/terms-of-service               → Terms of Service
+
+# Admin routes
 /admin/login                    → Admin Login
 /admin/dashboard                → Operational Overview
 /admin/users                    → User Registry
@@ -1291,6 +1504,8 @@ SystemSettings {
 /admin/services/new             → Create Service (CMS)
 /admin/services/[id]/edit       → Edit Service (CMS)
 /admin/transactions             → Financial Ledger
+/admin/orders                   → Order Management
+/admin/orders/[id]              → Order Detail
 /admin/content                  → Content Library
 /admin/content/new              → Add Content
 /admin/content/[id]/edit        → Edit Content
@@ -1309,7 +1524,7 @@ SystemSettings {
 
 ---
 
-### 10.15 Admin Feature Progress Tracker
+### 10.16 Admin Feature Progress Tracker
 
 ```
 STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
@@ -1319,6 +1534,8 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 |---|---|---|
 | **ADMIN** | | |
 | Admin Login Page | ⬜ | Design ref: Admin_Dashboard_-_Login.png |
+| Admin Order Management List | ⬜ | See §10.9 — filter tabs, sort by date |
+| Admin Order Detail | ⬜ | See §10.9 — status update, refund panel, chat link |
 | Admin Dashboard Overview | ⬜ | Design ref: Admin_Dashboard_-_Overview.png |
 | Admin Users List | ⬜ | Design ref: Admin_Dashboard_-_Users.png |
 | Admin Games List | ⬜ | Design ref: Admin_Games_List.png — GENRE/TYPE column, not price |
@@ -1547,12 +1764,12 @@ Admin                    →  Relaxed limits — trusted, but still protected
 
 | # | Issue | Affected Area | Status |
 |---|---|---|---|
-| 1 | **Cart data model undefined** — `Order` has one `serviceId` but cart supports multiple items and repeat purchases. Need a `CartItem` / `OrderItem` model. | Cart, Checkout, Order | ⚠️ TBD |
-| 2 | **Cart + scalar overlap** — "2 runs" achievable via scalar option OR adding service twice. Produces different orders, same outcome. Needs a defined rule. | Cart, Service Options | ⚠️ TBD |
-| 3 | **Search spec incomplete** — "related" is undefined. No zero-results state. Real-time vs. on-submit unclear. Scope of fields searched (title only? description?) undefined. | Search | ⚠️ TBD |
-| 4 | **No "orders to fulfill" queue** — Admin = booster but no dedicated view for pending orders that need action. Dashboard shows recent activity but no prioritized work queue. | Admin Dashboard | ⚠️ TBD |
-| 5 | **Customer auth & profiles not designed** — Required before any order flow, cart, or refund request can be built on the storefront. | Auth, Storefront | ⚠️ TBD |
-| 6 | **Order tracking page not designed** — Customers have no way to see order status post-purchase without this. Crypto refund wallet prompt also depends on this page. | Storefront | ⚠️ TBD |
+| 1 | **Cart data model undefined** — `Cart` + `CartItem` models defined. Each CartItem = one Order. Same service = new CartItem. Account details via chat. | Cart, Checkout, Order | ✅ Resolved — see §6 |
+| 2 | **Cart + scalar overlap** — Scalar = repeat actions within one service (e.g. dungeon runs). Duplicate CartItem = same service for a different account. Distinct use cases, no overlap. | Cart, Service Options | ✅ Resolved |
+| 3 | **Search spec incomplete** — Service titles only. Card view (image + title). On-submit (not real-time). Zero state: "No services found for [query]". No games in results. | Search | ✅ Resolved |
+| 4 | **No "orders to fulfill" queue** — Admin Order Management page designed. See §10.9. Filter tabs + date sort + status update actions per order. | Admin Dashboard | ✅ Resolved — see §10.9 |
+| 5 | **Customer auth & profiles not designed** — Login, Register, Profile pages designed. See §3.5–3.6. Email + Google OAuth via Supabase Auth. | Auth, Storefront | ✅ Resolved — see §3.5, 3.6 |
+| 6 | **Order tracking page not designed** — Tracked via Order History in Profile (§3.6). Order detail has timeline, status, refund button, and wallet address prompt for crypto. | Storefront | ✅ Resolved — see §3.6 |
 
 ---
 
