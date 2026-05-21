@@ -269,6 +269,8 @@
 - Field: `Email Address`
 - Field: `Password` — masked, eye toggle
 - Link: `Forgot Password?` (right-aligned, cyan/yellow depending on mode)
+- Divider: `or continue with`
+- Button: `Continue with Google` (Google icon + text, outlined)
 - CTA: `Login` (full-width, primary color)
 - Bottom: `Don't have an account?` → `Register` link
 
@@ -277,12 +279,14 @@
 - Field: `Email Address`
 - Field: `Password`
 - Field: `Confirm Password`
+- Divider: `or continue with`
+- Button: `Continue with Google` (Google icon, outlined)
 - CTA: `Create Account` (full-width, primary color)
 - Bottom: `Already have an account?` → `Login` link
 
 **Implementation:**
-- Email/password only: Supabase Auth `signUp` / `signInWithPassword`
-- No Google OAuth — email auth only
+- Email/password: Supabase Auth `signUp` / `signInWithPassword`
+- Google OAuth: Supabase Auth `signInWithOAuth({ provider: 'google' })` — free under 50K MAU, no separate charge
 - On success: redirect to previous page or `/profile`
 - Auth state persisted via Supabase session (JWT + refresh token)
 
@@ -764,8 +768,8 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 | TrustPilot integration | ⬜ | API TBD |
 | Search (global) | ⬜ | Service titles only — image + title card view, no games, zero-state message |
 | Cart | ⬜ | CartItem model defined — same service = new CartItem, account details via chat |
-| Customer Login page | ⬜ | Email/password only — no Google OAuth |
-| Customer Register page | ⬜ | Email/password only — no Google OAuth |
+| Customer Login page | ⬜ | Email/password + Google OAuth via Supabase Auth |
+| Customer Register page | ⬜ | Email/password + Google OAuth via Supabase Auth |
 | Customer Profile page | ⬜ | Order History + Transaction History tabs |
 | Order History (profile) | ⬜ | Filter tabs, status badges, View Detail |
 | Order Detail (profile) | ⬜ | Options breakdown, timeline, refund request button |
@@ -794,7 +798,8 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 | Backend | ✅ | Supabase |
 | Database | ✅ | Supabase PostgreSQL — dynamic fields as JSONB |
 | Auth provider | ✅ | Supabase Auth |
-| Image hosting | ⚠️ TBD | Cloudflare Images recommended (global CDN, auto WebP/AVIF, resizing) — deciding later |
+| Image hosting | ✅ | Supabase Storage (free tier) as origin + Cloudflare Images as CDN (transform + delivery) |
+| SMTP provider | ⚠️ TBD | Resend or Brevo — both have free tiers sufficient for early stage. Required for auth emails + notifications in production. |
 | Payment gateway | ✅ | Stripe (card + PayPal + Google Pay + Apple Pay) + NowPayments (crypto) |
 | Currency | ✅ | Fixed values — admin manually sets USD and EUR prices per service/option. No conversion API. |
 
@@ -816,7 +821,7 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 ### Features
 | Feature | Status | Decision |
 |---|---|---|
-| Customer auth & profiles | ✅ | Email/password only via Supabase Auth. No Google OAuth. |
+| Customer auth & profiles | ✅ | Email/password + Google OAuth via Supabase Auth. Both free under 50K MAU. |
 | Order tracking page (storefront) | ⚠️ TBD | Required — design pending |
 | Booster workflow | ✅ | No separate booster role. Admin acts as both administrator and booster. |
 | Order state machine | ✅ | No escrow — admin = booster, refunds via payment gateway. See §11 |
@@ -1352,7 +1357,7 @@ Central asset store for all CMS images and videos.
 | Feature | Detail |
 |---|---|
 | Upload | Drag & drop or browse — image (JPG, PNG, WebP, GIF) or video URL |
-| CDN | Served via image hosting provider (⚠️ TBD — Cloudflare Images recommended) |
+| CDN | Served via Cloudflare Images (origin: Supabase Storage) |
 | Usage tracking | Shows which content blocks reference each asset |
 | Search | Filter by filename or type |
 | Actions | Copy URL | Replace | Delete (blocked if asset is in use) |
@@ -1580,7 +1585,7 @@ PromoBanner {
 MediaAsset {
   id: string
   filename: string
-  url: string               // CDN URL (Cloudflare Images or TBD provider)
+  url: string               // CDN URL (Cloudflare Images — origin stored in Supabase Storage)
   type: "image" | "video"
   sizeBytes: number
   usedIn: string[]          // IDs of ContentBlocks or PromoBanners referencing this asset
@@ -1903,7 +1908,7 @@ Admin                    →  Relaxed limits — trusted, but still protected
 | 2 | **Cart + scalar overlap** — Scalar = repeat actions within one service (e.g. dungeon runs). Duplicate CartItem = same service for a different account. Distinct use cases, no overlap. | Cart, Service Options | ✅ Resolved |
 | 3 | **Search spec incomplete** — Service titles only. Card view (image + title). On-submit (not real-time). Zero state: "No services found for [query]". No games in results. | Search | ✅ Resolved |
 | 4 | **No "orders to fulfill" queue** — Admin Order Management page designed. See §10.9. Filter tabs + date sort + status update actions per order. | Admin Dashboard | ✅ Resolved — see §10.9 |
-| 5 | **Customer auth & profiles not designed** — Login, Register, Profile pages designed. See §3.5–3.6. Email + Google OAuth via Supabase Auth. | Auth, Storefront | ✅ Resolved — see §3.5, 3.6 |
+| 5 | **Customer auth & profiles not designed** — Login, Register, Profile pages designed. See §3.5–3.6. Email/password + Google OAuth via Supabase Auth (both free under 50K MAU). | Auth, Storefront | ✅ Resolved — see §3.5, 3.6 |
 | 6 | **Order tracking page not designed** — Tracked via Order History in Profile (§3.6). Order detail has timeline, status, refund button, and wallet address prompt for crypto. | Storefront | ✅ Resolved — see §3.6 |
 
 ---
@@ -1930,7 +1935,7 @@ Admin                    →  Relaxed limits — trusted, but still protected
 | 17 | **Mobile / responsive layouts** — All designs are desktop only. Breakpoints and mobile layouts undefined. | All pages | ✅ Resolved — to be built alongside desktop. Claude will assist. |
 | 18 | **Privacy Policy page** — Linked in footer on every page. Content and design pending. | Legal | ✅ Resolved — page to be designed matching MoonStrike design system. |
 | 15 | **NowPayments webhook verification** — Needs signature validation middleware same as Stripe. Not yet documented in implementation plan. | Backend, Security | ⬜ Not started |
-| 16 | **Image hosting provider** — Cloudflare Images recommended (CDN + optimization). Decision pending. | Infrastructure | ⚠️ TBD |
+| 16 | **Image hosting provider** — Cloudflare Images recommended (CDN + optimization). Decision pending. | Infrastructure | ✅ Resolved — Supabase Storage (free) as origin, Cloudflare Images as CDN. |
 | 19 | **Light mode hero layout differs from dark mode** — Light mode hero is a featured game carousel, not a promo banner. These are two different components, not just a color swap. Both need to be built. | Landing Page | ⬜ Noted |
 
 ---
@@ -1960,7 +1965,25 @@ Admin                    →  Relaxed limits — trusted, but still protected
 
 ---
 
-### `options_schema` Snapshot (resolves issue #7)
+### Auth — Google OAuth reinstated
+
+- Google OAuth re-added alongside email/password — free under Supabase's 50K MAU free tier, no separate charge
+- Both methods active: `signInWithPassword` + `signInWithOAuth({ provider: 'google' })`
+- Login and Register pages include `Continue with Google` button
+
+### Image Hosting (resolves issue #16)
+
+- **Origin storage:** Supabase Storage (free tier — 1 GB included, well within needs)
+- **CDN + transforms:** Cloudflare Images — pulls from Supabase on first request, caches at edge globally
+- **Supabase egress cost:** Near zero — Cloudflare only hits origin once per image variant, all repeat requests served from cache
+- **Estimated cost:** $0–$5/month at early-to-mid traffic (see pricing analysis above)
+
+### SMTP Provider
+
+- Required for production auth emails (OTP, verification, password reset) and order/refund notification emails
+- Supabase's default SMTP is limited to 2 emails/hour — not suitable for production
+- **Decision pending between:** Resend (3,000 emails/month free, 100/day) or Brevo (300 emails/day free)
+- Both integrate with Supabase via custom SMTP settings in the dashboard
 
 - Snapshot stores **selected values only** — not the full schema
 - Example: `{ "difficulty": "Mythic", "loot_traders": 2 }`
