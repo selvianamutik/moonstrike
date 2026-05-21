@@ -388,10 +388,7 @@
 1. **Card header:** `Order Summary`
 2. **Item row:** thumbnail | service name | price (e.g., WoW Mythic+ 15 Run — $45.00) | `⚡ Immediate Start` badge
 3. **Price breakdown:**
-   - Subtotal: $45.00
-   - Service Fee: $2.50
-   - Taxes: $0.00
-   - **Total: $47.50** (large, cyan)
+   - **Total: $45.00** (large, cyan) — taxes and fees included
 4. **`🔒 Complete Purchase` button** (full-width, purple gradient)
 5. **Security note:** `256-BIT SSL ENCRYPTED`
 6. **Legal note:** "By completing your purchase, you agree to our Terms of Service and Privacy Policy."
@@ -698,10 +695,7 @@ Order {
   serviceId: string
   userId: string
   selectedOptions: Record<string, any>  // resolved from options_schema at purchase time
-  subtotal: number
-  serviceFee: number
-  taxes: number
-  total: number
+  total: number           // base price only — taxes and fees included in service base price
   currency: string
 
   // Payment provider fields — stored at checkout, used for refunds
@@ -713,12 +707,12 @@ Order {
 
   // Order state machine (see §11 for full diagram and transition rules)
   // No escrow — refunds handled directly via payment gateway API
+  // Orders only exist post-payment — no pending_payment state
   status:
-    | "pending_payment"   // order created, payment not yet confirmed
     | "confirmed"         // payment cleared, admin notified, service in progress
     | "delivered"         // admin marked as delivered, customer notified
     | "completed"         // customer confirmed or admin closed — terminal
-    | "refund_requested"  // customer opened refund request
+    | "refund_requested"  // customer opened refund request — available from confirmed/delivered/completed
     | "refunded"          // admin approved and issued refund via gateway — terminal
 
   deliveredAt: Date | null         // set when admin marks delivered
@@ -779,8 +773,8 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 | Global Chat Bubble | ⬜ | Fixed bottom-right, all storefront pages, Supabase Realtime |
 | Notifications | ⬜ | In-app bell (storefront + admin) + email for customers. See §13.1 |
 | Currency display (USD/EUR) | ⬜ | Fixed values, no conversion — toggle in navbar |
-| Privacy Policy page | ⚠️ | ⚠️ TBD — content pending |
-| Mobile / responsive layouts | ⚠️ | ⚠️ TBD — all designs currently desktop only |
+| Privacy Policy page | ⬜ | To be designed matching MoonStrike design system |
+| Mobile / responsive layouts | ⬜ | To be built alongside desktop pages |
 | Light mode theme | ⬜ | Tokens confirmed — implement as CSS variable swap on `<html data-theme="light">` |
 | Theme toggle (dark/light) | ⬜ | Persisted in user preference / localStorage |
 
@@ -1367,23 +1361,27 @@ Central asset store for all CMS images and videos.
 
 ### 10.11 Admin Messages Page (`/admin/messages`)
 
-**Purpose:** Support inbox — admins manage all customer support conversations. Three-panel layout.
+**Purpose:** Unified inbox — admins manage both support conversations and order chats in one tab.
 
 **Layout:** Left sidebar (nav) | Middle panel (conversation list) | Right panel (active chat + user profile)
 
+**Two chat types, same tab:**
+- `[Support]` — general support threads, initiated by customer or admin. Available to anonymous and logged-in users.
+- `[Order #order_id]` — order-specific threads. Initiated by customer via order list chat button, or by admin via order management page chat button.
+
 **Middle Panel — Conversation List:**
-- Header: `Support` + green online indicator dot
+- Header: `Messages` + green online indicator dot
+- Filter/toggle to switch between Support and Order chats (or show all)
 - Each thread row:
+  - Label prefix: `[Support]` or `[Order #ord_001]`
   - Username + timestamp (relative, e.g. "2m ago")
-  - Thread subject/title (e.g. "Order #TRX-94821 - WoW Boost") — highlighted/linked
   - Message preview (italic, truncated)
-- Thread statuses implied by subject:
-  - Order support, Refund requests, General questions
+- Admin can initiate a new thread from this panel or from the Order Management page
 
 **Right Panel — Active Chat:**
 
 Top bar:
-- User avatar + username + ticket ID (e.g. `Arthas_King99 #8842`)
+- User avatar + username + thread label (e.g. `Arthas_King99 — [Order #ord_001]`)
 - Membership tier badge: `GOLD TIER MEMBER` (cyan)
 - ⋮ options menu
 
@@ -1413,6 +1411,12 @@ Chat messages (bubble style):
   - `Issue Refund` button (outlined)
   - `Update Ticket` button (outlined)
   - `Ban User` button (red/danger)
+
+**Anonymous → logged-in session handling:**
+- Anonymous users assigned a temporary `session_id` (cookie/localStorage)
+- On login: anonymous session merged into account — `user_id` attached to existing chat records, history preserved
+- Session expiry: anonymous = 1 hour, logged-in = 1 week
+- Expired sessions and their chat records are deleted to save storage
 
 ---
 
@@ -1671,7 +1675,7 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 | Promotional Banners CMS | ⬜ | Services page banner + seasonal — schedulable |
 | Media Library CMS | ⬜ | Upload, CDN serve, usage tracking, delete guard |
 | Hot Offers auto-population | ⬜ | Query Service WHERE isHotOffer = true — no CMS entry |
-| Admin Messages / Support Chat | ⬜ | Design ref: Admin_Messages_List.png |
+| Admin Messages / Chat | ⬜ | Unified tab: [Support] + [Order #order_id] threads. Anon session merge on login. See §10.11 and §13.1. |
 | Admin Audit Logs | ⬜ | Design ref: Admin_Dashboard_-_Audit_Logs.png |
 | Admin Settings | ⬜ | Design ref: Admin_Settings_Page.png |
 | Admin Auth Guard (route protection) | ⬜ | All /admin/* routes |
@@ -1749,14 +1753,18 @@ customer satisfied     customer requests refund
 | `pending_payment` | `confirmed` | Payment gateway webhook | System |
 | `confirmed` | `delivered` | Admin marks as delivered | Admin |
 | `delivered` | `completed` | Customer confirms or no dispute raised | Customer / Admin |
+| `confirmed` | `refund_requested` | Customer requests refund | Customer |
 | `delivered` | `refund_requested` | Customer requests refund | Customer |
+| `completed` | `refund_requested` | Customer requests refund (unsatisfied with work) | Customer |
 | `refund_requested` | `refunded` | Admin approves and issues via payment gateway | Admin |
 | `refund_requested` | `completed` | Admin denies refund request | Admin |
 
 ### Rules
 - `completed` and `refunded` are terminal states — no further transitions.
+- Refund request is available from `confirmed`, `delivered`, and `completed` only.
+- `refund_requested` and `refunded` cannot request another refund.
+- Orders are only created post-payment — no `pending_payment` state.
 - All state transitions must be written to the Audit Log.
-- `serviceFee` refundability on approved refunds — ⚠️ TBD.
 - No automated cron jobs or time-based auto-transitions needed (simpler than escrow).
 
 ### Refund API Behaviour by Provider
@@ -1905,7 +1913,7 @@ Admin                    →  Relaxed limits — trusted, but still protected
 | # | Issue | Affected Area | Status |
 |---|---|---|---|
 | 7 | **`options_schema` snapshot at purchase time** — If admin edits a service's options after orders exist, historical orders display incorrectly. Decide: snapshot full schema at purchase, or just selections. | Order, Service CMS | ✅ Resolved — snapshot selected values only. See §13.1 |
-| 8 | **Service fee amount undefined** — Checkout shows `$2.50` fee but calculation never defined. Flat? Percentage? Per item or per checkout? Admin-configurable or hardcoded? | Checkout, Order | ⚠️ TBD |
+| 8 | **Service fee amount undefined** — Checkout shows `$2.50` fee but calculation never defined. Flat? Percentage? Per item or per checkout? Admin-configurable or hardcoded? | Checkout, Order | ✅ Resolved — taxes and fees included in service base price. Removed from checkout UI and Order model. |
 | 9 | **TrustPilot API is read-only** — Reviews fetched from TrustPilot at runtime, not stored in DB. No Review model or table needed. Post-order prompt redirects customer to TrustPilot externally. | Reviews, Post-order flow | ✅ Confirmed — no DB storage |
 | 10 | **Notifications undefined** — Order state machine has multiple points requiring customer notification (confirmed, delivered, crypto wallet prompt). Without this, crypto refund flow breaks silently. | Notifications, Refund flow | ✅ Resolved — see §13.1 |
 | 11 | **Google Sheets API trigger undefined** — Confirmed integration but what data gets written, when, and by what event is not specified. | Google Sheets integration | ✅ Resolved — see §13.1 |
@@ -1916,14 +1924,14 @@ Admin                    →  Relaxed limits — trusted, but still protected
 
 | # | Issue | Affected Area | Status |
 |---|---|---|---|
-| 12 | **Order cancellation missing** — No `cancelled` state. Can customer cancel after `confirmed` but before `delivered`? If yes, is refund automatic? | Order state machine | ⚠️ TBD |
-| 13 | **Service fee per item vs. per checkout** — Multi-item cart: is fee charged once or per item? | Checkout, Cart | ⚠️ TBD |
-| 14 | **Admin Messages scope** — Is it support-only or does it also handle order status updates? Two different inbox designs if combined. | Admin Messages | ⚠️ TBD |
+| 12 | **Order cancellation missing** — No `cancelled` state. Can customer cancel after `confirmed` but before `delivered`? If yes, is refund automatic? | Order state machine | ✅ Resolved — no cancel state. Customer requests refund from `confirmed`, `delivered`, or `completed`. Admin approves/denies. |
+| 13 | **Service fee per item vs. per checkout** — Multi-item cart: is fee charged once or per item? | Checkout, Cart | ✅ Resolved — fees included in base price, no separate fee charged. |
+| 14 | **Admin Messages scope** — Is it support-only or does it also handle order status updates? Two different inbox designs if combined. | Admin Messages | ✅ Resolved — unified tab with `[Support]` and `[Order #order_id]` threads. See §10.11 and §13.1. |
+| 17 | **Mobile / responsive layouts** — All designs are desktop only. Breakpoints and mobile layouts undefined. | All pages | ✅ Resolved — to be built alongside desktop. Claude will assist. |
+| 18 | **Privacy Policy page** — Linked in footer on every page. Content and design pending. | Legal | ✅ Resolved — page to be designed matching MoonStrike design system. |
 | 15 | **NowPayments webhook verification** — Needs signature validation middleware same as Stripe. Not yet documented in implementation plan. | Backend, Security | ⬜ Not started |
 | 16 | **Image hosting provider** — Cloudflare Images recommended (CDN + optimization). Decision pending. | Infrastructure | ⚠️ TBD |
-| 17 | **Mobile / responsive layouts** — All designs are desktop only. Breakpoints and mobile layouts undefined. | All pages | ⚠️ TBD |
 | 19 | **Light mode hero layout differs from dark mode** — Light mode hero is a featured game carousel, not a promo banner. These are two different components, not just a color swap. Both need to be built. | Landing Page | ⬜ Noted |
-| 18 | **Privacy Policy page** — Linked in footer on every page. Content and design pending. | Legal | ⚠️ TBD |
 
 ---
 
@@ -2000,6 +2008,38 @@ Admin                    →  Relaxed limits — trusted, but still protected
 | Refund resolved | Update `refund_status` + `refunded_at` on existing Transactions row |
 
 **Not written to Sheets:** User registrations, admin actions, failed payments.
+
+---
+
+### Order Cancellation & Refund-Requestable Statuses (resolves issue #12)
+
+- No `cancelled` state — customers request a refund instead
+- Orders only exist post-payment, no `pending_payment` state
+- Refund request button visible on these statuses only:
+
+| Status | Refund Requestable? |
+|---|---|
+| `confirmed` | ✅ |
+| `delivered` | ✅ |
+| `completed` | ✅ (customer unsatisfied with booster's work) |
+| `refund_requested` | ❌ already in flow |
+| `refunded` | ❌ already resolved |
+
+- All refunds require admin approval — no automatic refunds triggered by customer action alone
+
+---
+
+### Admin Messages — Chat Scope (resolves issue #14)
+
+**Two thread types, one unified tab:**
+- `[Support]` — general support. Available to anonymous and logged-in customers. Admin can initiate.
+- `[Order #order_id]` — order-specific. Customer initiates via order list chat button; admin initiates via order management page chat button. Redirects both to the chat tab with that thread pre-selected.
+
+**Anonymous → logged-in session merge:**
+- Anonymous users get a temporary `session_id` (cookie/localStorage)
+- On login: `session_id` records updated with `user_id` — chat history carries over, no fresh start
+- Session expiry: anonymous = 1 hour, logged-in = 1 week
+- Expired sessions and their message records deleted on expiry to save storage
 
 ---
 
