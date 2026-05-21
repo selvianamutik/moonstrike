@@ -1934,9 +1934,9 @@ Admin                    →  Relaxed limits — trusted, but still protected
 | 14 | **Admin Messages scope** — Is it support-only or does it also handle order status updates? Two different inbox designs if combined. | Admin Messages | ✅ Resolved — unified tab with `[Support]` and `[Order #order_id]` threads. See §10.11 and §13.1. |
 | 17 | **Mobile / responsive layouts** — All designs are desktop only. Breakpoints and mobile layouts undefined. | All pages | ✅ Resolved — to be built alongside desktop. Claude will assist. |
 | 18 | **Privacy Policy page** — Linked in footer on every page. Content and design pending. | Legal | ✅ Resolved — page to be designed matching MoonStrike design system. |
-| 15 | **NowPayments webhook verification** — Needs signature validation middleware same as Stripe. Not yet documented in implementation plan. | Backend, Security | ⬜ Not started |
+| 15 | **NowPayments webhook verification** — Needs signature validation middleware same as Stripe. Not yet documented in implementation plan. | Backend, Security | ✅ Resolved — HMAC-SHA512 signature verification middleware. See §13.1. `NOWPAYMENTS_IPN_SECRET` env var required — setup pending. |
 | 16 | **Image hosting provider** — Cloudflare Images recommended (CDN + optimization). Decision pending. | Infrastructure | ✅ Resolved — Supabase Storage (free) as origin, Cloudflare Images as CDN. |
-| 19 | **Light mode hero layout differs from dark mode** — Light mode hero is a featured game carousel, not a promo banner. These are two different components, not just a color swap. Both need to be built. | Landing Page | ⬜ Noted |
+| 19 | **Light mode hero layout differs from dark mode** — Light mode hero is a featured game carousel, not a promo banner. These are two different components, not just a color swap. Both need to be built. | Landing Page | ✅ Resolved — Light mode is prototype/palette reference only. Single `<Hero />` component built for dark mode; light mode applies color token swap only. Carousel/two-column layout from light mode design is not implemented. |
 
 ---
 
@@ -2068,3 +2068,68 @@ Admin                    →  Relaxed limits — trusted, but still protected
 
 *Last updated: [DATE] — Update PROGRESS.md when any feature status changes.*
 *Design references: all screenshots stored in /design-refs/ folder.*
+
+### NowPayments Webhook Verification (resolves issue #15)
+
+**Approach:** HMAC-SHA512 signature verification middleware, mirroring Stripe's implementation.
+
+**Required env var:** `NOWPAYMENTS_IPN_SECRET` — obtained from NowPayments dashboard → API Settings → IPN Secret. ⚠️ Setup pending.
+
+**Verification utility:**
+```ts
+// lib/webhooks/verifyNowPayments.ts
+import crypto from "crypto";
+
+export function verifyNowPaymentsSignature(
+  rawBody: string,
+  signature: string,
+  secret: string
+): boolean {
+  const hmac = crypto
+    .createHmac("sha512", secret)
+    .update(rawBody)
+    .digest("hex");
+
+  return hmac === signature;
+}
+```
+
+**Webhook route:** `POST /api/v1/webhooks/nowpayments`
+```ts
+export async function POST(req: Request) {
+  const signature = req.headers.get("x-nowpayments-sig");
+  const rawBody = await req.text(); // must be raw — never parse first
+
+  if (!signature || !verifyNowPaymentsSignature(
+    rawBody,
+    signature,
+    process.env.NOWPAYMENTS_IPN_SECRET!
+  )) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  const payload = JSON.parse(rawBody);
+
+  if (payload.payment_status === "finished") {
+    // confirm order, write to Sheets, notify admin
+  }
+
+  return new Response("OK", { status: 200 });
+}
+```
+
+**Rules:**
+- Always read raw body before any JSON parsing — parsing mutates the body and breaks HMAC comparison
+- Log failed verifications to Audit Logs — repeated failures may signal an attack
+- Always return 200 after verification passes, even on business logic errors — NowPayments retries on non-200, which can cause duplicate order creation
+
+---
+
+### Light Mode Hero (resolves issue #19)
+
+Light mode is a **design prototype and color palette reference only**. The hero component is not a separate implementation.
+
+- Single `<Hero />` component — built for dark mode
+- Light mode applies CSS color token swap only (no layout change)
+- Carousel and two-column featured game layout from the light mode design screenshot are **not implemented**
+- Both dark and light modes share the same promo banner layout and CMS fields: `label`, `headline`, `subtext`, `CTA text/link`, `background image`
