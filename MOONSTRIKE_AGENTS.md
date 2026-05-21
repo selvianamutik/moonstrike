@@ -681,7 +681,8 @@ CartItem {
   cartId: string          // FK → Cart
   serviceId: string       // FK → Service
   selectedOptions: Record<string, any>   // user's current selections (label → value)
-  optionsSchemaSnapshot: JSONB           // full snapshot of options_schema at add-to-cart time
+  optionsSchemaSnapshot: JSONB           // snapshot of SELECTED options only at add-to-cart time
+                                         // e.g. { "difficulty": "Mythic", "loot_traders": 2 }
                                          // prevents price/option drift if admin edits service later
   priceUSD: number        // calculated total in USD at add-to-cart time (base + options)
   priceEUR: number        // calculated total in EUR at add-to-cart time
@@ -811,7 +812,7 @@ STATUS KEY: ✅ Done | 🚧 In Progress | ⬜ Not Started | 🔴 Blocked
 | Stripe | ✅ | Card, PayPal, Google Pay, Apple Pay — all via Stripe. Single integration. |
 | NowPayments | ✅ | Crypto payments + refund API (requires customer wallet address) |
 | TrustPilot | ✅ | Read-only API — displays existing reviews. Customers review on TrustPilot directly. |
-| Google Sheets API | ⚠️ TBD | Writes customer service data — exact trigger and fields to be defined |
+| Google Sheets API | ⬜ | Orders tab + Transactions tab. See §13.1 for schema and trigger rules. |
 | Google Pay | ✅ | Handled via Stripe — not a separate API |
 | Apple Pay | ✅ | Handled via Stripe — not a separate API |
 | Currency converter | ✅ | Not needed — fixed USD + EUR values set manually by admin per service |
@@ -1903,11 +1904,11 @@ Admin                    →  Relaxed limits — trusted, but still protected
 
 | # | Issue | Affected Area | Status |
 |---|---|---|---|
-| 7 | **`options_schema` snapshot at purchase time** — If admin edits a service's options after orders exist, historical orders display incorrectly. Decide: snapshot full schema at purchase, or just selections. | Order, Service CMS | ⚠️ TBD |
+| 7 | **`options_schema` snapshot at purchase time** — If admin edits a service's options after orders exist, historical orders display incorrectly. Decide: snapshot full schema at purchase, or just selections. | Order, Service CMS | ✅ Resolved — snapshot selected values only. See §13.1 |
 | 8 | **Service fee amount undefined** — Checkout shows `$2.50` fee but calculation never defined. Flat? Percentage? Per item or per checkout? Admin-configurable or hardcoded? | Checkout, Order | ⚠️ TBD |
 | 9 | **TrustPilot API is read-only** — Reviews fetched from TrustPilot at runtime, not stored in DB. No Review model or table needed. Post-order prompt redirects customer to TrustPilot externally. | Reviews, Post-order flow | ✅ Confirmed — no DB storage |
 | 10 | **Notifications undefined** — Order state machine has multiple points requiring customer notification (confirmed, delivered, crypto wallet prompt). Without this, crypto refund flow breaks silently. | Notifications, Refund flow | ✅ Resolved — see §13.1 |
-| 11 | **Google Sheets API trigger undefined** — Confirmed integration but what data gets written, when, and by what event is not specified. | Google Sheets integration | ⚠️ TBD |
+| 11 | **Google Sheets API trigger undefined** — Confirmed integration but what data gets written, when, and by what event is not specified. | Google Sheets integration | ✅ Resolved — see §13.1 |
 
 ---
 
@@ -1948,6 +1949,57 @@ Admin                    →  Relaxed limits — trusted, but still protected
 - Bell icon with unread counter badge
 - Clicking opens a notification feed/dropdown
 - Notifications marked as read on open/click
+
+---
+
+### `options_schema` Snapshot (resolves issue #7)
+
+- Snapshot stores **selected values only** — not the full schema
+- Example: `{ "difficulty": "Mythic", "loot_traders": 2 }`
+- Stored as JSONB in `CartItem.optionsSchemaSnapshot` at add-to-cart time, then carried into `Order.selectedOptions` at checkout
+- Admin can freely edit a service's `options_schema` without corrupting historical order records
+
+---
+
+### Google Sheets Integration (resolves issue #11)
+
+**Two tabs — one spreadsheet:**
+
+**Orders tab** — one row per order, updated in place on every status change:
+| Column | Notes |
+|---|---|
+| `order_id` | Anchor key — used to find and update the row |
+| `user_id` | FK reference |
+| `username` | Denormalized for readability |
+| `email` | Denormalized for readability |
+| `service` | Service name at purchase time |
+| `options_snapshot` | Selected values only e.g. `{"difficulty":"Mythic","loot_traders":2}` |
+| `status` | Updated in place on every state transition |
+| `created_at` | Set once on order creation |
+| `delivered_at` | Set when status → `delivered` |
+
+**Transactions tab** — one row per payment, `refund_status` updated in place (no new row for refunds):
+| Column | Notes |
+|---|---|
+| `transaction_id` | Anchor key |
+| `order_id` | FK reference |
+| `user_id` / `username` | Denormalized |
+| `amount` | Positive for payments |
+| `currency` | USD / EUR |
+| `provider` | `stripe` or `nowpayments` |
+| `payment_status` | `paid`, `failed` |
+| `refund_status` | Updated in place — `refunded` or `denied` when resolved |
+| `created_at` | Set once on payment |
+| `refunded_at` | Set when refund approved |
+
+**Write triggers:**
+| Event | Action |
+|---|---|
+| Order created (`confirmed`) | Append new row to Orders tab + Transactions tab |
+| Order status changes (`delivered`, `refund_requested`, `refunded`, etc.) | Update existing Orders row by `order_id` |
+| Refund resolved | Update `refund_status` + `refunded_at` on existing Transactions row |
+
+**Not written to Sheets:** User registrations, admin actions, failed payments.
 
 ---
 
