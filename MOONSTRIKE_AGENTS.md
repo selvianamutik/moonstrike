@@ -102,7 +102,7 @@
 
 | Component | Description |
 |---|---|
-| `<Navbar>` | Logo · Hamburger · Search bar · Currency selector (USD/EUR + flag) · Services · About · Profiles |
+| `<Navbar>` | Logo · Currency selector (USD/EUR + flag) · Services (mega menu trigger) · Cart icon (→ `/cart`) · Dark/Light mode toggle · Profile icon |
 | `<Footer>` | Logo · Sitemap · Legal · Genres · Social Media · Disclaimer · copyright |
 | `<GameCard>` | Image thumbnail · Genre tags · Game name · Short description |
 | `<ServiceCard>` | Image · HOT badge (conditional) · Title · Description · Price · Buy Now button |
@@ -181,9 +181,11 @@
 
 **Right Column — "Configure Your Run" Sticky Sidebar:**
 1. Option fields rendered from `options_schema` (see §6)
-2. Currency selector
+2. Currency selector (synced to global currency state)
 3. Total price (live-calculated, cyan)
-4. Buy Now button (full-width, gradient)
+4. Two action buttons side by side: `Add to Cart` (outlined) + `Buy Now` (gradient, goes directly to checkout)
+
+> All service content is admin-managed via CMS: title, description, badges, image, What You Get items, requirements list, and option schema. Nothing on this page is hardcoded.
 
 ---
 
@@ -206,18 +208,20 @@
 **Sidebar:** Avatar · Username · Email · Member since · Total Orders + Total Spent · Edit Profile · Logout.
 
 **Tab 1 — Order History (default):**
-- Filter tabs: All · Pending · In Progress · Delivered · Completed · Refund Requested · Refunded
+- Filter tabs: All · Pending · Confirmed · In Progress · Delivered · Completed · Refund Requested · Refunded
 - Each row: thumbnail + name · options summary · date · amount · status badge · View Details
 
 **Order Detail (`/profile/orders/[id]`):**
 - Service name + thumbnail
 - Full selected options breakdown with prices
 - Price breakdown: base + options + total
-- Order timeline: placed > confirmed > delivered > completed
+- Order timeline: placed > pending > confirmed > in_progress > delivered > completed
 - `Open Support Chat` button
-- `Request Refund` button (visible on any non-terminal status):
-  - Confirmation dialog before submitting
-  - Sets `order.status -> refund_requested` and `refundRequestedAt`
+- `Request Refund` button — visibility rules:
+  - Shown when status is `pending`, `confirmed`, or `in_progress` (no time limit — service not yet delivered)
+  - Shown when status is `delivered` AND within 7 days of `deliveredAt`
+  - Hidden once `refund_requested`, `refunded`, or `completed` (terminal or already attempted)
+  - On click: confirmation dialog → sets `status → refund_requested`
   - If `paymentProvider = "nowpayments"`: wallet address input shown before confirming
 
 **Tab 2 — Transaction History:** Read-only. Columns: TXN ID · Service name · Date · Amount · Method · Status.
@@ -235,7 +239,34 @@
 
 ---
 
-### 3.8 Secure Checkout (`/checkout`)
+### 3.8 Cart Page (`/cart`)
+
+**Purpose:** Review selected services before checkout.
+
+**Access:** Cart icon in navbar (with item count badge) → redirects to `/cart`.
+
+**Layout:** Single-column centered, max-width content.
+
+**Content:**
+1. Page title: `Your Cart`
+2. Currency toggle (synced to global currency state)
+3. Service rows — one per CartItem:
+   - Service thumbnail + name
+   - Selected options summary (e.g. "Level: 21–40 · Add-ons: Loot bag · Runs: 2")
+   - Line total (base + options, in active currency, cyan)
+   - Remove item button
+4. Order total (sum of all CartItems in active currency, large, cyan)
+5. `Proceed to Checkout` button (full-width, gradient)
+6. Empty state: "Your cart is empty." + `Browse Services` link
+
+**Rules:**
+- Same service can appear multiple times as separate rows (each is a distinct CartItem)
+- Prices are locked at add-to-cart time — no live recalculation from service changes
+- Cart persists per user account (not session-based)
+
+---
+
+### 3.9 Secure Checkout (`/checkout`)
 
 **Layout:** Two-column — payment form (left) + order summary (right).
 
@@ -245,13 +276,13 @@
 
 ---
 
-### 3.9 Refund Policy (`/refund-policy`)
+### 3.10 Refund Policy (`/refund-policy`)
 
-Sections: Overview · Escrow Process (48-hour review window) · Eligibility (Non-Delivery, Not as Described, Mutual Cancellation) · Dispute Resolution · Note callout · Contact Support CTA.
+Sections: Overview · How Refunds Work (admin reviews and issues directly via payment gateway — no middleman or escrow) · Eligibility (Non-Delivery, Not as Described, Change of Mind) · Refund Window (7 days post-delivery for delivered orders; any time for pre-delivery orders) · Crypto Refunds (wallet address required) · Dispute Resolution · Contact Support CTA.
 
 ---
 
-### 3.10 Terms of Service (`/terms-of-service`)
+### 3.11 Terms of Service (`/terms-of-service`)
 
 TOC sidebar (left) + content (right) on desktop. Single column on mobile.
 
@@ -259,7 +290,7 @@ TOC: Acceptance of Terms · User Conduct · Service Delivery · Limitation of Li
 
 ---
 
-### 3.11 Quick Select Mega Menu (Global Component)
+### 3.12 Quick Select Mega Menu (Global Component)
 
 Triggered by hamburger or "Services" nav item. Floating overlay.
 
@@ -300,7 +331,7 @@ Checkout
 - Use the same `<Footer>` on every page
 - Make all cards hoverable (subtle lift + border glow)
 - All prices in USD by default; currency toggle persists in global state
-- Region (USA/EUROPE) is a global filter — persists across navigation
+- Region (USA/EUROPE) is a single global state — same as currency. Changing in one place updates all `<RegionSelector>` instances site-wide. Persists across navigation.
 
 ### DO NOT
 - Do not use white or light backgrounds anywhere in dark mode
@@ -503,17 +534,18 @@ Order {
 
   status:
     | "pending"            // payment cleared, awaiting admin acknowledgment
-    | "in_progress"        // admin acknowledged, service actively underway
+    | "confirmed"          // admin acknowledged the order
+    | "in_progress"        // service actively underway
     | "delivered"          // admin marked delivered, customer notified, 7-day refund window starts
-    | "completed"          // terminal — customer confirmed, or admin closed, or refund denied
-    | "refund_requested"   // customer opened refund — one attempt per order, within 7 days of deliveredAt
+    | "completed"          // terminal — customer confirmed, 7-day window passed, or refund denied
+    | "refund_requested"   // customer opened refund — one attempt per order
     | "refunded"           // terminal — admin approved and issued via payment gateway
 
   // Refund rules:
-  //   - Only available if no previous refund attempt on this order
-  //   - Request window: within 7 days of deliveredAt
-  //   - Once refund_requested, status can only move to refunded (approved) or completed (denied)
-  //   - completed (denied) is terminal — no further refund attempts allowed
+  //   - Available from ANY non-terminal status (customer may change mind even before delivery)
+  //   - Post-delivery: request window is within 7 days of deliveredAt
+  //   - Pre-delivery (pending/confirmed/in_progress): no time limit on request
+  //   - One attempt per order — once attempted (approved or denied), no further requests
 
   deliveredAt: Date | null
   refundRequestedAt: Date | null
@@ -540,14 +572,19 @@ AdminUser {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SUPPORT CHAT
+//
+// SupportTicket is the container for a chat conversation between a customer
+// and admin. When a customer opens the chat bubble, a ticket is created.
+// Messages are grouped under it. Admin sees these as conversations in /admin/messages.
+// Two thread types: general support (no orderId) and order-specific (orderId set).
 // ─────────────────────────────────────────────────────────────────────────────
 
 SupportTicket {
   id: string
-  orderId?: string    // set for order-specific threads
+  orderId?: string    // set for order-specific threads, null for general support
   userId: string
   subject: string
-  status: "open" | "in_progress" | "resolved" | "refund_requested"
+  status: "open" | "in_progress" | "resolved"  // communication status only
   messages: Message[]
   createdAt: Date
   updatedAt: Date
@@ -668,7 +705,7 @@ SystemSettings {
 | Customer Profile | not-started | Order History + Transaction History tabs |
 | Order History | not-started | Filter tabs, status badges, View Detail |
 | Order Detail | not-started | Options breakdown, timeline, refund request + wallet prompt |
-| Cart | not-started | Same service = new CartItem; account details via chat |
+| Cart | not-started | `/cart` page — service rows + totals + currency toggle + proceed to checkout |
 | Search | not-started | Service titles only — image + title card, zero-state message |
 | Currency toggle | not-started | Fixed USD/EUR — no conversion, toggle persists |
 | Region toggle | not-started | USA/EUROPE — persists across navigation |
@@ -711,6 +748,7 @@ SystemSettings {
 
 | Feature | Status | Notes |
 |---|---|---|
+| Auto-complete cron (7-day window) | not-started | Supabase scheduled function — moves `delivered` orders to `completed` after 7 days if no refund request |
 | Order state machine | not-started | See §11 — no escrow, direct gateway refund |
 | Stripe integration | not-started | Checkout + auto-routed refund API |
 | NowPayments integration | not-started | Checkout + auto-routed refund + wallet address collection |
@@ -738,7 +776,7 @@ SystemSettings {
 | Image hosting | Supabase Storage (origin, free tier) + Cloudflare Images (CDN + transforms) |
 | Payment | Stripe (card + PayPal + Google Pay + Apple Pay) + NowPayments (crypto) |
 | SMTP | Resend — see §13 for setup details. Required for auth emails (confirm, reset password) and order notification emails. |
-| Currency | Fixed USD/EUR values — no conversion API. Toggle persists globally. Cart follows the last selected currency and includes a currency toggle button inside the cart panel. At checkout, the currency active at that moment determines which price (USD or EUR) is charged. |
+| Currency | Fixed USD/EUR values per service — no conversion API. One global currency state shared across navbar selector, service detail sidebar, and cart page toggle. Changing currency in any one location updates all others. At checkout, the currency active at that moment determines which price is charged. |
 
 ### Third-Party APIs
 
@@ -763,6 +801,7 @@ SystemSettings {
 | Service fees | Taxes and fees included in base price. No separate fee at checkout. |
 | Order cancellation | No cancelled state — customers request refunds instead. Admin approves or denies. |
 | Hot Offers | Random selection from services where `isHotOffer = true`. Landing page shows ~4 cards initially, loads more on scroll. Services page HOT OFFERS tab shows all, paginated. No CMS entry needed. |
+| Region | Single global state (USA / EUROPE). Changing in any `<RegionSelector>` — Services page banner, Service Detail, or any other location — updates all other selectors site-wide. Persists across navigation. Filters which services are shown based on `service.region[]`. |
 | Light mode hero | Prototype/palette reference only. Single Hero component — CSS token swap only. |
 | Rate limiting | Documented in §12. Implementation depends on framework. |
 
@@ -791,7 +830,7 @@ src/
     refund-policy/
     terms-of-service/
     admin/              All admin routes (see §10.14)
-  hooks/                useCart, useCurrency, useRegion
+  hooks/                useCart, useCurrency, useRegion  ← both are global state, same pattern
   store/                Global state (currency, region, cart)
   lib/                  API clients, utils, webhook verification
   types/                TypeScript interfaces (mirrors §6 models)
@@ -953,7 +992,7 @@ Full-page storefront render using draft data. Read-only — no checkout.
 
 ### 10.9 Admin Orders (`/admin/orders`, `/admin/orders/[id]`)
 
-**Filter tabs:** All · Pending · In Progress · Delivered · Completed · Refund Requested · Refunded
+**Filter tabs:** All · Pending · Confirmed · In Progress · Delivered · Completed · Refund Requested · Refunded
 
 **Default sort:** Newest first by `createdAt`.
 
@@ -964,7 +1003,8 @@ Full-page storefront render using draft data. Read-only — no checkout.
 **Order Detail — right column (Actions panel):**
 - Current status badge (large)
 - Status update buttons — context-aware, only valid next states shown:
-  - `pending` → Mark as In Progress
+  - `pending` → Confirm Order
+  - `confirmed` → Mark as In Progress
   - `in_progress` → Mark as Delivered
   - `refund_requested` → Approve Refund (red) or Deny Refund (outlined)
 - Open Chat button (links to Admin Messages filtered to this customer)
@@ -1043,6 +1083,7 @@ Full-page storefront render using draft data. Read-only — no checkout.
 /games                          Games Page
 /services                       Services Page
 /services/[game]/[slug]         Service Detail
+/cart                           Cart Page
 /checkout                       Checkout
 /login                          Customer Login
 /register                       Customer Register
@@ -1090,7 +1131,12 @@ Full-page storefront render using draft data. Read-only — no checkout.
 +------------------+
 |     pending      |  Payment cleared. Awaiting admin acknowledgment.
 +--------+---------+
-         |  admin acknowledges order
+         |  admin acknowledges
+         v
++------------------+
+|    confirmed     |  Admin confirmed. Service about to begin.
++--------+---------+
+         |  admin starts service
          v
 +------------------+
 |   in_progress    |  Service actively underway.
@@ -1104,7 +1150,7 @@ Full-page storefront render using draft data. Read-only — no checkout.
     +----+-----------------------------+
     |                                  |
 customer confirms               customer requests refund
-(or 7-day window passes)        (within 7 days, one attempt only)
+(or 7-day window passes)        (within 7 days of deliveredAt)
     v                                  v
 +----------+                +--------------------+
 | completed|                |  refund_requested  |
@@ -1120,23 +1166,30 @@ customer confirms               customer requests refund
                     +-----------+         +-----------+
 ```
 
+Refund can also be requested from `pending`, `confirmed`, and `in_progress`
+(customer changed their mind before delivery — no time limit in this case).
+
 ### Transition Rules
 
 | From | To | Trigger | Actor |
 |---|---|---|---|
 | — | `pending` | Payment gateway webhook confirms charge | System |
-| `pending` | `in_progress` | Admin acknowledges order | Admin |
+| `pending` | `confirmed` | Admin acknowledges the order | Admin |
+| `confirmed` | `in_progress` | Admin starts the service | Admin |
 | `in_progress` | `delivered` | Admin marks as delivered | Admin |
-| `delivered` | `completed` | Customer confirms, or 7-day window passes with no dispute | Customer / System |
-| `delivered` | `refund_requested` | Customer requests refund (within 7 days of `deliveredAt`) | Customer |
+| `delivered` | `completed` | Customer confirms, or 7-day window passes with no dispute | Customer / Cron |
+| `pending` / `confirmed` / `in_progress` | `refund_requested` | Customer changed mind (no time limit) | Customer |
+| `delivered` | `refund_requested` | Customer disputes delivery (within 7 days of `deliveredAt`) | Customer |
 | `refund_requested` | `refunded` | Admin approves and issues via gateway | Admin |
 | `refund_requested` | `completed` | Admin denies refund — terminal, no further attempts | Admin |
 
 **Rules:**
 - `completed` and `refunded` are terminal — no further transitions
 - Orders only exist post-payment — no pre-payment state
-- Refund requests only allowed within **7 days of `deliveredAt`**
-- **One refund attempt per order** — once attempted (approved or denied), no further requests allowed
+- Refund from pre-delivery states: no time limit
+- Refund from `delivered`: within **7 days of `deliveredAt`** only
+- **One refund attempt per order** — once attempted (approved or denied), no further requests
+- Auto-completion after 7 days requires a scheduled cron function (see §7 System tracker)
 - All transitions must be written to Audit Log
 
 ### Refund Routing by Provider
@@ -1255,12 +1308,12 @@ Admin                    →  Relaxed   — trusted, still protected
 | `refund_requested → refunded` | "Your refund has been approved and is being processed." |
 | `refund_requested → completed` (denied) | "Your refund request has been denied." |
 
-**Admin (in-app bell only):**
+**Admin (in-app bell + email via Resend):**
 
 | Trigger | Message |
 |---|---|
-| New order confirmed | "New order received — [service name]" |
-| Order hits `refund_requested` | "Refund requested — [order ID]" |
+| New order hits `pending` | In-app bell: "New order received — [service name]" + email to admin |
+| Order hits `refund_requested` | In-app bell: "Refund requested — [order ID]" + email to admin |
 
 **In-App Bell:** Unread counter badge on bell icon. Clicking opens notification feed. Marked as read on open/click. Present in both storefront navbar and admin top bar.
 
