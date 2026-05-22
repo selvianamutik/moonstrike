@@ -206,7 +206,7 @@
 **Sidebar:** Avatar · Username · Email · Member since · Total Orders + Total Spent · Edit Profile · Logout.
 
 **Tab 1 — Order History (default):**
-- Filter tabs: All · In Progress · Delivered · Completed · Refund Requested · Refunded
+- Filter tabs: All · Pending · In Progress · Delivered · Completed · Refund Requested · Refunded
 - Each row: thumbnail + name · options summary · date · amount · status badge · View Details
 
 **Order Detail (`/profile/orders/[id]`):**
@@ -494,7 +494,6 @@ Order {
   total: number                         // taxes and fees included in base price
   currency: "USD" | "EUR"
   region: "USA" | "EUROPE"
-  startType: "immediate" | "scheduled"
 
   // Payment provider — stored at checkout, used to route refunds automatically
   paymentProvider: "stripe" | "nowpayments"
@@ -503,11 +502,18 @@ Order {
   cryptoRefundAddress: string | null    // collected at refund request time (crypto only)
 
   status:
-    | "confirmed"          // payment cleared, admin notified, service in progress
-    | "delivered"          // admin marked delivered, customer notified
-    | "completed"          // terminal — customer confirmed or admin closed
-    | "refund_requested"   // customer opened refund — available from confirmed/delivered/completed
-    | "refunded"           // terminal — admin approved and issued via gateway
+    | "pending"            // payment cleared, awaiting admin acknowledgment
+    | "in_progress"        // admin acknowledged, service actively underway
+    | "delivered"          // admin marked delivered, customer notified, 7-day refund window starts
+    | "completed"          // terminal — customer confirmed, or admin closed, or refund denied
+    | "refund_requested"   // customer opened refund — one attempt per order, within 7 days of deliveredAt
+    | "refunded"           // terminal — admin approved and issued via payment gateway
+
+  // Refund rules:
+  //   - Only available if no previous refund attempt on this order
+  //   - Request window: within 7 days of deliveredAt
+  //   - Once refund_requested, status can only move to refunded (approved) or completed (denied)
+  //   - completed (denied) is terminal — no further refund attempts allowed
 
   deliveredAt: Date | null
   refundRequestedAt: Date | null
@@ -632,7 +638,7 @@ SystemSettings {
 }
 
 // Hot Offers: no content model — auto-populated by querying Service WHERE isHotOffer = true.
-// Reviews: not stored in DB — fetched from TrustPilot API at runtime.
+// TrustPilot: TrustBox widget embed — no server API calls, no DB storage needed.
 ```
 
 ---
@@ -652,7 +658,7 @@ SystemSettings {
 | Checkout Page UI | not-started | Design ref: Moon_Strike_-_Secure_Checkout.png |
 | Refund Policy UI | not-started | Design ref: Moon_Strike_-_Refund_Policy.png |
 | Terms of Service UI | not-started | Design ref: Moon_Strike_-_Terms_of_Service.png |
-| Privacy Policy UI | not-started | Match MoonStrike design system |
+| Privacy Policy UI | not-started | Same layout as ToS and Refund Policy. Content written during build. |
 | Quick Select Mega Menu | not-started | Design ref: quick_select.png |
 | Global Navbar | not-started | Shared component |
 | Global Footer | not-started | Shared component |
@@ -731,8 +737,8 @@ SystemSettings {
 | Auth | Supabase Auth — storefront customers and admin as separate instances |
 | Image hosting | Supabase Storage (origin, free tier) + Cloudflare Images (CDN + transforms) |
 | Payment | Stripe (card + PayPal + Google Pay + Apple Pay) + NowPayments (crypto) |
-| SMTP | TBD — Resend or Brevo (both have free tiers). Required for auth + notification emails. |
-| Currency | Fixed values — admin manually sets USD + EUR per service. No conversion API. |
+| SMTP | Resend — see §13 for setup details. Required for auth emails (confirm, reset password) and order notification emails. |
+| Currency | Fixed USD/EUR values — no conversion API. Toggle persists globally. Cart follows the last selected currency and includes a currency toggle button inside the cart panel. At checkout, the currency active at that moment determines which price (USD or EUR) is charged. |
 
 ### Third-Party APIs
 
@@ -740,7 +746,7 @@ SystemSettings {
 |---|---|
 | Stripe | Card, PayPal, Google Pay, Apple Pay — all via Stripe. Single integration. |
 | NowPayments | Crypto payments + refund API. Requires customer wallet address for refunds. |
-| TrustPilot | Read-only API. Reviews fetched at runtime. No DB storage. |
+| TrustPilot | TrustBox widget embed (script tag). Loads reviews client-side from TrustPilot's CDN — no server-side API calls, no rate limits, no caching needed. Reviews display on Landing and Services pages. |
 | Google Sheets | Orders tab + Transactions tab. See §13 for schema and trigger rules. |
 
 ### Feature Decisions
@@ -756,7 +762,7 @@ SystemSettings {
 | Crypto refund wallet | Customer wallet address collected at refund request time (required by NowPayments). |
 | Service fees | Taxes and fees included in base price. No separate fee at checkout. |
 | Order cancellation | No cancelled state — customers request refunds instead. Admin approves or denies. |
-| Hot Offers | Auto-populated from isHotOffer = true on Service. No CMS entry needed. |
+| Hot Offers | Random selection from services where `isHotOffer = true`. Landing page shows ~4 cards initially, loads more on scroll. Services page HOT OFFERS tab shows all, paginated. No CMS entry needed. |
 | Light mode hero | Prototype/palette reference only. Single Hero component — CSS token swap only. |
 | Rate limiting | Documented in §12. Implementation depends on framework. |
 
@@ -947,7 +953,7 @@ Full-page storefront render using draft data. Read-only — no checkout.
 
 ### 10.9 Admin Orders (`/admin/orders`, `/admin/orders/[id]`)
 
-**Filter tabs:** All · Confirmed · In Progress · Delivered · Completed · Refund Requested · Refunded
+**Filter tabs:** All · Pending · In Progress · Delivered · Completed · Refund Requested · Refunded
 
 **Default sort:** Newest first by `createdAt`.
 
@@ -958,7 +964,8 @@ Full-page storefront render using draft data. Read-only — no checkout.
 **Order Detail — right column (Actions panel):**
 - Current status badge (large)
 - Status update buttons — context-aware, only valid next states shown:
-  - `confirmed` → Mark as Delivered
+  - `pending` → Mark as In Progress
+  - `in_progress` → Mark as Delivered
   - `refund_requested` → Approve Refund (red) or Deny Refund (outlined)
 - Open Chat button (links to Admin Messages filtered to this customer)
 - Refund panel (visible when `refund_requested`): payment method display · wallet address field (crypto only, pre-filled if provided) · Issue Refund button
@@ -1000,9 +1007,9 @@ Full-page storefront render using draft data. Read-only — no checkout.
 
 **Composer:** Formatting toolbar (B · I · Link · List · Emoji) · text input · attach button · Send button.
 
-**User profile sidebar:** Avatar · username · location · orders + spend stats · recent activity · management actions (Issue Refund · Update Ticket · Ban User).
+**User profile sidebar:** Avatar · username · location · orders + spend stats · recent activity · management actions (Update Ticket · Ban User).
 
-**Anonymous session merge:** Anonymous users get a temporary `session_id`. On login, `user_id` is attached to existing records — chat history preserved. Session expiry: anonymous = 1 hour, logged-in = 1 week. Expired sessions and records deleted.
+**Anonymous session merge:** Anonymous users get a temporary `session_id`. On login, `user_id` and `username` are attached to existing records — chat history preserved, and the customer's display name updates to their actual username going forward. Pre-login messages retain the anonymous label. Session expiry: anonymous = 1 hour, logged-in = 1 week. Expired sessions and records deleted.
 
 ---
 
@@ -1041,7 +1048,7 @@ Full-page storefront render using draft data. Read-only — no checkout.
 /register                       Customer Register
 /profile                        Customer Profile
 /profile/orders/[id]            Order Detail
-/refund-policy                  Refund Policy
+/privacy-policy                 Privacy Policy
 /terms-of-service               Terms of Service
 
 # Admin Terminal
@@ -1081,17 +1088,23 @@ Full-page storefront render using draft data. Read-only — no checkout.
       |
       v
 +------------------+
-|    confirmed     |  Payment cleared. Admin notified. Service begins.
+|     pending      |  Payment cleared. Awaiting admin acknowledgment.
++--------+---------+
+         |  admin acknowledges order
+         v
++------------------+
+|   in_progress    |  Service actively underway.
 +--------+---------+
          |  admin marks as delivered
          v
 +------------------+
-|    delivered     |  Customer notified.
+|    delivered     |  Customer notified. 7-day refund window starts.
 +--------+---------+
          |
     +----+-----------------------------+
     |                                  |
-customer satisfied          customer requests refund
+customer confirms               customer requests refund
+(or 7-day window passes)        (within 7 days, one attempt only)
     v                                  v
 +----------+                +--------------------+
 | completed|                |  refund_requested  |
@@ -1107,24 +1120,23 @@ customer satisfied          customer requests refund
                     +-----------+         +-----------+
 ```
 
-Refund can also be requested from `completed` (customer unsatisfied with delivered work).
-
 ### Transition Rules
 
 | From | To | Trigger | Actor |
 |---|---|---|---|
-| — | `confirmed` | Payment gateway webhook confirms charge | System |
-| `confirmed` | `delivered` | Admin marks as delivered | Admin |
-| `delivered` | `completed` | Customer confirms or no dispute | Customer / Admin |
-| `confirmed` | `refund_requested` | Customer requests refund | Customer |
-| `delivered` | `refund_requested` | Customer requests refund | Customer |
-| `completed` | `refund_requested` | Customer unsatisfied with work | Customer |
+| — | `pending` | Payment gateway webhook confirms charge | System |
+| `pending` | `in_progress` | Admin acknowledges order | Admin |
+| `in_progress` | `delivered` | Admin marks as delivered | Admin |
+| `delivered` | `completed` | Customer confirms, or 7-day window passes with no dispute | Customer / System |
+| `delivered` | `refund_requested` | Customer requests refund (within 7 days of `deliveredAt`) | Customer |
 | `refund_requested` | `refunded` | Admin approves and issues via gateway | Admin |
-| `refund_requested` | `completed` | Admin denies refund | Admin |
+| `refund_requested` | `completed` | Admin denies refund — terminal, no further attempts | Admin |
 
 **Rules:**
 - `completed` and `refunded` are terminal — no further transitions
-- Orders only exist post-payment — no `pending_payment` state
+- Orders only exist post-payment — no pre-payment state
+- Refund requests only allowed within **7 days of `deliveredAt`**
+- **One refund attempt per order** — once attempted (approved or denied), no further requests allowed
 - All transitions must be written to Audit Log
 
 ### Refund Routing by Provider
@@ -1254,7 +1266,50 @@ Admin                    →  Relaxed   — trusted, still protected
 
 ---
 
+### Resend (SMTP)
+
+Resend is a developer-focused email API. It handles transactional emails — no newsletter features, no drag-and-drop builder. Just reliable email delivery via API or SDK.
+
+**What it sends for Moon Strike:**
+- Auth emails: email confirmation on register, password reset link (both triggered by Supabase Auth automatically when configured)
+- Order notification emails: boost complete, refund approved, refund denied (triggered by your backend on state transitions)
+
+**How it works:**
+1. Create a free account at resend.com (100 emails/day free, 3,000/month)
+2. Verify your sending domain (adds DNS records — one-time setup)
+3. Add `RESEND_API_KEY` to env vars
+4. Install the SDK: `npm install resend`
+5. Send emails from your backend:
+
+```ts
+import { Resend } from 'resend';
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+await resend.emails.send({
+  from: 'MoonStrike <noreply@yourdomain.com>',
+  to: customer.email,
+  subject: 'Your boost is complete!',
+  html: '<p>Your order has been delivered...</p>'
+});
+```
+
+**Supabase integration:** In Supabase dashboard → Authentication → Email → set custom SMTP to Resend's SMTP details. This routes all Supabase auth emails (confirm, reset) through Resend automatically.
+
+---
+
 ### Google Sheets Integration
+
+**Why it needs auth:** Google's API requires authentication even for your own spreadsheets — it doesn't allow anonymous writes. You authenticate using a **service account**: a bot Google identity that your backend acts as. The spreadsheet is shared with the service account's email address, and your backend uses a JSON key to sign API requests. Zero cost, one-time setup, key lives in env vars.
+
+**Setup:**
+1. Go to Google Cloud Console → Create a project (or use existing)
+2. Enable the Google Sheets API
+3. Create a Service Account → generate a JSON key → download it
+4. Add the key to env: `GOOGLE_SERVICE_ACCOUNT_JSON` (the full JSON as a string)
+5. Create your Google Spreadsheet → Share it with the service account's email (Editor access)
+6. Copy the Spreadsheet ID from the URL → add to env: `GOOGLE_SHEET_ID`
+
+
 
 One spreadsheet, two tabs. Written on order events only.
 
