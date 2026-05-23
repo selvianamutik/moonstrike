@@ -89,14 +89,14 @@
 
 ### 2.3 Typography
 
-| Element | Style |
-|---|---|
-| Logo / Display | Bold, purple-to-cyan gradient |
-| Headings | `--ms-text-primary`, bold |
-| Body | `--ms-text-secondary`, regular weight |
-| Badges / Tags | Uppercase, small, colored pill shapes |
+| Element | Font | Style |
+|---|---|---|
+| Logo / Display / Headings | Montserrat | Bold |
+| Body / Labels | Montserrat | Regular weight |
+| IDs / Code / Monospace elements | JetBrains Mono | Regular |
+| Badges / Tags | Montserrat | Uppercase, small |
 
-> Do not use generic fonts (Inter, Roboto, Arial). Use a gaming/premium aesthetic font.
+> Additional fonts may be introduced during development. Montserrat and JetBrains Mono are the confirmed base. Never use generic fallbacks (Inter, Roboto, Arial, sans-serif) as primary fonts.
 
 ### 2.4 Global Components
 
@@ -292,11 +292,16 @@ TOC: Acceptance of Terms · User Conduct · Service Delivery · Limitation of Li
 
 ### 3.12 Quick Select Mega Menu (Global Component)
 
-Triggered by hamburger or "Services" nav item. Floating overlay.
+Triggered by "Services" nav item click. Floating overlay panel.
 
-1. Search bar: Search Game or Service
-2. Category tabs: ALL GAMES · ACTION RPG · TACTICAL SHOOTING · LOOTER SHOOTING
-3. Service grid — 4 columns, each column = one service category with 3–5 sub-service links
+**Layout:**
+1. Game tabs (horizontal, scrollable): `All · [Game Name] · [Game Name] · ...` — auto-populated from `Game` table WHERE `status = "active"`
+2. Service grid below the tabs:
+   - **"All" tab:** services grouped by game name (game name as a section header), then by `serviceCategory` as column headers, individual service links below each column
+   - **Single game tab:** service categories as column headers, individual service links below each column — no game header needed
+3. Each service link → navigates to `/services/[game]/[slug]`
+
+**Data source:** Auto-queried from `Service` table — no CMS entry needed. Filtered by selected game tab. Only `status = "active"` services shown.
 
 ---
 
@@ -758,7 +763,7 @@ SystemSettings {
 | Audit log (every admin action) | not-started | Backend middleware |
 | Google Sheets integration | not-started | Orders + Transactions tabs. See §13 |
 | Real-time chat | not-started | Supabase Realtime WebSocket |
-| 2FA enforcement | not-started | Required for all admin logins |
+| 2FA enforcement | not-started | Email OTP via Supabase on first login / new device. Default session timeout: 8 hours. |
 
 ---
 
@@ -784,7 +789,7 @@ SystemSettings {
 |---|---|
 | Stripe | Card, PayPal, Google Pay, Apple Pay — all via Stripe. Single integration. |
 | NowPayments | Crypto payments + refund API. Requires customer wallet address for refunds. |
-| TrustPilot | TrustBox widget embed (script tag). Loads reviews client-side from TrustPilot's CDN — no server-side API calls, no rate limits, no caching needed. Reviews display on Landing and Services pages. |
+| TrustPilot | TrustBox **Carousel** widget embed (script tag). Loads reviews client-side from TrustPilot's CDN — no server-side API calls, no rate limits, no caching needed. Displays on Landing and Services pages. |
 | Google Sheets | Orders tab + Transactions tab. See §13 for schema and trigger rules. |
 
 ### Feature Decisions
@@ -892,7 +897,17 @@ Centered card. No sidebar or header.
 - Contact System Admin help link
 - Security badges: 2FA Protected · SSL Encrypted
 
-**Rules:** 2FA enforced for all accounts. Failed logins logged to Audit Logs. Session timeout after inactivity (configurable in Settings).
+**Admin account creation rules:**
+- Admin accounts are **never self-registered**. There is no public admin registration page.
+- The first admin account is seeded directly into Supabase (via Supabase dashboard or a protected one-time script).
+- After that, only existing admins can create new admin accounts from `/admin/users/new`.
+- Admin accounts live in a **separate Supabase Auth instance** from storefront customers.
+
+**2FA — email OTP on first login:**
+- On first login (or any new device), Supabase sends a one-time passcode to the admin's email
+- Admin enters the OTP to complete login
+- Implemented via Supabase's built-in email OTP — no third-party 2FA app required
+- Failed logins logged to Audit Logs. Session timeout after inactivity (default: 8 hours, configurable in Settings).
 
 ---
 
@@ -1116,7 +1131,7 @@ Full-page storefront render using draft data. Read-only — no checkout.
 /admin/settings                 Terminal Configuration
 ```
 
-**Route guard:** All `/admin/*` routes require authenticated admin session with 2FA verified. Session timeout redirects to `/admin/login`.
+**Route guard:** All `/admin/*` routes require authenticated admin session with 2FA verified. Session timeout after 8 hours of inactivity (configurable in Settings) — redirects to `/admin/login`.
 
 ---
 
@@ -1292,7 +1307,7 @@ Admin                    →  Relaxed   — trusted, still protected
 - Payment webhook endpoints use signature verification — IP-based limiting does not apply
 - Limits above are starting estimates — tune after launch with real traffic data
 
-**Implementation:** TBD — options: Supabase API gateway limits, Upstash Redis, or framework middleware.
+**Implementation:** Supabase API gateway rate limiting.
 
 ---
 
