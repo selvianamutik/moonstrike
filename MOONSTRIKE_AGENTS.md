@@ -111,7 +111,7 @@
 | `<RegionSelector>` | USA / EUROPE toggle pills |
 | `<Badge>` | HOT · NEW UPDATE · COMING SOON · FEATURED — corner/inline labels |
 | `<ThemeToggle>` | Switches dark and light mode; persisted in user preference |
-| `<SearchResults>` | Service cards only (image + title). On-submit, not real-time. Zero state: "No services found for [query]." |
+| `<SearchResults>` | Real-time overlay below the navbar search bar. Triggered on input (debounced 300ms) — no enter key needed. Shows closest matching service cards (image + name, max 6 results). Click result → navigate to service detail. Closes on click outside or Escape. Zero state: "No services found for [query]." |
 
 ---
 
@@ -125,8 +125,8 @@
 |---|---|
 | Navbar | Global component |
 | Hero / Promo Banner | CMS-editable (`hero` block). Label · Headline · Subtext · CTA button. Fields: label, headline, subtext, CTA text/link, background image. |
-| Game Filter + Grid | Category tabs: ALL GAMES · ACTION RPG · TACTICAL SHOOTING · LOOTER SHOOTING. 4-column game card grid. Load More button. |
-| Best Offers | Section header + VIEW ALL DEALS link. 4 horizontal service cards with price + Buy Now. |
+| Game Filter + Grid | Category tabs: auto-populated from distinct `genre` values in the Game table (e.g. ALL · ACTION RPG · TACTICAL SHOOTER · LOOTER SHOOTING). 4-column game card grid. Clicking a game card → `/[game-slug]/services`. `Load More Games` button (click to load more — not infinite scroll). |
+| Best Offers | Section header + `VIEW ALL DEALS →` link (→ `/hot-offers`). Fixed 4 random hot offer service cards with price + Buy Now. |
 | Trust Stats Bar | CMS-editable. 4 stats: 50K+ GAMES BOOSTED · 99.9% SUCCESS RATE · 24/7 ACTIVE SUPPORT · TOP 1% PRO PLAYERS |
 | Why Choose Us | CMS-editable. Full-width media block + 3 benefit items (icon + label + description). |
 | How It Works | CMS-editable. 4 numbered steps: Choose Service · Log Into Account · Daily Progress Updates · Enjoy Result. |
@@ -136,17 +136,17 @@
 
 ---
 
-### 3.2 Services Page (`/services`)
+### 3.2 Game Services Page (`/[game-slug]/services`)
 
-**Purpose:** Browse all boosting services for a selected game, filterable by category.
+**Purpose:** Browse all boosting services for a specific game, filterable by service category.
 
 | Section | Details |
 |---|---|
 | Navbar | Global |
-| Page Header | Title: All Services · Search input right-aligned |
+| Page Header | Game name as title · Search input right-aligned — filters services within this game only |
 | Featured Game Banner | CMS-editable (Promotional Banner). Wide card with game art, game title left, USA/EUROPE toggle right. Schedulable. |
-| Service Category Tabs | HOT OFFERS · DUNGEONS · POWERLEVELING · RAID · STORIES (scrollable) |
-| Service Cards Grid | 2-row x 4-column. Each card: HOT badge · image · title · description · price · Buy Now |
+| Service Category Tabs | Auto-populated from distinct `serviceCategory` values for this game (e.g. HOT OFFERS · DUNGEON · POWERLEVELING · RAID · STORIES). HOT OFFERS always first. Scrollable. |
+| Service Cards Grid | 2-row x 4-column initial load. Infinite scroll — auto-loads more on scroll. Each card: HOT badge · image · title · description · price · Buy Now |
 | TrustPilot Reviews | Same carousel component as landing page |
 | Footer | Global |
 
@@ -158,13 +158,32 @@
 
 **Layout:** Two-column — sidebar (left) + main content (right).
 
-**Sidebar:** TOP TITLES list (All Games, WoW, Destiny 2, Valorant, LoL) · GENRES multi-select tag pills (Action RPG, MMO, Shooters, MOBA).
+**Sidebar:**
+- `All Games` link (clears all filters)
+- `GENRES` multi-select tag pills — auto-populated from distinct `genre` values in the Game table: Action RPG · MMO · Shooters · MOBA · Tactical Shooter · Battle Royale · Looter Shooter
+- Selecting a genre filters the main grid to matching games. Multiple genres can be selected (OR logic — shows games matching any selected genre).
 
-**Main Content:** All games header · Search input · 3-column game card grid · Load More button.
+**Main Content:** All games header · Search input · 3-column game card grid · infinite scroll (auto-loads on scroll). Clicking a game card → `/[game-slug]/services`.
 
 ---
 
-### 3.4 Service Detail Page (`/services/[game]/[service-slug]`)
+### 3.4 Hot Offers Page (`/hot-offers`)
+
+**Purpose:** Dedicated deals page. Shows all services where `isHotOffer = true` across all games, filterable by game.
+
+| Section | Details |
+|---|---|
+| Navbar | Global |
+| Page Header | Title: `Hot Offers 🔥` · Subtitle: "Best deals across all games" |
+| Game Tabs | Auto-populated from games that have at least one `isHotOffer = true` service: `ALL · [Game Name] · [Game Name] · ...`. ALL shown by default. |
+| Service Cards Grid | Same card style as game services page. HOT badge on every card. Sorted by most recently marked as hot offer. Infinite scroll — auto-loads on scroll. |
+| Footer | Global |
+
+**Data source:** `Service WHERE isHotOffer = true AND status = "active"`. Filtered by selected game tab.
+
+---
+
+### 3.5 Service Detail Page (`/[game-slug]/services/[service-slug]`)
 
 **Purpose:** Full service view with configurator. Primary conversion page.
 
@@ -183,13 +202,16 @@
 1. Option fields rendered from `options_schema` (see §6)
 2. Currency selector (synced to global currency state)
 3. Total price (live-calculated, cyan)
-4. Two action buttons side by side: `Add to Cart` (outlined) + `Buy Now` (gradient, goes directly to checkout)
+4. Two action buttons side by side: `Add to Cart` (outlined) + `Buy Now` (gradient)
+   - Both add the configured service to cart
+   - `Add to Cart` → adds silently, shows cart item count badge update
+   - `Buy Now` → adds to cart then opens the cart page so customer reviews before proceeding to checkout
 
 > All service content is admin-managed via CMS: title, description, badges, image, What You Get items, requirements list, and option schema. Nothing on this page is hardcoded.
 
 ---
 
-### 3.5 Login & Register (`/login`, `/register`)
+### 3.6 Login & Register (`/login`, `/register`)
 
 **Layout:** Centered card on full background. No navbar or footer.
 
@@ -199,13 +221,31 @@
 
 **Implementation:** Supabase Auth — `signUp` / `signInWithPassword` / `signInWithOAuth({ provider: 'google' })`. On success: redirect to previous page or `/profile`.
 
+**Forgot Password flow:**
+- "Forgot Password" link on login card → replaces card content with a "Reset Password" form (same card, same style — no new page)
+- User enters email → Supabase sends reset link via Resend
+- Reset link → opens a "Set New Password" form (same card style at `/reset-password`)
+- On success: redirect to `/login`
+
+**Email verification:**
+- Supabase sends confirmation email on register via Resend
+- Unverified users can: browse all pages, view services, view games
+- Unverified users cannot: access `/profile`, add to cart, or proceed to checkout
+- Unverified users see a banner: "Please verify your email to make purchases. [Resend email]"
+
 ---
 
-### 3.6 Customer Profile (`/profile`)
+### 3.7 Customer Profile (`/profile`)
 
 **Layout:** Left sidebar (profile info) + main tabbed content.
 
-**Sidebar:** Avatar · Username · Email · Member since · Total Orders + Total Spent · Edit Profile · Logout.
+**Sidebar:** Avatar · Username · Email · Member since · Total Orders + Total Spent · Edit Profile button · Logout.
+
+**Edit Profile (`/profile/edit`):**
+- Avatar: choose from app-generated initials avatar OR upload custom image (max 2MB, JPEG/PNG only, compressed before storing to Supabase Storage)
+- Username: text input with real-time availability check
+- Password: current password → new password → confirm new password fields
+- Save Changes button (gradient) · Cancel (outlined → back to profile)
 
 **Tab 1 — Order History (default):**
 - Filter tabs: All · Pending · Confirmed · In Progress · Delivered · Completed · Refund Requested · Refunded
@@ -228,7 +268,7 @@
 
 ---
 
-### 3.7 Global Chat Bubble (all storefront pages)
+### 3.8 Global Chat Bubble (all storefront pages)
 
 - Fixed, bottom-right corner of every storefront page
 - Collapsed: circular icon + unread count badge
@@ -239,7 +279,7 @@
 
 ---
 
-### 3.8 Cart Page (`/cart`)
+### 3.9 Cart Page (`/cart`)
 
 **Purpose:** Review selected services before checkout.
 
@@ -256,33 +296,71 @@
    - Line total (base + options, in active currency, cyan)
    - Remove item button
 4. Order total (sum of all CartItems in active currency, large, cyan)
-5. `Proceed to Checkout` button (full-width, gradient)
-6. Empty state: "Your cart is empty." + `Browse Services` link
+5. `Proceed to Checkout` button (full-width, gradient) — auth-gate: anonymous or unverified users are redirected to `/login` then returned to cart after login
+6. Empty state: "Your cart is empty." + `Browse Services` link (→ `/games`)
 
 **Rules:**
+- Anonymous users can add to cart — items stored against a `session_id` in a cookie
+- On login, anonymous CartItems are merged into the user's account cart automatically
 - Same service can appear multiple times as separate rows (each is a distinct CartItem)
 - Prices are locked at add-to-cart time — no live recalculation from service changes
-- Cart persists per user account (not session-based)
+- Cart is emptied automatically after successful payment — all CartItems removed
 
 ---
 
-### 3.9 Secure Checkout (`/checkout`)
+### 3.10 Secure Checkout (`/checkout`)
+
+**Auth-gate:** Requires authenticated + verified user. Anonymous or unverified users clicking "Buy Now" or "Proceed to Checkout" are redirected to `/login`, then returned to checkout after login.
 
 **Layout:** Two-column — payment form (left) + order summary (right).
 
 **Left:** Payment method tabs: CREDIT CARD (Stripe) · PAYPAL (Stripe) · CRYPTO (NowPayments). Card details form shown when Credit Card is active.
 
-**Right:** Item row (thumbnail · name · price · Immediate Start badge) · Total (large, cyan, taxes included in base price) · Complete Purchase button (gradient) · SSL note · legal note.
+**Right:** Order summary — lists ALL CartItems (one row per service: thumbnail · name · options summary · line total) · Grand total (sum of all items, large, cyan, taxes included) · Complete Purchase button (gradient) · SSL note · legal note.
+
+> Prototype shows one item — actual implementation shows all cart items. One payment covers the full cart. Backend creates one `Order` record per `CartItem` on payment success.
+
+**On payment success:** Redirect to `/order-confirmed/[orderId]`.
 
 ---
 
-### 3.10 Refund Policy (`/refund-policy`)
+### 3.11 Order Confirmed (`/order-confirmed/[orderId]`)
+
+**Purpose:** Post-payment success page. Confirms the order and sets expectations for what happens next.
+
+**Layout:** Centered single-column card on full dark background.
+
+**Content (top to bottom):**
+1. Large gradient checkmark icon
+2. Heading: `Order Confirmed!` (gradient text)
+3. Sub-label: `Order #[orderId]` (muted, JetBrains Mono)
+4. Service thumbnail + name + selected options summary
+5. Total paid (cyan, large)
+6. Divider
+7. **"What happens next?"** — 4 horizontal steps with icons:
+   `Admin Confirms` → `Service In Progress` → `Delivered` → `Enjoy!`
+8. Note: "Have questions? Open a support chat anytime."
+9. Two CTAs: `View My Order →` (gradient → `/profile/orders/[orderId]`) · `Browse More Services` (outlined → `/games`)
+
+**Rules:**
+- Accessible only by the customer who placed the order — if `orderId` doesn't belong to the logged-in user, redirect to `/profile`
+- Chat bubble visible on this page
+
+---
+
+### 3.12 Refund Policy (`/refund-policy`)
 
 Sections: Overview · How Refunds Work (admin reviews and issues directly via payment gateway — no middleman or escrow) · Eligibility (Non-Delivery, Not as Described, Change of Mind) · Refund Window (7 days post-delivery for delivered orders; any time for pre-delivery orders) · Crypto Refunds (wallet address required) · Dispute Resolution · Contact Support CTA.
 
 ---
 
-### 3.11 Terms of Service (`/terms-of-service`)
+### 3.13 Privacy Policy (`/privacy-policy`)
+
+Same layout as Terms of Service and Refund Policy. Content written during build.
+
+---
+
+### 3.14 Terms of Service (`/terms-of-service`)
 
 TOC sidebar (left) + content (right) on desktop. Single column on mobile.
 
@@ -290,7 +368,7 @@ TOC: Acceptance of Terms · User Conduct · Service Delivery · Limitation of Li
 
 ---
 
-### 3.12 Quick Select Mega Menu (Global Component)
+### 3.15 Quick Select Mega Menu (Global Component)
 
 Triggered by "Services" nav item click. Floating overlay panel.
 
@@ -299,7 +377,7 @@ Triggered by "Services" nav item click. Floating overlay panel.
 2. Service grid below the tabs:
    - **"All" tab:** services grouped by game name (game name as a section header), then by `serviceCategory` as column headers, individual service links below each column
    - **Single game tab:** service categories as column headers, individual service links below each column — no game header needed
-3. Each service link → navigates to `/services/[game]/[slug]`
+3. Each service link → navigates to `/[game-slug]/services/[service-slug]`
 
 **Data source:** Auto-queried from `Service` table — no CMS entry needed. Filtered by selected game tab. Only `status = "active"` services shown.
 
@@ -309,19 +387,23 @@ Triggered by "Services" nav item click. Floating overlay panel.
 
 ```
 Landing Page
-  ├── Click game card     → Games Page → click game → Services Page
-  ├── Click offer card    → Service Detail → Configure → Buy Now → Checkout
+  ├── Click game card     → /[game-slug]/services → click service → Service Detail
+  ├── Click offer card    → Service Detail → Configure → Buy Now → Cart → Checkout
+  ├── VIEW ALL DEALS      → /hot-offers
   ├── Navbar > Services   → Quick Select mega menu → sub-service → Service Detail
   └── Footer > Legal      → Refund Policy / Terms of Service
 
-Services Page
-  └── Click service card  → Service Detail → Configure → Checkout
+Games Page (/games)
+  └── Click game card     → /[game-slug]/services
 
-Games Page
-  └── Click game          → Services Page (filtered to that game)
+/[game-slug]/services
+  └── Click service card  → /[game-slug]/services/[slug]
+
+Hot Offers (/hot-offers)
+  └── Click service card  → /[game-slug]/services/[slug]
 
 Checkout
-  └── Cancel & Return     → back to Service Detail
+  └── Cancel & Return     → back to Cart
 ```
 
 ---
@@ -370,14 +452,13 @@ Checkout
 
 Game {
   id: string
-  name: string          // "World of Warcraft" | "Dota 2" | "Black Desert Online"
-  slug: string          // "world-of-warcraft"
+  name: string
+  slug: string
   image: string
   genre: string         // "MMORPG" | "MOBA" | "FPS" | "ACTION RPG"
                         // | "TACTICAL SHOOTER" | "BATTLE ROYALE" | "LOOTER SHOOTER"
   platforms: string[]   // ["PC"] | ["PC", "Console"] | ["Cross-play"]
   description: string
-  isTopTitle: boolean
   status: "active" | "draft" | "archived"
 }
 
@@ -495,10 +576,14 @@ OptionItem {
 
 Cart {
   id: string
-  userId: string
+  userId: string | null   // null for anonymous carts
+  sessionId: string | null // set for anonymous carts (cookie-based), null after login merge
   createdAt: Date
   updatedAt: Date
 }
+
+// On login: CartItems from anonymous sessionId cart are moved to the user's cart.
+// Anonymous cart is then deleted. Merge is automatic — customer keeps all items.
 
 CartItem {
   id: string
@@ -695,7 +780,8 @@ SystemSettings {
 |---|---|---|
 | Landing Page UI | not-started | Design ref: Moon_Strike_Landing_Page.png |
 | Games Page UI | not-started | Design ref: Moon_Strike_Game.png |
-| Services Page UI | not-started | Design ref: Moon_Strike_Services.png |
+| Game Services Page UI | not-started | Design ref: Moon_Strike_Services.png |
+| Hot Offers Page UI | not-started | `/hot-offers` — game tabs + hot offer service grid |
 | Service Detail UI | not-started | Design ref: Moon_Strike_Service_Detail.png |
 | Checkout Page UI | not-started | Design ref: Moon_Strike_-_Secure_Checkout.png |
 | Refund Policy UI | not-started | Design ref: Moon_Strike_-_Refund_Policy.png |
@@ -799,16 +885,16 @@ SystemSettings {
 | Auth | Email/password + Google OAuth via Supabase Auth. Both free under 50K MAU. |
 | Booster role | No separate booster role — Admin = booster. One admin role only. |
 | Order state machine | No escrow — direct refund via payment gateway. See §11. |
-| Search | Service titles only. Image + title card view. On-submit, not real-time. No games in results. |
+| Search | Real-time overlay, debounced 300ms. Service titles only — image + name card, max 6 results. No games in results. Closes on click outside or Escape. |
 | Cart | Same service can be added multiple times as separate CartItems. |
-| Reviews | TrustPilot read-only API. No DB storage. |
+| Reviews | TrustPilot TrustBox Carousel embed — loads business reviews client-side from TrustPilot's CDN. No DB storage, no server API calls. |
 | Crypto refund wallet | Customer wallet address collected at refund request time (required by NowPayments). |
 | Service fees | Taxes and fees included in base price. No separate fee at checkout. |
 | Order cancellation | No cancelled state — customers request refunds instead. Admin approves or denies. |
-| Hot Offers | Random selection from services where `isHotOffer = true`. Landing page shows ~4 cards initially, loads more on scroll. Services page HOT OFFERS tab shows all, paginated. No CMS entry needed. |
+| Hot Offers | Random selection from services where `isHotOffer = true`. Landing page: fixed 4 cards + VIEW ALL DEALS link (no load more). Services page HOT OFFERS tab: infinite scroll, loads on scroll. No CMS entry needed. |
 | Region | Single global state (USA / EUROPE). Changing in any `<RegionSelector>` — Services page banner, Service Detail, or any other location — updates all other selectors site-wide. Persists across navigation. Filters which services are shown based on `service.region[]`. |
 | Light mode hero | Prototype/palette reference only. Single Hero component — CSS token swap only. |
-| Rate limiting | Documented in §12. Implementation depends on framework. |
+| Rate limiting | Supabase API gateway. See §12 for limits per endpoint and tier. |
 
 ---
 
@@ -823,18 +909,27 @@ src/
     configurator/       SingleChoice, MultiChoice, Scalar
     checkout/           PaymentForm, OrderSummary
   app/
-    page.tsx            Landing
+    page.tsx                    Landing
     games/
-    services/
-    services/[game]/[slug]/
+    [game-slug]/
+      services/
+        page.tsx                Game Services Page
+        [service-slug]/
+          page.tsx              Service Detail
+    hot-offers/
+    cart/
     checkout/
+    order-confirmed/[orderId]/
     login/
     register/
     profile/
+    profile/edit/
     profile/orders/[id]/
+    reset-password/
     refund-policy/
+    privacy-policy/
     terms-of-service/
-    admin/              All admin routes (see §10.14)
+    admin/                      All admin routes (see §10.14)
   hooks/                useCart, useCurrency, useRegion  ← both are global state, same pattern
   store/                Global state (currency, region, cart)
   lib/                  API clients, utils, webhook verification
@@ -863,7 +958,7 @@ Same dark theme as storefront, with these differences:
 **Global layout:**
 ```
 +------------------------------------------------------------------+
-|  MoonStrike / Admin Terminal   [Search]  [Bell][?]  Admin  LOGOUT |
+|  MoonStrike / Admin Terminal   [Search orders/users/txns]  [Bell]  Admin  LOGOUT |
 +----------------+--------------------------------------------------+
 |  Dashboard     |                                                  |
 |  Users         |  Page Content                                    |
@@ -875,12 +970,12 @@ Same dark theme as storefront, with these differences:
 |  Messages      |                                                  |
 |  Logs          |                                                  |
 |  Settings      |                                                  |
-|  ───────────   |                                                  |
-|  Manage Server |                                                  |
 +----------------+--------------------------------------------------+
 |  Moon Strike 2024  |  Support  |  Privacy  |  API Docs  |  STABLE |
 +------------------------------------------------------------------+
 ```
+
+**Admin search (top bar):** Searches across orders (by ID), transactions (by ID), and users (by username or email). Shows results as a dropdown overlay with labeled sections (ORDERS / TRANSACTIONS / USERS).
 
 **Global Admin Components:** `<AdminSidebar>` · `<AdminTopBar>` · `<AdminFooter>` · `<StatCard>` · `<DataTable>` · `<StatusBadge>` · `<ActionIcons>` (Edit · Hide · Delete · Ban)
 
@@ -931,6 +1026,8 @@ Only `ADMIN` role in admin terminal. Storefront customers are a separate Supabas
 
 **Stat cards:** TOTAL USERS · ACTIVE ORDERS · PENDING REFUNDS · BANNED/FLAGGED
 
+> Game card image recommended upload size: **600×400px** (3:2 ratio). Cloudflare Images serves optimized versions at render time.
+
 ---
 
 ### 10.5 Admin Games (`/admin/games`)
@@ -945,8 +1042,6 @@ Only `ADMIN` role in admin terminal. Storefront customers are a separate Supabas
 Genre/Type values: `ACTION RPG · MOBA · FPS · MMORPG · TACTICAL SHOOTER · BATTLE ROYALE · LOOTER SHOOTER · SPORTS ACTION`
 
 Platform values: `PC · Console · Cross-play`
-
-> Games table has no price column. Prices live on Services only.
 
 ---
 
@@ -1095,15 +1190,20 @@ Full-page storefront render using draft data. Read-only — no checkout.
 ```
 # Storefront
 /                               Landing Page
-/games                          Games Page
-/services                       Services Page
-/services/[game]/[slug]         Service Detail
+/games                          Games Page (all games)
+/hot-offers                     Hot Offers Page (all hot offer services, filterable by game)
+/[game-slug]/services           Game Services Page
+/[game-slug]/services/[slug]    Service Detail
 /cart                           Cart Page
 /checkout                       Checkout
+/order-confirmed/[orderId]      Order Confirmed (post-payment success)
 /login                          Customer Login
 /register                       Customer Register
 /profile                        Customer Profile
+/profile/edit                   Edit Profile
 /profile/orders/[id]            Order Detail
+/reset-password                 Reset Password (from email link)
+/refund-policy                  Refund Policy
 /privacy-policy                 Privacy Policy
 /terms-of-service               Terms of Service
 
@@ -1498,3 +1598,172 @@ supabase.auth.signInWithOAuth({ provider: 'google' })
 
 *Last updated: see git history — update §7 Feature Progress Tracker when any feature status changes.*
 *Design references: all screenshots stored in `/design-refs/`.*
+
+---
+
+## 14. Quality & Launch Checklist
+
+### 14.1 UAT (User Acceptance Testing)
+
+Test every flow end-to-end as a real user before going live. Use Stripe test cards and NowPayments sandbox — never live keys during testing.
+
+**Stripe test card:** `4242 4242 4242 4242` · any future expiry · any CVC
+
+| Flow | What to verify |
+|---|---|
+| Register → verify email → login | Confirmation email arrives via Resend, link works, redirects to profile |
+| Register with Google OAuth | Account created, redirected correctly |
+| Forgot password | Reset email arrives, link opens reset form, redirect to login on success |
+| Add to cart (anonymous) → login → cart merge | Items survive login, prices and options intact |
+| Add same service twice | Two separate CartItems appear in cart |
+| Configure service → Add to Cart → Buy Now → Cart | Cart opens, item shown with correct options and price |
+| Cart currency toggle | Prices update across cart, navbar, and service detail simultaneously |
+| Cart region toggle | Services filter correctly, persists across navigation |
+| Proceed to Checkout (anonymous) | Redirected to login, returned to cart after login |
+| Full purchase — Stripe card | Payment clears, order created, Order Confirmed page shown, cart emptied, admin notified |
+| Full purchase — NowPayments crypto | Webhook fires, signature verified, order created, wallet address flow works on refund |
+| Multi-item checkout | All CartItems shown in order summary, one payment, one Order per CartItem created |
+| Order Confirmed page | Correct order details shown, View My Order links to correct order detail |
+| Admin: Confirm Order → In Progress → Delivered | Each status transition updates customer profile and sends notification |
+| Customer requests refund (pre-delivery) | Button visible on pending/confirmed/in_progress, refund_requested status set |
+| Customer requests refund (post-delivery, within 7 days) | Button visible, 7-day window enforced |
+| Customer requests refund (post-delivery, after 7 days) | Button hidden — refund not available |
+| Admin approves refund — Stripe | Refund issued via Stripe API, status → refunded |
+| Admin approves refund — NowPayments | Wallet address collected, refund issued via NowPayments API, status → refunded |
+| Admin denies refund | Status → completed (terminal), refund button no longer shown |
+| Second refund attempt on same order | Not possible — button hidden after first attempt |
+| 7-day auto-complete cron | Delivered order auto-moves to completed after 7 days with no refund request |
+| Support chat (anonymous) | Chat opens, message sent to admin |
+| Support chat → login → name updates | History preserved, username shown going forward |
+| Admin search | Finds orders by ID, transactions by ID, users by email/username |
+| Unverified user tries to purchase | Blocked, verification banner shown, resend email works |
+| Admin login + 2FA | OTP email arrives, login completes, session persists for 8 hours |
+| Admin session timeout | After 8 hours inactivity, redirected to /admin/login |
+| Maintenance mode ON | Public storefront inaccessible, admin terminal unaffected |
+| Light mode toggle | Colors swap correctly, layout unchanged, preference persists on reload |
+
+---
+
+### 14.2 Security Checklist
+
+All items must be checked before going live. Items marked **CRITICAL** are non-negotiable — the app should not launch without them.
+
+| Item | Priority | Details |
+|---|---|---|
+| Supabase RLS enabled on all tables | **CRITICAL** | See §14.3 — without this, any logged-in customer can read other customers' data directly |
+| All env vars in hosting platform, not in code | **CRITICAL** | Use Vercel / hosting dashboard env vars. Never hardcode secrets. |
+| `.env` files in `.gitignore` | **CRITICAL** | One leaked commit = compromised keys |
+| NowPayments webhook signature verified | **CRITICAL** | Without this, fake payments can create real orders — See §13 |
+| Stripe webhook signature verified | **CRITICAL** | Same risk as above |
+| Admin routes server-side auth-gated | **CRITICAL** | `/admin/*` must verify session server-side, not just client-side |
+| Admin 2FA enforced | **CRITICAL** | Email OTP on every new device login |
+| HTTPS only | **CRITICAL** | Enforce via hosting platform — no HTTP fallback |
+| Avatar upload validates file type + size | High | Accept JPEG/PNG only, reject all others, compress before storing |
+| Rate limiting active | High | Supabase API gateway limits per §12 |
+| Supabase Storage bucket policies | High | Game/service images: public read. User avatars: private, owner-only write. |
+| Order ownership verified on Order Confirmed page | High | If `orderId` doesn't belong to logged-in user → redirect to `/profile` |
+| Cart ownership verified | High | Users can only read/write their own CartItems |
+| Audit log covers all admin actions | Medium | Every state transition, login, and settings change logged |
+| Failed webhook attempts logged | Medium | Repeated failures flagged as BLOCKED in Audit Log |
+
+---
+
+### 14.3 Supabase RLS Policies
+
+RLS (Row Level Security) restricts which rows a user can read or write at the database level. Without it, a logged-in customer using the Supabase client can query any table and read other users' data — even if your frontend doesn't expose it.
+
+**Enable RLS on every table. Then add these policies:**
+
+```sql
+-- ── ORDERS ────────────────────────────────────────────────────────────────
+-- Customers can only see their own orders
+CREATE POLICY "customer_read_own_orders"
+ON orders FOR SELECT
+USING (auth.uid() = user_id);
+
+-- Only backend (service role) can insert/update orders
+CREATE POLICY "service_role_write_orders"
+ON orders FOR ALL
+USING (auth.role() = 'service_role');
+
+-- ── CART & CART ITEMS ──────────────────────────────────────────────────────
+CREATE POLICY "customer_read_own_cart"
+ON carts FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "customer_manage_own_cart_items"
+ON cart_items FOR ALL
+USING (
+  cart_id IN (
+    SELECT id FROM carts WHERE user_id = auth.uid()
+  )
+);
+
+-- ── SUPPORT TICKETS & MESSAGES ─────────────────────────────────────────────
+-- Customers can only read their own tickets
+CREATE POLICY "customer_read_own_tickets"
+ON support_tickets FOR SELECT
+USING (auth.uid() = user_id);
+
+-- Customers can only send messages on their own tickets
+CREATE POLICY "customer_send_own_messages"
+ON messages FOR INSERT
+WITH CHECK (
+  ticket_id IN (
+    SELECT id FROM support_tickets WHERE user_id = auth.uid()
+  )
+);
+
+-- ── GAMES & SERVICES ───────────────────────────────────────────────────────
+-- Public read for active records only
+CREATE POLICY "public_read_active_games"
+ON games FOR SELECT
+USING (status = 'active');
+
+CREATE POLICY "public_read_active_services"
+ON services FOR SELECT
+USING (status = 'active');
+
+-- Only service role can write
+CREATE POLICY "service_role_write_games"
+ON games FOR ALL
+USING (auth.role() = 'service_role');
+
+CREATE POLICY "service_role_write_services"
+ON services FOR ALL
+USING (auth.role() = 'service_role');
+
+-- ── ADMIN TABLES ───────────────────────────────────────────────────────────
+-- Audit logs, admin users, content blocks: service role only
+CREATE POLICY "service_role_only"
+ON audit_logs FOR ALL
+USING (auth.role() = 'service_role');
+
+CREATE POLICY "service_role_only"
+ON admin_users FOR ALL
+USING (auth.role() = 'service_role');
+
+CREATE POLICY "service_role_only"
+ON content_blocks FOR ALL
+USING (auth.role() = 'service_role');
+```
+
+> All backend API routes that write to the database must use the **Supabase service role key** (never the anon key) — this bypasses RLS intentionally for trusted server-side operations. The anon key is for the frontend client only.
+
+---
+
+### 14.4 Performance Guidelines
+
+Follow these during development — not as a post-launch fix.
+
+| Area | Rule |
+|---|---|
+| Images | Lazy load all game/service images. Use Cloudflare Images URLs with size transforms (e.g. `?width=600`). Never serve original upload URLs directly to the frontend. |
+| Infinite scroll | Fetch in pages of 16 items. Never load entire table. Use Supabase `.range(from, to)` pagination. |
+| Search debounce | Already specced at 300ms — do not reduce. Each keystroke = one DB query. |
+| Supabase Realtime | Subscribe to chat WebSocket only when chat bubble is open. Unsubscribe on close. Never keep open connections across all pages. |
+| TrustBox widget | Load async via script tag. Does not block page render — no action needed. |
+| Options schema render | Service Detail configurator reads `options_schema` JSONB. Parse once on load, do not re-parse on every price recalculation. |
+| Price calculation | Run entirely client-side on each option change — no API call needed. One pure function (see §6). |
+| Admin dashboard charts | Fetch aggregated data server-side. Never query raw orders/transactions table on the client for chart data. |
+| Cart item count badge | Store count in global state (useCart hook). Do not re-fetch cart on every page to get the count. |
