@@ -20,6 +20,8 @@
 11. Order State Machine
 12. Rate Limiting
 13. Implementation Notes
+14. Quality & Launch Checklist
+15. Environment Variables
 
 ---
 
@@ -125,8 +127,8 @@
 |---|---|
 | Navbar | Global component |
 | Hero / Promo Banner | CMS-editable (`hero` block). Label · Headline · Subtext · CTA button. Fields: label, headline, subtext, CTA text/link, background image. |
-| Game Filter + Grid | Category tabs: auto-populated from distinct `genre` values in the Game table (e.g. ALL · ACTION RPG · TACTICAL SHOOTER · LOOTER SHOOTING). 4-column game card grid. Clicking a game card → `/[game-slug]/services`. `Load More Games` button (click to load more — not infinite scroll). |
-| Best Offers | Section header + `VIEW ALL DEALS →` link (→ `/hot-offers`). Fixed 4 random hot offer service cards with price + Buy Now. |
+| Game Filter + Grid | Category tabs: auto-populated from distinct `genre` values in the Game table (e.g. ALL · ACTION RPG · TACTICAL SHOOTER · LOOTER SHOOTER). 4-column game card grid. Clicking a game card → `/[game-slug]/services`. `Load More Games` button (click to load more — not infinite scroll). |
+| Best Offers | Section header + `VIEW ALL DEALS →` link (→ `/hot-offers`). 4 service cards selected at random from all active `isHotOffer = true` services, re-randomized on each page load (server-side via `ORDER BY RANDOM() LIMIT 4`). Shows price + Buy Now. If fewer than 4 hot offer services exist, shows however many are available. No admin curation — fully automatic. |
 | Trust Stats Bar | CMS-editable. 4 stats: 50K+ GAMES BOOSTED · 99.9% SUCCESS RATE · 24/7 ACTIVE SUPPORT · TOP 1% PRO PLAYERS |
 | Why Choose Us | CMS-editable. Full-width media block + 3 benefit items (icon + label + description). |
 | How It Works | CMS-editable. 4 numbered steps: Choose Service · Log Into Account · Daily Progress Updates · Enjoy Result. |
@@ -143,12 +145,22 @@
 | Section | Details |
 |---|---|
 | Navbar | Global |
-| Page Header | Game name as title · Search input right-aligned — filters services within this game only |
-| Featured Game Banner | CMS-editable (Promotional Banner). Wide card with game art, game title left, USA/EUROPE toggle right. Schedulable. |
-| Service Category Tabs | Auto-populated from distinct `serviceCategory` values for this game (e.g. HOT OFFERS · DUNGEON · POWERLEVELING · RAID · STORIES). HOT OFFERS always first. Scrollable. |
-| Service Cards Grid | 2-row x 4-column initial load. Infinite scroll — auto-loads more on scroll. Each card: HOT badge · image · title · description · price · Buy Now |
+| Page Header | Game name as title · Search input right-aligned (filters services within this game only) |
+| Featured Game Banner | CMS-editable. Wide card with game art, game title left, USA/EUROPE toggle right. Schedulable. |
+| Service Category Tabs | Scrollable pill tabs. HOT OFFERS is always first (hardcoded). Remaining tabs auto-populated from distinct `serviceCategory` values for this game. |
+| Service Cards Grid | 2-row × 4-column initial load. Infinite scroll. Each card: HOT badge · image · title · description · price · Buy Now |
 | TrustPilot Reviews | Same carousel component as landing page |
 | Footer | Global |
+
+**Featured Game Banner — query logic:**
+1. Fetch active `PromoBanner` where `gameId = this game` and `region` includes the active region
+2. If none found, fall back to a banner where `gameId IS NULL` and region matches (a default banner)
+3. If still none found, hide the section entirely — do not render an empty card
+
+**Service Category Tabs — important:**
+`HOT OFFERS` is hardcoded — it filters by `isHotOffer = true`. It is **not** a `serviceCategory` value in the DB. Never query for `serviceCategory = "HOT OFFERS"` — that row will never exist. All other tabs (e.g. `DUNGEON · POWERLEVELING · RAID`) are auto-populated from the DB.
+
+If no Game record matches `[game-slug]` → call `notFound()` to render the 404 page.
 
 ---
 
@@ -160,7 +172,7 @@
 
 **Sidebar:**
 - `All Games` link (clears all filters)
-- `GENRES` multi-select tag pills — auto-populated from distinct `genre` values in the Game table: Action RPG · MMO · Shooters · MOBA · Tactical Shooter · Battle Royale · Looter Shooter
+- `GENRES` multi-select tag pills — auto-populated from distinct `genre` values in the Game table: `ACTION RPG · MMORPG · FPS · MOBA · TACTICAL SHOOTER · BATTLE ROYALE · LOOTER SHOOTER · SPORTS ACTION`
 - Selecting a genre filters the main grid to matching games. Multiple genres can be selected (OR logic — shows games matching any selected genre).
 
 **Main Content:** All games header · Search input · 3-column game card grid · infinite scroll (auto-loads on scroll). Clicking a game card → `/[game-slug]/services`.
@@ -179,7 +191,7 @@
 | Service Cards Grid | Same card style as game services page. HOT badge on every card. Sorted by most recently marked as hot offer. Infinite scroll — auto-loads on scroll. |
 | Footer | Global |
 
-**Data source:** `Service WHERE isHotOffer = true AND status = "active"`. Filtered by selected game tab.
+**Data source:** `Service WHERE isHotOffer = true AND status = "active"`, sorted by `hotOfferAt DESC`. Filtered by selected game tab.
 
 ---
 
@@ -192,14 +204,14 @@
 **Left Column:**
 1. Breadcrumb (game name, uppercase colored)
 2. Title and description
-3. Quick badges: Starts in < 15 mins · 100% Completion
+3. Quick badges: rendered from `service.badges[]`
 4. Service image (wide, rounded)
-5. "What You Get" — 2x2 benefit cards (icon + title + description)
-6. Requirements checklist
+5. "What You Get" — 2x2 benefit cards (icon + title + description) from `service.whatYouGet[]`
+6. Requirements checklist from `service.requirements[]`
 7. "Why Choose Us" section (shared component)
 
 **Right Column — "Configure Your Run" Sticky Sidebar:**
-1. Option fields rendered from `options_schema` (see §6)
+1. Option fields rendered from `optionsSchema` (see §6)
 2. Currency selector (synced to global currency state)
 3. Total price (live-calculated, cyan)
 4. Two action buttons side by side: `Add to Cart` (outlined) + `Buy Now` (gradient)
@@ -208,6 +220,8 @@
    - `Buy Now` → adds to cart then opens the cart page so customer reviews before proceeding to checkout
 
 > All service content is admin-managed via CMS: title, description, badges, image, What You Get items, requirements list, and option schema. Nothing on this page is hardcoded.
+
+If no Service record matches `[service-slug]` for the given game → call `notFound()` to render the 404 page.
 
 ---
 
@@ -264,6 +278,8 @@
   - On click: confirmation dialog → sets `status → refund_requested`
   - If `paymentProvider = "nowpayments"`: wallet address input shown before confirming
 
+If `orderId` doesn't belong to the logged-in user → call `notFound()` to render the 404 page.
+
 **Tab 2 — Transaction History:** Read-only. Columns: TXN ID · Service name · Date · Amount · Method · Status.
 
 ---
@@ -300,8 +316,10 @@
 6. Empty state: "Your cart is empty." + `Browse Services` link (→ `/games`)
 
 **Rules:**
-- Anonymous users can add to cart — items stored against a `session_id` in a cookie
+- Anonymous users can add to cart — items stored against a `session_id` in a cookie (`ms_cart_session`, 30-day HttpOnly cookie)
+- All anonymous cart operations go through server-side API routes using the service role key — the Supabase client is never used directly for anonymous cart writes
 - On login, anonymous CartItems are merged into the user's account cart automatically
+- Anonymous cart cookie (`ms_cart_session`) has a **30-day expiry** — independent of the support chat session (1-hour TTL). These are two separate cookies with separate lifetimes
 - Same service can appear multiple times as separate rows (each is a distinct CartItem)
 - Prices are locked at add-to-cart time — no live recalculation from service changes
 - Cart is emptied automatically after successful payment — all CartItems removed
@@ -318,32 +336,34 @@
 
 **Right:** Order summary — lists ALL CartItems (one row per service: thumbnail · name · options summary · line total) · Grand total (sum of all items, large, cyan, taxes included) · Complete Purchase button (gradient) · SSL note · legal note.
 
-> Prototype shows one item — actual implementation shows all cart items. One payment covers the full cart. Backend creates one `Order` record per `CartItem` on payment success.
+> Prototype shows one item — actual implementation shows all cart items. One payment covers the full cart. Backend creates one `Order` record per `CartItem` on payment success. All orders from the same payment share a `checkoutSessionId` (the Stripe Payment Intent ID or NowPayments payment ID).
 
-**On payment success:** Redirect to `/order-confirmed/[orderId]`.
+**On payment success:** Redirect to `/order-confirmed?session=[checkoutSessionId]`.
 
 ---
 
-### 3.11 Order Confirmed (`/order-confirmed/[orderId]`)
+### 3.11 Order Confirmed (`/order-confirmed`)
 
-**Purpose:** Post-payment success page. Confirms the order and sets expectations for what happens next.
+**Route:** `/order-confirmed?session=[checkoutSessionId]`
+
+**Purpose:** Post-payment success page. Confirms all orders from the completed payment and sets expectations for what happens next.
 
 **Layout:** Centered single-column card on full dark background.
 
 **Content (top to bottom):**
 1. Large gradient checkmark icon
 2. Heading: `Order Confirmed!` (gradient text)
-3. Sub-label: `Order #[orderId]` (muted, JetBrains Mono)
-4. Service thumbnail + name + selected options summary
-5. Total paid (cyan, large)
-6. Divider
-7. **"What happens next?"** — 4 horizontal steps with icons:
+3. All orders from this checkout — one row per order: service thumbnail + name + selected options summary + line total
+4. Grand total paid (cyan, large)
+5. Divider
+6. **"What happens next?"** — 4 horizontal steps with icons:
    `Admin Confirms` → `Service In Progress` → `Delivered` → `Enjoy!`
-8. Note: "Have questions? Open a support chat anytime."
-9. Two CTAs: `View My Order →` (gradient → `/profile/orders/[orderId]`) · `Browse More Services` (outlined → `/games`)
+7. Note: "Have questions? Open a support chat anytime."
+8. Two CTAs: `View My Orders →` (gradient → `/profile` with Order History tab open) · `Browse More Services` (outlined → `/games`)
 
 **Rules:**
-- Accessible only by the customer who placed the order — if `orderId` doesn't belong to the logged-in user, redirect to `/profile`
+- Fetches all orders where `checkoutSessionId` matches the query param AND `userId` = logged-in user
+- If no matching orders found for the logged-in user → redirect to `/profile`
 - Chat bubble visible on this page
 
 ---
@@ -383,6 +403,29 @@ Triggered by "Services" nav item click. Floating overlay panel.
 
 ---
 
+### 3.16 Not Found (`/404`)
+
+**Purpose:** Shown whenever a route doesn't resolve — typo'd URL, deleted game slug, expired link, etc.
+
+**Layout:** Centered single-column on full dark background. No navbar. No footer. No chat bubble.
+
+**Content (top to bottom):**
+1. MoonStrike logo (links to `/`)
+2. Large `404` in primary gradient text (Montserrat Bold, display size)
+3. Heading: `Page Not Found`
+4. Subtext: "The page you're looking for doesn't exist or has been moved."
+5. Two CTAs side by side: `Go to Homepage` (gradient → `/`) · `Browse Services` (outlined → `/games`)
+
+**Implementation:** Next.js `app/not-found.tsx` — automatically caught by the framework for any unresolved route. Also call `notFound()` explicitly in:
+- `/[game-slug]/services` — if no Game record matches the slug
+- `/[game-slug]/services/[service-slug]` — if no Service record matches the slug
+- `/profile/orders/[id]` — if the order doesn't belong to the logged-in user
+- `/order-confirmed` — if no orders found for `checkoutSessionId` belonging to the logged-in user
+
+> Do not redirect to `/` on unresolved slugs — always render the 404 page so the user understands what happened.
+
+---
+
 ## 4. User Flows
 
 ```
@@ -403,6 +446,7 @@ Hot Offers (/hot-offers)
   └── Click service card  → /[game-slug]/services/[slug]
 
 Checkout
+  └── On success          → /order-confirmed?session=[checkoutSessionId]
   └── Cancel & Return     → back to Cart
 ```
 
@@ -442,331 +486,331 @@ Checkout
 
 ## 6. Data Models
 
-> All models use Supabase PostgreSQL. Dynamic fields are stored as JSONB.
+> All models use Supabase PostgreSQL. Dynamic fields are stored as JSONB. All TypeScript fields use camelCase — Supabase maps these to snake_case DB columns automatically (e.g. `optionsSchema` ↔ `options_schema`).
+
+**Shared type used throughout:**
+`Region = "USA" | "EUROPE"` — `Service.region` and `PromoBanner.region` are `Region[]`. `Order.region` is a single `Region` value (whichever was active at checkout). `"BOTH"` is never used — represent both regions as `["USA", "EUROPE"]`.
+
+---
+
+### Game
+
+> Games do not have prices — prices live on Services.
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | |
+| name | string | |
+| slug | string | |
+| image | string | |
+| genre | string | `"ACTION RPG" \| "MMORPG" \| "FPS" \| "MOBA" \| "TACTICAL SHOOTER" \| "BATTLE ROYALE" \| "LOOTER SHOOTER" \| "SPORTS ACTION"` |
+| platforms | string[] | `"PC"`, `"Console"`, `"Cross-play"` |
+| description | string | |
+| status | string | `"active" \| "draft" \| "archived"` |
+
+---
+
+### Service
+
+> `serviceCategory` ≠ `genre`. Category = what the booster does (Dungeon, Raid). Genre = type of game (MMORPG, FPS).
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | |
+| gameId | string | FK → Game |
+| title | string | e.g. "Mythic+ Dungeons Boost" |
+| slug | string | |
+| image | string | |
+| description | string | |
+| serviceCategory | string | `"Dungeon" \| "Leveling" \| "Raid" \| "Stories" \| "Coaching" \| "Rank Boost" \| "Item Farm" \| "Powerleveling" \| "Placement Matches"` |
+| status | string | `"active" \| "draft" \| "archived"` |
+| isHotOffer | boolean | `true` → appears in HOT OFFERS tab |
+| hotOfferAt | Date \| null | Set to `NOW()` when `isHotOffer` toggled on; cleared to `null` when toggled off. Used to sort Hot Offers page (`hotOfferAt DESC`). |
+| region | Region[] | `["USA"]`, `["EUROPE"]`, or `["USA", "EUROPE"]` |
+| badges | string[] | Admin-managed. Options: `"Starts in < 15 mins"`, `"100% Completion"`, `"Safe & Secure"`, `"24/7 Support"` |
+| requirements | string[] | Rendered as checklist on Service Detail |
+| whatYouGet | Benefit[] | 2×2 benefit cards on Service Detail — see Benefit model below |
+| basePriceUSD | number | Flat fee always charged — admin sets manually, no runtime conversion |
+| basePriceEUR | number | Set independently from USD |
+| optionsSchema | JSONB | Array of ServiceOption — see below. DB column: `options_schema` |
+
+**Benefit**
+
+| Field | Type | Notes |
+|---|---|---|
+| icon | string | Tabler icon name, e.g. `"ti-shield"` |
+| title | string | |
+| description | string | |
+
+---
+
+### Service Options (`optionsSchema`)
+
+Each service's `optionsSchema` is an array of `ServiceOption` objects stored as JSONB. Admins build this through the CMS form — they never write raw JSON.
+
+**Adding a new option type** requires: define the schema shape + build the UI component + add to CMS dropdown = one deploy. Adding a new service using existing types = admin fills form, zero deploy.
+
+**ServiceOption**
+
+| Field | Type | Notes |
+|---|---|---|
+| label | string | e.g. `"Level up boost"`, `"Number of runs"` |
+| required | boolean | |
+| type | string | `"single_choice"` \| `"multiple_choice"` \| `"scalar"` |
+| options | OptionItem[] | For `single_choice` and `multiple_choice` only |
+| min | number | For `scalar` only |
+| max | number | For `scalar` only |
+| pricePerUnitUSD | number | For `scalar` only |
+| pricePerUnitEUR | number | For `scalar` only |
+
+**OptionItem**
+
+| Field | Type | Notes |
+|---|---|---|
+| label | string | e.g. `"1–20"`, `"Loot bag"` |
+| priceUSD | number | |
+| priceEUR | number | Set independently — never converted from USD |
+
+**Component mapping:**
+- `single_choice` → `<SingleChoice />` — pill/card grid, pick one
+- `multiple_choice` → `<MultiChoice />` — checklist, pick any
+- `scalar` → `<Scalar />` — slider or stepper
+
+**Price calculation** (pure function, run client-side on every option change):
+```
+total = basePriceUSD/EUR (always charged, flat)
+      + single_choice   → the selected OptionItem's price
+      + multiple_choice → sum of all checked OptionItems' prices
+      + scalar          → quantity × pricePerUnit
+```
+USD and EUR totals are always calculated independently. Never convert between currencies at runtime.
+
+**Example** (Level Boost, `basePriceUSD: 45` — selecting "21–40" + "Loot bag" + 2 runs):
+```
+$45 base + $10 level + $5 loot bag + $10 (2 × $5 runs) = $70 USD
+```
+
+---
+
+### Cart
+
+Each CartItem becomes exactly one Order on checkout. Adding the same service twice creates two separate CartItems and two Orders.
+
+**Cart**
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | |
+| userId | string \| null | `null` for anonymous carts |
+| sessionId | string \| null | Set for anonymous carts (`ms_cart_session` cookie, 30-day TTL). Cleared after login merge. |
+| createdAt | Date | |
+| updatedAt | Date | |
+
+> Anonymous cart operations always go through server-side API routes using the service role key. The Supabase client is never used directly for anonymous cart reads or writes. On login, CartItems are moved to the user's cart and the anonymous cart is deleted automatically.
+
+**CartItem**
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | |
+| cartId | string | FK → Cart |
+| serviceId | string | FK → Service |
+| selectedOptions | Record\<string, string \| number \| string[]\> | Live user selections, keyed by option label. Used for price display in the cart. |
+| selectedOptionsSnapshot | JSONB | Frozen copy of selections at add-to-cart time, including prices at that moment. Preserved so historical orders still reflect what the customer paid for even if the service is later edited. Shape: `{ [optionLabel]: { value, priceUSD, priceEUR } }` |
+| priceUSD | number | Calculated total at add-to-cart time (base + all options) |
+| priceEUR | number | |
+| addedAt | Date | |
+
+---
+
+### Order
+
+Orders only exist post-payment. No pre-payment state. No escrow — refunds go directly through the payment gateway. See §11 for the full state machine.
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | |
+| cartItemId | string | FK → CartItem |
+| serviceId | string | FK → Service |
+| userId | string | FK → auth.users |
+| checkoutSessionId | string | Groups all Orders from the same payment. Equals the Stripe Payment Intent ID or NowPayments payment ID. Used by `/order-confirmed?session=[id]` to fetch all sibling orders. |
+| selectedOptionsSnapshot | JSONB | Copied from `CartItem.selectedOptionsSnapshot` at checkout. Use this for all display, history, and Google Sheets writes — `selectedOptions` does not exist on Order. |
+| total | number | Taxes and fees included in base price |
+| currency | string | `"USD"` \| `"EUR"` |
+| region | Region | Single value — whichever was active at checkout |
+| paymentProvider | string | `"stripe"` \| `"nowpayments"` — stored at checkout, used to route refunds automatically |
+| stripePaymentIntentId | string \| null | Set when `paymentProvider = "stripe"` |
+| nowpaymentsPaymentId | string \| null | Set when `paymentProvider = "nowpayments"` |
+| cryptoRefundAddress | string \| null | Collected at refund request time for crypto orders |
+| status | string | See statuses below |
+| deliveredAt | Date \| null | |
+| refundRequestedAt | Date \| null | |
+| createdAt | Date | |
+| updatedAt | Date | |
+
+**Order statuses:**
+
+| Status | Meaning |
+|---|---|
+| `pending` | Payment cleared. Awaiting admin acknowledgment. |
+| `confirmed` | Admin acknowledged the order. |
+| `in_progress` | Service actively underway. |
+| `delivered` | Admin marked delivered. Customer notified. 7-day refund window starts. |
+| `completed` | Terminal. 7-day window passed with no refund request, or refund was denied. |
+| `refund_requested` | Customer opened a refund. One attempt per order. |
+| `refunded` | Terminal. Admin approved and issued refund via payment gateway. |
+
+**Refund rules:**
+- Refund can be requested from any non-terminal status (pre-delivery: no time limit; post-delivery: within 7 days of `deliveredAt`)
+- One attempt per order — once attempted (approved or denied), no further requests
+
+---
+
+### AdminUser
+
+One role only: `ADMIN`. Admin = booster. No partial-access roles. Auth is manual (bcrypt + signed JWT) — not Supabase Auth. See §8 and §10.2.
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | |
+| displayName | string | |
+| email | string | |
+| passwordHash | string | bcrypt hash — never plain text |
+| role | string | Always `"ADMIN"` |
+| status | string | `"active" \| "suspended" \| "banned"` |
+| avatar | string | |
+| lastLogin | Date | |
+| knownDevices | string[] | Device fingerprint hashes verified via 2FA OTP. On login: known device → skip OTP; unknown → require OTP. Clearable from Settings to force re-verification. |
+| createdAt | Date | |
+
+---
+
+### Support Chat
+
+A `SupportTicket` is the container for a conversation. `Message` records are a separate table joined by `ticketId` — **not a JSONB array on the ticket row**. This is required for Supabase Realtime to work on individual messages.
+
+Two thread types: general support (`orderId` is null) and order-specific (`orderId` is set).
+
+**SupportTicket**
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | |
+| orderId | string? | Set for order-specific threads; null for general support |
+| userId | string \| null | `null` for anonymous users. Set to the user's ID on login merge. |
+| sessionId | string \| null | Set for anonymous users (`ms_chat_session` cookie, 1-hour TTL). Cleared after login merge. |
+| subject | string | |
+| status | string | `"open" \| "in_progress" \| "resolved"` |
+| createdAt | Date | |
+| updatedAt | Date | |
+
+> On login: `userId` is attached to anonymous ticket records, `sessionId` is cleared. Chat history is preserved. Pre-login messages keep the anonymous label; display name updates to the customer's username going forward.
+
+**Message**
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | |
+| ticketId | string | FK → SupportTicket |
+| senderId | string | |
+| senderRole | string | `"admin" \| "customer"` |
+| content | string | |
+| attachments | Attachment[]? | Optional |
+| sentAt | Date | |
+
+**Attachment**
+
+| Field | Type |
+|---|---|
+| filename | string |
+| sizeBytes | number |
+| url | string |
+
+---
+
+### AuditLog
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | |
+| timestamp | Date | |
+| actorId | string \| null | Admin UUID from `admin_users.id`. `null` for system-generated events. |
+| actorType | string | `"admin"` — actorId is set, actorLabel is admin's display name. `"system"` — actorId is null, actorLabel is `"System (Cron)"` or `"System (Webhook)"`. |
+| actorLabel | string | Always set — displayed in the Audit Logs table |
+| action | string | |
+| ipAddress | string \| null | `null` for system-generated events |
+| status | string | `"success" \| "critical" \| "blocked"` |
+
+---
+
+### CMS Models
+
+One record per block — shared across dark and light mode. Theme changes CSS only, not content. Never create separate records per theme.
+
+**ContentBlock**
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | |
+| name | string | |
+| type | string | `"hero" \| "stats_bar" \| "benefits_section" \| "steps_section"` |
+| status | string | `"active" \| "scheduled" \| "draft"` |
+| data | JSONB | Block-specific fields |
+| thumbnail | string? | |
+| scheduledAt | Date? | |
+| modifiedAt | Date | |
+| createdBy | string | Admin UUID from `admin_users.id` — not `auth.uid()`. Join with `admin_users` to display creator name. |
+
+**PromoBanner**
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | |
+| name | string | |
+| image | string | Media Library URL |
+| gameId | string \| null | FK → Game. If set, banner only shows on that game's Services page. If null, acts as a regional default/fallback. |
+| region | Region[] | |
+| link | string? | Optional CTA link |
+| status | string | `"active" \| "scheduled" \| "draft"` |
+| scheduledAt | Date? | |
+| modifiedAt | Date | |
+| createdBy | string | Admin UUID from `admin_users.id` |
+
+**MediaAsset**
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | |
+| filename | string | |
+| url | string | Cloudflare CDN URL (origin: Supabase Storage) |
+| type | string | `"image" \| "video"` |
+| sizeBytes | number | |
+| usedIn | { type: "content_block" \| "promo_banner", id: string }[] | Typed references. Delete is blocked if this array is non-empty. Remove entries when a ContentBlock or PromoBanner is deleted. |
+| uploadedAt | Date | |
+| uploadedBy | string | Admin UUID from `admin_users.id` |
+
+**SystemSettings**
+
+A singleton — exactly one row ever exists, created by the seed script.
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | Always `"singleton"` |
+| adminDisplayName | string | |
+| adminEmail | string | |
+| adminAvatar | string | |
 
 ```ts
-// ─────────────────────────────────────────────────────────────────────────────
-// GAME
-// NOTE: Games do NOT have prices. Prices live on Services.
-// ─────────────────────────────────────────────────────────────────────────────
-
-Game {
-  id: string
-  name: string
-  slug: string
-  image: string
-  genre: string         // "MMORPG" | "MOBA" | "FPS" | "ACTION RPG"
-                        // | "TACTICAL SHOOTER" | "BATTLE ROYALE" | "LOOTER SHOOTER"
-  platforms: string[]   // ["PC"] | ["PC", "Console"] | ["Cross-play"]
-  description: string
-  status: "active" | "draft" | "archived"
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SERVICE
-// NOTE: serviceCategory != game genre.
-//   serviceCategory = what the booster does  (e.g. "Dungeon", "Raid")
-//   genre           = the type of game       (e.g. "MMORPG", "FPS")
-// ─────────────────────────────────────────────────────────────────────────────
-
-Service {
-  id: string
-  gameId: string          // FK -> Game
-  title: string           // "Mythic+ Dungeons Boost"
-  slug: string
-  image: string
-  description: string
-  serviceCategory: string // "Dungeon" | "Leveling" | "Raid" | "Stories" | "Coaching"
-                          // | "Rank Boost" | "Item Farm" | "Powerleveling" | "Placement Matches"
-  status: "active" | "draft" | "archived"
-  isHotOffer: boolean     // true → appears in HOT OFFERS tab on Services page
-  region: string[]        // ["USA", "EUROPE"]
-  badges: string[]        // ["Starts in < 15 mins", "100% Completion"]
-  requirements: string[]
-  whatYouGet: Benefit[]
-
-  // Base price — flat fee ALWAYS charged, regardless of option selections.
-  // Admin sets both currencies manually. No runtime conversion.
-  basePriceUSD: number
-  basePriceEUR: number
-
-  options_schema: JSONB   // array of ServiceOption — see below
-}
-
-Benefit {
-  icon: string
-  title: string
-  description: string
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SERVICE OPTIONS  (stored as JSONB in options_schema)
-//
-// Types are predefined — admins pick from a dropdown, never free-type.
-// Adding a NEW TYPE = define schema + build component + add to CMS dropdown = 1 deploy.
-// Adding a NEW SERVICE with existing types = admin fills form, zero deploy.
-// ─────────────────────────────────────────────────────────────────────────────
-
-ServiceOption {
-  label: string         // "Level up boost" | "Number of runs" | "Add-ons"
-  required: boolean
-  type:
-    | "single_choice"   // pick exactly one — total += selected option's price
-    | "multiple_choice" // pick one or more — total += each selected option's price
-    | "scalar"          // numeric quantity — total += quantity x pricePerUnit
-  options?: OptionItem[]       // used by single_choice and multiple_choice
-  min?: number                 // used by scalar
-  max?: number                 // used by scalar
-  pricePerUnitUSD?: number     // used by scalar
-  pricePerUnitEUR?: number     // used by scalar
-}
-
-OptionItem {
-  label: string    // "1–20" | "21–40" | "Loot bag" | "Express delivery"
-  priceUSD: number
-  priceEUR: number // set independently — never converted from USD
-}
-
-// Storefront component mapping:
-//   "single_choice"   → <SingleChoice />   (pill/card grid, single select)
-//   "multiple_choice" → <MultiChoice />    (checklist, multi select)
-//   "scalar"          → <Scalar />         (slider or stepper)
-// Unknown types: log a warning, render nothing (no crash).
-
-// Price calculation (one pure function, no exceptions):
-//   total = basePriceUSD (or EUR)                    always charged, flat
-//         + single_choice   → selected OptionItem's priceUSD/EUR
-//         + multiple_choice → each checked OptionItem's priceUSD/EUR
-//         + scalar          → quantity x pricePerUnitUSD/EUR
-// USD and EUR totals calculated independently. Never convert between them at runtime.
-
-// Example options_schema (Level Boost service — basePriceUSD: 45, basePriceEUR: 40):
-// [
-//   {
-//     "type": "single_choice", "label": "Level up boost", "required": true,
-//     "options": [
-//       { "label": "1–20",  "priceUSD": 5,  "priceEUR": 4  },
-//       { "label": "21–40", "priceUSD": 10, "priceEUR": 15 },
-//       { "label": "41–60", "priceUSD": 18, "priceEUR": 22 },
-//       { "label": "61–80", "priceUSD": 25, "priceEUR": 30 }
-//     ]
-//   },
-//   {
-//     "type": "multiple_choice", "label": "Add-ons", "required": false,
-//     "options": [
-//       { "label": "Loot bag",         "priceUSD": 5, "priceEUR": 4 },
-//       { "label": "Express delivery", "priceUSD": 8, "priceEUR": 7 }
-//     ]
-//   },
-//   {
-//     "type": "scalar", "label": "Number of runs", "required": true,
-//     "min": 1, "max": 10, "pricePerUnitUSD": 5, "pricePerUnitEUR": 4
-//   }
-// ]
-// Example total — "21–40" + "Loot bag" + 2 runs, USD:
-//   45(base) + 10(level) + 5(lootbag) + 10(2x5 runs) = $70 USD
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CART & CART ITEM
-//
-// Each CartItem becomes exactly one Order on checkout.
-// Same service added twice = two separate CartItems = two Orders.
-// Account-specific details communicated via support chat after purchase.
-// ─────────────────────────────────────────────────────────────────────────────
-
-Cart {
-  id: string
-  userId: string | null   // null for anonymous carts
-  sessionId: string | null // set for anonymous carts (cookie-based), null after login merge
-  createdAt: Date
-  updatedAt: Date
-}
-
-// On login: CartItems from anonymous sessionId cart are moved to the user's cart.
-// Anonymous cart is then deleted. Merge is automatic — customer keeps all items.
-
-CartItem {
-  id: string
-  cartId: string
-  serviceId: string
-  selectedOptions: Record<string, any>  // user's selections (label → value)
-  optionsSchemaSnapshot: JSONB          // snapshot of SELECTED values at add-to-cart time
-                                        // prevents drift if admin edits service later
-  priceUSD: number                      // calculated total at add-to-cart time (base + options)
-  priceEUR: number
-  addedAt: Date
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ORDER
-//
-// Orders only exist post-payment. No pending_payment state.
-// No escrow — refunds handled directly via payment gateway API.
-// See §11 for full state machine and transitions.
-// ─────────────────────────────────────────────────────────────────────────────
-
-Order {
-  id: string
-  cartItemId: string
-  serviceId: string
-  userId: string
-  selectedOptions: Record<string, any>
-  optionsSchemaSnapshot: JSONB          // from CartItem — preserved for history
-  total: number                         // taxes and fees included in base price
-  currency: "USD" | "EUR"
-  region: "USA" | "EUROPE"
-
-  // Payment provider — stored at checkout, used to route refunds automatically
-  paymentProvider: "stripe" | "nowpayments"
-  stripePaymentIntentId: string | null  // set when provider = "stripe"
-  nowpaymentsPaymentId: string | null   // set when provider = "nowpayments"
-  cryptoRefundAddress: string | null    // collected at refund request time (crypto only)
-
-  status:
-    | "pending"            // payment cleared, awaiting admin acknowledgment
-    | "confirmed"          // admin acknowledged the order
-    | "in_progress"        // service actively underway
-    | "delivered"          // admin marked delivered, customer notified, 7-day refund window starts
-    | "completed"          // terminal — customer confirmed, 7-day window passed, or refund denied
-    | "refund_requested"   // customer opened refund — one attempt per order
-    | "refunded"           // terminal — admin approved and issued via payment gateway
-
-  // Refund rules:
-  //   - Available from ANY non-terminal status (customer may change mind even before delivery)
-  //   - Post-delivery: request window is within 7 days of deliveredAt
-  //   - Pre-delivery (pending/confirmed/in_progress): no time limit on request
-  //   - One attempt per order — once attempted (approved or denied), no further requests
-
-  deliveredAt: Date | null
-  refundRequestedAt: Date | null
-  createdAt: Date
-  updatedAt: Date
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ADMIN USER
-//
-// One role only: ADMIN. Admin = booster. No partial-access roles.
-// Separate Supabase Auth instance from storefront customers.
-// ─────────────────────────────────────────────────────────────────────────────
-
-AdminUser {
-  id: string
-  displayName: string
-  email: string
-  role: "ADMIN"
-  avatar: string
-  lastLogin: Date
-  createdAt: Date
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SUPPORT CHAT
-//
-// SupportTicket is the container for a chat conversation between a customer
-// and admin. When a customer opens the chat bubble, a ticket is created.
-// Messages are grouped under it. Admin sees these as conversations in /admin/messages.
-// Two thread types: general support (no orderId) and order-specific (orderId set).
-// ─────────────────────────────────────────────────────────────────────────────
-
-SupportTicket {
-  id: string
-  orderId?: string    // set for order-specific threads, null for general support
-  userId: string
-  subject: string
-  status: "open" | "in_progress" | "resolved"  // communication status only
-  messages: Message[]
-  createdAt: Date
-  updatedAt: Date
-}
-
-Message {
-  id: string
-  ticketId: string
-  senderId: string
-  senderRole: "admin" | "customer"
-  content: string
-  attachments?: Attachment[]
-  sentAt: Date
-}
-
-Attachment {
-  filename: string
-  sizeBytes: number
-  url: string
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AUDIT LOG
-// ─────────────────────────────────────────────────────────────────────────────
-
-AuditLog {
-  id: string
-  timestamp: Date
-  userId: string | "SYSTEM_NODE"
-  userLabel: string
-  action: string
-  ipAddress: string
-  status: "SUCCESS" | "CRITICAL" | "BLOCKED"
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CONTENT (CMS)
-//
-// ONE record per block type — shared across dark and light mode.
-// Theme changes CSS/layout only, not the underlying data.
-// Never create separate content entries per theme.
-// ─────────────────────────────────────────────────────────────────────────────
-
-ContentBlock {
-  id: string
-  name: string
-  type:
-    | "hero"              // label + headline + subtext + CTA + background image
-    | "stats_bar"         // 4 trust stats
-    | "benefits_section"  // Why Choose Us — media + 3 benefits
-    | "steps_section"     // How It Works — 4 steps
-  status: "ACTIVE" | "SCHEDULED" | "DRAFT"
-  data: JSONB
-  thumbnail?: string
-  scheduledAt?: Date
-  modifiedAt: Date
-  createdBy: string
-}
-
-PromoBanner {
-  id: string
-  name: string
-  image: string           // Media Library URL
-  region: "USA" | "EUROPE" | "BOTH"
-  link?: string
-  status: "ACTIVE" | "SCHEDULED" | "DRAFT"
-  scheduledAt?: Date
-  modifiedAt: Date
-  createdBy: string
-}
-
-MediaAsset {
-  id: string
-  filename: string
-  url: string             // Cloudflare CDN URL (origin: Supabase Storage)
-  type: "image" | "video"
-  sizeBytes: number
-  usedIn: string[]        // IDs of ContentBlocks or PromoBanners referencing this asset
-  uploadedAt: Date
-  uploadedBy: string
-}
-
-SystemSettings {
-  maintenanceMode: boolean
-  adminDisplayName: string
-  adminEmail: string
-  adminAvatar: string
-}
-
-// Hot Offers: no content model — auto-populated by querying Service WHERE isHotOffer = true.
-// TrustPilot: TrustBox widget embed — no server API calls, no DB storage needed.
+// Always query with .single()
+const { data: settings } = await supabase
+  .from('system_settings')
+  .select('*')
+  .eq('id', 'singleton')
+  .single()
 ```
+
+> **Hot Offers** have no CMS model — auto-populated by querying `Service WHERE isHotOffer = true`.
+> **TrustPilot reviews** use a TrustBox widget embed — no DB storage, no server API calls needed.
 
 ---
 
@@ -805,6 +849,7 @@ SystemSettings {
 | TrustPilot integration | not-started | Read-only API |
 | Notifications | not-started | In-app bell + email for customers. See §13 |
 | Mobile / responsive layouts | not-started | Built alongside desktop pages |
+| Not Found page (404) | not-started | `app/not-found.tsx` — also called via `notFound()` on bad slugs/order IDs |
 
 ### Admin Terminal
 
@@ -815,7 +860,7 @@ SystemSettings {
 | Admin Users | not-started | Design ref: Admin_Dashboard_-_Users.png |
 | Admin Games | not-started | Design ref: Admin_Games_List.png |
 | Admin Services List | not-started | Design ref: Admin_Services_List.png |
-| Admin Service CMS | not-started | Design ref: Admin_Services_List_CMS.png — JSON options_schema |
+| Admin Service CMS | not-started | Design ref: Admin_Services_List_CMS.png — JSON optionsSchema |
 | Admin Service Preview | not-started | /admin/services/[id]/preview — draft storefront render |
 | Admin Order Management | not-started | Filter tabs, date sort, status update actions |
 | Admin Order Detail | not-started | Status update, refund panel, chat link |
@@ -832,7 +877,6 @@ SystemSettings {
 | Admin Sidebar | not-started | Shared across all admin pages |
 | Admin Top Bar | not-started | Shared across all admin pages |
 | System Pulse indicator | not-started | Live status in admin footer |
-| Maintenance Mode toggle | not-started | Disables public storefront |
 | CSV export | not-started | Dashboard + Logs + Transactions |
 
 ### System
@@ -843,13 +887,14 @@ SystemSettings {
 | Order state machine | not-started | See §11 — no escrow, direct gateway refund |
 | Stripe integration | not-started | Checkout + auto-routed refund API |
 | NowPayments integration | not-started | Checkout + auto-routed refund + wallet address collection |
-| NowPayments webhook verification | not-started | HMAC-SHA512 middleware. `NOWPAYMENTS_IPN_SECRET` setup pending. See §13 |
+| NowPayments webhook verification | not-started | HMAC-SHA512 middleware with timing-safe comparison. `NOWPAYMENTS_IPN_SECRET` setup pending. See §13 |
 | Refund router | not-started | Reads paymentProvider, routes to Stripe or NowPayments automatically |
 | Rate limiting | not-started | See §12 — depends on framework |
 | Audit log (every admin action) | not-started | Backend middleware |
 | Google Sheets integration | not-started | Orders + Transactions tabs. See §13 |
 | Real-time chat | not-started | Supabase Realtime WebSocket |
-| 2FA enforcement | not-started | Email OTP via Supabase on first login / new device. Default session timeout: 8 hours. |
+| Admin 2FA enforcement | not-started | Email OTP on first login / new device. Default session timeout: 8 hours. |
+| Anonymous cart API routes | not-started | All anonymous cart operations go through server-side routes with service role key |
 
 ---
 
@@ -863,11 +908,12 @@ SystemSettings {
 | CSS | Tailwind CSS |
 | Backend | Supabase |
 | Database | Supabase PostgreSQL — dynamic fields as JSONB |
-| Auth | Supabase Auth — storefront customers and admin as separate instances |
-| Image hosting | Supabase Storage (origin, free tier) + Cloudflare Images (CDN + transforms) |
-| Payment | Stripe (card + PayPal + Google Pay + Apple Pay) + NowPayments (crypto) |
-| SMTP | Resend — see §13 for setup details. Required for auth emails (confirm, reset password) and order notification emails. |
-| Currency | Fixed USD/EUR values per service — no conversion API. One global currency state shared across navbar selector, service detail sidebar, and cart page toggle. Changing currency in any one location updates all others. At checkout, the currency active at that moment determines which price is charged. |
+| Auth (customers) | Supabase Auth — email/password + Google OAuth |
+| Auth (admin) | Manual — bcrypt password in `admin_users` table, signed JWT on successful login + 2FA. Verified server-side on every `/admin/*` request. Single Supabase project — no separate project needed. |
+| Image hosting | Supabase Storage (origin) + Cloudflare Images (CDN + transforms) |
+| Payment | Stripe (card, PayPal, Google Pay, Apple Pay) + NowPayments (crypto) |
+| SMTP | Resend — auth emails + order notifications. See §13. |
+| Currency | Fixed USD/EUR values per service — no runtime conversion. Global state shared across navbar, service detail, and cart. Changing in any one location updates all others. |
 
 ### Third-Party APIs
 
@@ -882,19 +928,20 @@ SystemSettings {
 
 | Feature | Decision |
 |---|---|
-| Auth | Email/password + Google OAuth via Supabase Auth. Both free under 50K MAU. |
-| Booster role | No separate booster role — Admin = booster. One admin role only. |
-| Order state machine | No escrow — direct refund via payment gateway. See §11. |
-| Search | Real-time overlay, debounced 300ms. Service titles only — image + name card, max 6 results. No games in results. Closes on click outside or Escape. |
-| Cart | Same service can be added multiple times as separate CartItems. |
-| Reviews | TrustPilot TrustBox Carousel embed — loads business reviews client-side from TrustPilot's CDN. No DB storage, no server API calls. |
-| Crypto refund wallet | Customer wallet address collected at refund request time (required by NowPayments). |
-| Service fees | Taxes and fees included in base price. No separate fee at checkout. |
+| Auth | Customer: email/password + Google OAuth via Supabase Auth (free under 50K MAU). Admin: manual bcrypt + JWT — no separate Supabase project. |
+| Booster role | No separate booster role — Admin = booster. One role only. |
+| Order state machine | No escrow — refunds go directly to the payment gateway. See §11. |
+| Search | Real-time overlay, debounced 300ms. Service titles only — image + name, max 6 results. Closes on click outside or Escape. |
+| Cart | Same service can be added multiple times as separate CartItems. Anonymous cart uses `ms_cart_session` cookie (30-day TTL). All anonymous cart operations go server-side via service role key. |
+| Reviews | TrustPilot TrustBox Carousel embed — client-side, no DB storage, no server API calls. |
+| Crypto refund | Wallet address collected at refund request time (required by NowPayments). |
+| Service fees | Taxes and fees included in base price. No extra fee at checkout. |
 | Order cancellation | No cancelled state — customers request refunds instead. Admin approves or denies. |
-| Hot Offers | Random selection from services where `isHotOffer = true`. Landing page: fixed 4 cards + VIEW ALL DEALS link (no load more). Services page HOT OFFERS tab: infinite scroll, loads on scroll. No CMS entry needed. |
-| Region | Single global state (USA / EUROPE). Changing in any `<RegionSelector>` — Services page banner, Service Detail, or any other location — updates all other selectors site-wide. Persists across navigation. Filters which services are shown based on `service.region[]`. |
-| Light mode hero | Prototype/palette reference only. Single Hero component — CSS token swap only. |
-| Rate limiting | Supabase API gateway. See §12 for limits per endpoint and tier. |
+| Hot Offers | 4 random `isHotOffer = true` services via `ORDER BY RANDOM() LIMIT 4` — re-randomized per page load. No admin curation. |
+| Region | Single global state (USA / EUROPE). Updates all `<RegionSelector>` instances site-wide. Persists across navigation. `Region[]` everywhere except `Order.region` (single value at checkout). |
+| Light mode | CSS variable swap only — `<html data-theme="light">`. Same components, no separate content. |
+| Rate limiting | Supabase API gateway. See §12. |
+| Multi-order checkout | One payment → one Order per CartItem. All share a `checkoutSessionId`. Redirect: `/order-confirmed?session=[checkoutSessionId]`. |
 
 ---
 
@@ -919,7 +966,8 @@ src/
     hot-offers/
     cart/
     checkout/
-    order-confirmed/[orderId]/
+    order-confirmed/
+      page.tsx                  Order Confirmed (?session=[checkoutSessionId])
     login/
     register/
     profile/
@@ -929,6 +977,7 @@ src/
     refund-policy/
     privacy-policy/
     terms-of-service/
+    not-found.tsx               Global 404 page
     admin/                      All admin routes (see §10.14)
   hooks/                useCart, useCurrency, useRegion  ← both are global state, same pattern
   store/                Global state (currency, region, cart)
@@ -944,6 +993,8 @@ src/
 The Admin Terminal is a **separate application** from the storefront with its own login, layout, routing, and access control. Never accessible from the public storefront.
 
 **Single role: ADMIN** — full access to all sections. Admin = booster. No partial-access roles.
+
+**Admin auth:** Uses manual bcrypt + JWT authentication (not Supabase Auth). Admin credentials live in the `admin_users` table. On successful login + 2FA, the backend issues a signed JWT with `role: "admin"`. Every `/admin/*` route verifies this JWT server-side. This runs in the same single Supabase project as the storefront — no separate project needed.
 
 ### 10.1 Admin Design System
 
@@ -994,15 +1045,19 @@ Centered card. No sidebar or header.
 
 **Admin account creation rules:**
 - Admin accounts are **never self-registered**. There is no public admin registration page.
-- The first admin account is seeded directly into Supabase (via Supabase dashboard or a protected one-time script).
+- The first admin account is seeded directly into the database (via a protected one-time script that bcrypt-hashes the password).
 - After that, only existing admins can create new admin accounts from `/admin/users/new`.
-- Admin accounts live in a **separate Supabase Auth instance** from storefront customers.
 
-**2FA — email OTP on first login:**
-- On first login (or any new device), Supabase sends a one-time passcode to the admin's email
-- Admin enters the OTP to complete login
-- Implemented via Supabase's built-in email OTP — no third-party 2FA app required
+**2FA — email OTP on first login or new device:**
+- On first login (or any new device), the backend sends a one-time passcode to the admin's email via Resend
+- Admin enters the OTP to complete login; on success the device fingerprint hash is added to `AdminUser.knownDevices`
+- Subsequent logins from a known device skip OTP
 - Failed logins logged to Audit Logs. Session timeout after inactivity (default: 8 hours, configurable in Settings).
+
+**"Remember this terminal session" checkbox:**
+- **Unchecked (default):** JWT expires after 8 hours of inactivity. Admin must re-login after timeout.
+- **Checked:** JWT expiry extends to 30 days. Intended for dedicated admin devices. 2FA is still required on the first login from that device. Can be revoked from Settings.
+- Implementation: set JWT expiry to `8h` or `30d` at token issuance time based on checkbox value.
 
 ---
 
@@ -1020,9 +1075,14 @@ Centered card. No sidebar or header.
 
 **Table:** NAME · EMAIL · ROLE · STATUS · LAST LOGIN · ACTIONS
 
-Only `ADMIN` role in admin terminal. Storefront customers are a separate Supabase Auth instance — not listed here.
+Only `ADMIN` role in admin terminal. Storefront customers authenticate via Supabase Auth in the same project — their records live in the Supabase `auth.users` table and are not listed in this admin table.
 
 **Row actions:** Edit · Activity history · Ban/Suspend
+
+**Ban/Suspend guard:**
+- An admin cannot ban their own account
+- If only one admin account exists, the Ban action is disabled for that account with a tooltip: "Cannot ban the only admin account."
+- Both checks are enforced server-side — not just in the UI. Attempting either via a direct API call returns HTTP 403 with error `SELF_BAN_NOT_ALLOWED` or `LAST_ADMIN_NOT_ALLOWED`.
 
 **Stat cards:** TOTAL USERS · ACTIVE ORDERS · PENDING REFUNDS · BANNED/FLAGGED
 
@@ -1039,7 +1099,7 @@ Only `ADMIN` role in admin terminal. Storefront customers are a separate Supabas
 
 **Table:** GAME NAME · GENRE/TYPE · PLATFORM · STATUS · ACTIONS
 
-Genre/Type values: `ACTION RPG · MOBA · FPS · MMORPG · TACTICAL SHOOTER · BATTLE ROYALE · LOOTER SHOOTER · SPORTS ACTION`
+Genre/Type values (canonical — must match §6 exactly): `ACTION RPG · MMORPG · FPS · MOBA · TACTICAL SHOOTER · BATTLE ROYALE · LOOTER SHOOTER · SPORTS ACTION`
 
 Platform values: `PC · Console · Cross-play`
 
@@ -1059,15 +1119,23 @@ Service Category values: `Dungeon · Leveling · Raid · Stories · Powerlevelin
 
 **Left column:**
 
-1. **Basic Info:** Service Name · Game (dropdown) · Service Category (dropdown) · Hot Offer checkbox (true = appears in HOT OFFERS tab)
+1. **Basic Info:** Service Name · Game (dropdown) · Service Category (dropdown) · Hot Offer checkbox — when checked, sets `isHotOffer = true` and `hotOfferAt = current timestamp`; when unchecked, sets `isHotOffer = false` and `hotOfferAt = null` · Region (multi-select: USA / EUROPE / Both)
 
-2. **Custom Service Options (JSONB):** Dynamic field builder. Each field: label input · type dropdown (Single Choice / Multiple Choice / Scalar) · required toggle · type-specific price inputs. Saved as `options_schema` JSONB in Supabase.
+2. **Service Badges:** Tag input with pre-defined options. Admin selects any combination:
+   `Starts in < 15 mins` · `100% Completion` · `Safe & Secure` · `24/7 Support`
+   Rendered as pill badges below the service title on Service Detail. Leave empty to show no badges.
+
+3. **Custom Service Options (JSONB):** Dynamic field builder. Each field: label input · type dropdown (Single Choice / Multiple Choice / Scalar) · required toggle · type-specific price inputs. Saved as `optionsSchema` JSONB in Supabase (DB column: `options_schema`).
    - Single / Multiple Choice: option rows with label + `$USD` + `€EUR` per option
    - Scalar: min · max · `$pricePerUnitUSD` · `€pricePerUnitEUR`
 
-3. **Service Details:** Rich text editor (B / I / List / Link) for description.
+4. **What You Get (Benefit Cards):** Repeatable field builder — up to 4 entries. Each entry: icon picker (Tabler icon name, text input with preview) · benefit title · benefit description. Rendered as the 2×2 grid on Service Detail. Minimum 1 entry required to publish.
 
-**Right column:** BASE PRICE (basePriceUSD + basePriceEUR — always charged flat, options stack on top) · Thumbnail upload (drag + drop, recommended 1200x1080px) · Pro Tip card.
+5. **Service Details:** Rich text editor (B / I / List / Link) for description.
+
+6. **Requirements:** Repeatable text field — one requirement per row. Rendered as checklist on Service Detail.
+
+**Right column:** BASE PRICE (`basePriceUSD` + `basePriceEUR` — always charged flat, options stack on top) · Thumbnail upload (drag + drop, recommended 1200×1080px) · Pro Tip card.
 
 ---
 
@@ -1077,8 +1145,14 @@ Full-page storefront render using draft data. Read-only — no checkout.
 
 - Amber banner: `PREVIEW MODE — This service is not yet published`
 - Buttons: Back to Editor · Deploy Now
-- Renders identical components as the public Service Detail page (§3.4)
+- Renders identical components as the public Service Detail page (§3.5)
 - What admins see = what customers see
+
+**Deploy Now behavior:**
+1. Runs the same field validation as Save in the CMS editor: minimum 1 `whatYouGet` entry, all required fields filled, `basePriceUSD` and `basePriceEUR` > 0.
+2. If validation fails: show inline errors on the preview page. Stay on preview — do not publish.
+3. If validation passes: sets `service.status → "active"`, redirect to `/admin/services` with a success toast: "Service published."
+4. If the service is already `active` (re-previewing a live service): button label changes to `Update Live`. Same behavior — no confirmation dialog needed.
 
 ---
 
@@ -1139,7 +1213,7 @@ Full-page storefront render using draft data. Read-only — no checkout.
 | Why Choose Us | `benefits_section` | Media (image/video) · 3 benefit icon + title + description |
 | How It Works | `steps_section` | 4 step titles + descriptions |
 
-**Tab 2 — Promotional Banners:** Banner title · image (from Media Library) · region (USA / EUROPE / Both) · optional CTA link · status (Active / Scheduled / Draft) · schedule date.
+**Tab 2 — Promotional Banners:** Banner title · Game (optional dropdown — if set, banner only shows on that game's Services page; if left blank, acts as a regional default) · image (from Media Library) · region (USA / EUROPE / Both) · optional CTA link · status (active / scheduled / draft) · schedule date.
 
 **Tab 3 — Media Library:** Upload via drag + drop. Served via Cloudflare Images CDN. Usage tracking shown per asset. Delete blocked if asset is in use.
 
@@ -1159,17 +1233,19 @@ Full-page storefront render using draft data. Read-only — no checkout.
 
 **User profile sidebar:** Avatar · username · location · orders + spend stats · recent activity · management actions (Update Ticket · Ban User).
 
-**Anonymous session merge:** Anonymous users get a temporary `session_id`. On login, `user_id` and `username` are attached to existing records — chat history preserved, and the customer's display name updates to their actual username going forward. Pre-login messages retain the anonymous label. Session expiry: anonymous = 1 hour, logged-in = 1 week. Expired sessions and records deleted.
+**Anonymous session merge:** Anonymous users get a temporary `session_id` (stored in `SupportTicket.sessionId`). On login, `userId` and `username` are attached to existing ticket records — chat history preserved, and the customer's display name updates to their actual username going forward. Pre-login messages retain the anonymous label. Chat session TTL: anonymous = 1 hour. Expired chat session records deleted. (Cart data is on a separate 30-day cookie — independent of this expiry.)
 
 ---
 
 ### 10.12 Admin Audit Logs (`/admin/logs`)
 
-**Table:** TIMESTAMP · USER · ACTION · IP ADDRESS · STATUS
+**Table:** TIMESTAMP · ACTOR · ACTION · IP ADDRESS · STATUS
 
-**Status types:** `SUCCESS` (green) · `CRITICAL` (red filled) · `BLOCKED` (amber)
+> ACTOR column shows `actorLabel` — admin display name for admin actions, "System (Cron)" or "System (Webhook)" for system-generated events.
 
-**Example events:** Admin Console Login (SUCCESS) · Database Connection Timeout (CRITICAL) · Modified User Permissions (SUCCESS) · Unauthorized API Request (BLOCKED)
+**Status types:** `success` (green) · `critical` (red filled) · `blocked` (amber)
+
+**Example events:** Admin Console Login (success) · Database Connection Timeout (critical) · Modified User Permissions (success) · Unauthorized API Request (blocked)
 
 **Bottom stat cards:** UPTIME PERFORMANCE · BLOCKED THREATS · ACTIVE ANOMALIES
 
@@ -1179,7 +1255,7 @@ Full-page storefront render using draft data. Read-only — no checkout.
 
 **Profile card:** Avatar upload · Admin Display Name · Email · Change Security Password link.
 
-**Application card:** Maintenance Mode toggle (disables public storefront when on).
+**Application card:** Session timeout duration (default 8 hours, adjustable).
 
 **Actions:** Save All Changes (purple) · Discard (outlined).
 
@@ -1196,7 +1272,7 @@ Full-page storefront render using draft data. Read-only — no checkout.
 /[game-slug]/services/[slug]    Service Detail
 /cart                           Cart Page
 /checkout                       Checkout
-/order-confirmed/[orderId]      Order Confirmed (post-payment success)
+/order-confirmed                Order Confirmed (?session=[checkoutSessionId])
 /login                          Customer Login
 /register                       Customer Register
 /profile                        Customer Profile
@@ -1206,6 +1282,7 @@ Full-page storefront render using draft data. Read-only — no checkout.
 /refund-policy                  Refund Policy
 /privacy-policy                 Privacy Policy
 /terms-of-service               Terms of Service
+/404                            Not Found (handled by Next.js not-found.tsx — no explicit route needed)
 
 # Admin Terminal
 /admin/login                    Admin Login
@@ -1231,7 +1308,7 @@ Full-page storefront render using draft data. Read-only — no checkout.
 /admin/settings                 Terminal Configuration
 ```
 
-**Route guard:** All `/admin/*` routes require authenticated admin session with 2FA verified. Session timeout after 8 hours of inactivity (configurable in Settings) — redirects to `/admin/login`.
+**Route guard:** All `/admin/*` routes require a valid signed JWT with `role: "admin"` verified server-side. Session timeout after 8 hours of inactivity (configurable in Settings) — redirects to `/admin/login`.
 
 ---
 
@@ -1264,8 +1341,8 @@ Full-page storefront render using draft data. Read-only — no checkout.
          |
     +----+-----------------------------+
     |                                  |
-customer confirms               customer requests refund
-(or 7-day window passes)        (within 7 days of deliveredAt)
+7-day window passes             customer requests refund
+(no refund request)             (within 7 days of deliveredAt)
     v                                  v
 +----------+                +--------------------+
 | completed|                |  refund_requested  |
@@ -1292,7 +1369,7 @@ Refund can also be requested from `pending`, `confirmed`, and `in_progress`
 | `pending` | `confirmed` | Admin acknowledges the order | Admin |
 | `confirmed` | `in_progress` | Admin starts the service | Admin |
 | `in_progress` | `delivered` | Admin marks as delivered | Admin |
-| `delivered` | `completed` | Customer confirms, or 7-day window passes with no dispute | Customer / Cron |
+| `delivered` | `completed` | 7-day window passes with no refund request | Cron |
 | `pending` / `confirmed` / `in_progress` | `refund_requested` | Customer changed mind (no time limit) | Customer |
 | `delivered` | `refund_requested` | Customer disputes delivery (within 7 days of `deliveredAt`) | Customer |
 | `refund_requested` | `refunded` | Admin approves and issues via gateway | Admin |
@@ -1393,6 +1470,7 @@ Admin                    →  Relaxed   — trusted, still protected
 
 | Endpoint | Anonymous | Customer | Admin | Reason |
 |---|---|---|---|---|
+| `POST /api/auth/login` (customer) | 10 / 15 min / IP | — | — | Brute force |
 | `POST /admin/login` | 5 / 15 min / IP | — | 10 / 15 min / IP | Brute force |
 | `GET /api/search` | 15 / 1 min / IP | 40 / 1 min / user | unlimited | Scraping |
 | `GET /api/games` | 20 / 1 min / IP | 60 / 1 min / user | unlimited | Scraping |
@@ -1403,9 +1481,10 @@ Admin                    →  Relaxed   — trusted, still protected
 | Payment webhooks | signature check only | — | — | Replay attack prevention |
 
 **Rules:**
-- Violations return HTTP 429 + Audit Log entry with status `BLOCKED`
+- Violations return HTTP 429 + Audit Log entry with status `blocked`
 - Payment webhook endpoints use signature verification — IP-based limiting does not apply
 - Limits above are starting estimates — tune after launch with real traffic data
+- Supabase Auth has its own built-in rate limiting on `/auth/v1/token`. Verify it is enabled: Supabase Dashboard → Authentication → Rate Limits. The custom customer login limit above is a defense-in-depth layer — both should be active.
 
 **Implementation:** Supabase API gateway rate limiting.
 
@@ -1419,7 +1498,7 @@ Admin                    →  Relaxed   — trusted, still protected
 
 | Trigger | Message |
 |---|---|
-| `confirmed → delivered` | "Your boost is complete!" |
+| `in_progress → delivered` | "Your boost is complete!" |
 | `refund_requested → refunded` | "Your refund has been approved and is being processed." |
 | `refund_requested → completed` (denied) | "Your refund request has been denied." |
 
@@ -1427,8 +1506,8 @@ Admin                    →  Relaxed   — trusted, still protected
 
 | Trigger | Message |
 |---|---|
-| New order hits `pending` | In-app bell: "New order received — [service name]" + email to admin |
-| Order hits `refund_requested` | In-app bell: "Refund requested — [order ID]" + email to admin |
+| New order enters `pending` | In-app bell: "New order received — [service name]" + email to admin |
+| Order enters `refund_requested` | In-app bell: "Refund requested — [order ID]" + email to admin |
 
 **In-App Bell:** Unread counter badge on bell icon. Clicking opens notification feed. Marked as read on open/click. Present in both storefront navbar and admin top bar.
 
@@ -1441,6 +1520,7 @@ Resend is a developer-focused email API. It handles transactional emails — no 
 **What it sends for Moon Strike:**
 - Auth emails: email confirmation on register, password reset link (both triggered by Supabase Auth automatically when configured)
 - Order notification emails: boost complete, refund approved, refund denied (triggered by your backend on state transitions)
+- Admin 2FA OTP emails (triggered by backend on admin login)
 
 **How it works:**
 1. Create a free account at resend.com (100 emails/day free, 3,000/month)
@@ -1476,8 +1556,6 @@ await resend.emails.send({
 4. Add the key to env: `GOOGLE_SERVICE_ACCOUNT_JSON` (the full JSON as a string)
 5. Create your Google Spreadsheet → Share it with the service account's email (Editor access)
 6. Copy the Spreadsheet ID from the URL → add to env: `GOOGLE_SHEET_ID`
-
-
 
 One spreadsheet, two tabs. Written on order events only.
 
@@ -1516,9 +1594,11 @@ Not written to Sheets: user registrations, admin actions, failed payments.
 
 | Event | Action |
 |---|---|
-| Order confirmed | Append new row to Orders tab + Transactions tab |
-| Order status changes | Update existing Orders row by `order_id` |
+| Payment webhook fires — order enters `pending` | Append new row to Orders tab + Transactions tab |
+| Order status changes to any subsequent state | Update existing Orders row by `order_id` |
 | Refund resolved | Update `refund_status` + `refunded_at` on Transactions row |
+
+> "Order enters `pending`" = payment confirmed by webhook. This is the first write. Do not wait for admin to set `confirmed` — that would miss orders admin never acknowledges.
 
 ---
 
@@ -1542,7 +1622,12 @@ export function verifyNowPaymentsSignature(
     .update(rawBody)
     .digest("hex");
 
-  return hmac === signature;
+  // Use timing-safe comparison to prevent timing attacks
+  if (hmac.length !== signature.length) return false;
+  return crypto.timingSafeEqual(
+    Buffer.from(hmac, "hex"),
+    Buffer.from(signature, "hex")
+  );
 }
 ```
 
@@ -1572,6 +1657,7 @@ export async function POST(req: Request) {
 
 **Critical rules:**
 - Always read raw body before any JSON parsing — parsing mutates the body and breaks HMAC comparison
+- Use `crypto.timingSafeEqual` for the comparison — plain `===` is vulnerable to timing attacks
 - Log failed verifications to Audit Logs — repeated failures may signal an attack
 - Always return 200 after verification passes, even on business logic errors — NowPayments retries on non-200, which risks duplicate order creation
 
@@ -1587,12 +1673,14 @@ export async function POST(req: Request) {
 
 ### Auth — Google OAuth
 
-Both auth methods active. Both free under Supabase's 50K MAU free tier.
+Both auth methods active for storefront customers. Both free under Supabase's 50K MAU free tier.
 
 ```ts
 supabase.auth.signInWithPassword({ email, password })
 supabase.auth.signInWithOAuth({ provider: 'google' })
 ```
+
+Admin auth does not use Supabase Auth — see §8 and §10.2.
 
 ---
 
@@ -1620,10 +1708,10 @@ Test every flow end-to-end as a real user before going live. Use Stripe test car
 | Cart currency toggle | Prices update across cart, navbar, and service detail simultaneously |
 | Cart region toggle | Services filter correctly, persists across navigation |
 | Proceed to Checkout (anonymous) | Redirected to login, returned to cart after login |
-| Full purchase — Stripe card | Payment clears, order created, Order Confirmed page shown, cart emptied, admin notified |
-| Full purchase — NowPayments crypto | Webhook fires, signature verified, order created, wallet address flow works on refund |
-| Multi-item checkout | All CartItems shown in order summary, one payment, one Order per CartItem created |
-| Order Confirmed page | Correct order details shown, View My Order links to correct order detail |
+| Full purchase — Stripe card | Payment clears, orders created, Order Confirmed page shows all purchased services, cart emptied, admin notified |
+| Full purchase — NowPayments crypto | Webhook fires, signature verified, orders created, wallet address flow works on refund |
+| Multi-item checkout | All CartItems shown in order summary, one payment, one Order per CartItem created, all visible on Order Confirmed page |
+| Order Confirmed page | All orders from checkout shown, View My Orders links to profile Order History |
 | Admin: Confirm Order → In Progress → Delivered | Each status transition updates customer profile and sends notification |
 | Customer requests refund (pre-delivery) | Button visible on pending/confirmed/in_progress, refund_requested status set |
 | Customer requests refund (post-delivery, within 7 days) | Button visible, 7-day window enforced |
@@ -1639,8 +1727,10 @@ Test every flow end-to-end as a real user before going live. Use Stripe test car
 | Unverified user tries to purchase | Blocked, verification banner shown, resend email works |
 | Admin login + 2FA | OTP email arrives, login completes, session persists for 8 hours |
 | Admin session timeout | After 8 hours inactivity, redirected to /admin/login |
-| Maintenance mode ON | Public storefront inaccessible, admin terminal unaffected |
 | Light mode toggle | Colors swap correctly, layout unchanged, preference persists on reload |
+| 404 page — bad game slug | notFound() renders correctly, no redirect to homepage |
+| 404 page — bad service slug | notFound() renders correctly |
+| 404 page — wrong order ID | notFound() renders for order not belonging to logged-in user |
 
 ---
 
@@ -1655,16 +1745,18 @@ All items must be checked before going live. Items marked **CRITICAL** are non-n
 | `.env` files in `.gitignore` | **CRITICAL** | One leaked commit = compromised keys |
 | NowPayments webhook signature verified | **CRITICAL** | Without this, fake payments can create real orders — See §13 |
 | Stripe webhook signature verified | **CRITICAL** | Same risk as above |
-| Admin routes server-side auth-gated | **CRITICAL** | `/admin/*` must verify session server-side, not just client-side |
+| Admin routes server-side auth-gated | **CRITICAL** | `/admin/*` must verify JWT server-side, not just client-side |
 | Admin 2FA enforced | **CRITICAL** | Email OTP on every new device login |
 | HTTPS only | **CRITICAL** | Enforce via hosting platform — no HTTP fallback |
+| Anonymous cart goes through server-side routes only | **CRITICAL** | Supabase client never used for anonymous cart reads/writes — service role key only via API routes |
 | Avatar upload validates file type + size | High | Accept JPEG/PNG only, reject all others, compress before storing |
 | Rate limiting active | High | Supabase API gateway limits per §12 |
 | Supabase Storage bucket policies | High | Game/service images: public read. User avatars: private, owner-only write. |
-| Order ownership verified on Order Confirmed page | High | If `orderId` doesn't belong to logged-in user → redirect to `/profile` |
+| Order ownership verified on Order Confirmed page | High | If `checkoutSessionId` doesn't belong to logged-in user → redirect to `/profile` |
 | Cart ownership verified | High | Users can only read/write their own CartItems |
+| Admin self-ban and last-admin-ban blocked | High | Server-side guard — see §10.4 |
 | Audit log covers all admin actions | Medium | Every state transition, login, and settings change logged |
-| Failed webhook attempts logged | Medium | Repeated failures flagged as BLOCKED in Audit Log |
+| Failed webhook attempts logged | Medium | Repeated failures flagged as `blocked` in Audit Log |
 
 ---
 
@@ -1686,11 +1778,28 @@ CREATE POLICY "service_role_write_orders"
 ON orders FOR ALL
 USING (auth.role() = 'service_role');
 
--- ── CART & CART ITEMS ──────────────────────────────────────────────────────
-CREATE POLICY "customer_read_own_cart"
+-- ── CART ──────────────────────────────────────────────────────────────────
+-- Authenticated users read their own cart by user_id
+CREATE POLICY "customer_read_own_cart_auth"
 ON carts FOR SELECT
-USING (auth.uid() = user_id);
+USING (auth.uid() IS NOT NULL AND auth.uid() = user_id);
 
+-- Authenticated users can create their own cart
+CREATE POLICY "customer_insert_own_cart"
+ON carts FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+-- Authenticated users can update their own cart (e.g. updatedAt)
+CREATE POLICY "customer_update_own_cart"
+ON carts FOR UPDATE
+USING (auth.uid() = user_id)
+WITH CHECK (auth.uid() = user_id);
+
+-- NOTE: Anonymous cart operations (userId = null) are handled entirely through
+-- server-side API routes using the service role key. The Supabase client is never
+-- used directly for anonymous cart reads or writes — no RLS policy needed for anon carts.
+
+-- ── CART ITEMS ──────────────────────────────────────────────────────────────
 CREATE POLICY "customer_manage_own_cart_items"
 ON cart_items FOR ALL
 USING (
@@ -1714,6 +1823,9 @@ WITH CHECK (
   )
 );
 
+-- NOTE: Anonymous support ticket operations (userId = null) also go through
+-- server-side API routes with the service role key — same pattern as the cart.
+
 -- ── GAMES & SERVICES ───────────────────────────────────────────────────────
 -- Public read for active records only
 CREATE POLICY "public_read_active_games"
@@ -1735,15 +1847,15 @@ USING (auth.role() = 'service_role');
 
 -- ── ADMIN TABLES ───────────────────────────────────────────────────────────
 -- Audit logs, admin users, content blocks: service role only
-CREATE POLICY "service_role_only"
+CREATE POLICY "service_role_only_audit_logs"
 ON audit_logs FOR ALL
 USING (auth.role() = 'service_role');
 
-CREATE POLICY "service_role_only"
+CREATE POLICY "service_role_only_admin_users"
 ON admin_users FOR ALL
 USING (auth.role() = 'service_role');
 
-CREATE POLICY "service_role_only"
+CREATE POLICY "service_role_only_content_blocks"
 ON content_blocks FOR ALL
 USING (auth.role() = 'service_role');
 ```
@@ -1763,7 +1875,65 @@ Follow these during development — not as a post-launch fix.
 | Search debounce | Already specced at 300ms — do not reduce. Each keystroke = one DB query. |
 | Supabase Realtime | Subscribe to chat WebSocket only when chat bubble is open. Unsubscribe on close. Never keep open connections across all pages. |
 | TrustBox widget | Load async via script tag. Does not block page render — no action needed. |
-| Options schema render | Service Detail configurator reads `options_schema` JSONB. Parse once on load, do not re-parse on every price recalculation. |
+| Options schema render | Service Detail configurator reads `optionsSchema` JSONB. Parse once on load, do not re-parse on every price recalculation. |
 | Price calculation | Run entirely client-side on each option change — no API call needed. One pure function (see §6). |
 | Admin dashboard charts | Fetch aggregated data server-side. Never query raw orders/transactions table on the client for chart data. |
 | Cart item count badge | Store count in global state (useCart hook). Do not re-fetch cart on every page to get the count. |
+
+---
+
+## 15. Environment Variables
+
+> All secrets go in your hosting platform's env var dashboard (Vercel, etc.) — never hardcoded, never committed to git. Add `.env.local` to `.gitignore` before the first commit.
+
+### Required Variables
+
+| Variable | Used in | When needed | Notes |
+|---|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Frontend + Backend | Build + Runtime | Supabase project URL. Safe to expose — prefixed `NEXT_PUBLIC_`. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Frontend client | Build + Runtime | Supabase anon key. Safe to expose — RLS enforces access. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Backend API routes only | Runtime | **Never expose to frontend.** Bypasses RLS. Used for all server-side DB writes. |
+| `JWT_SECRET` | Backend | Runtime | Signs and verifies admin JWTs. Min 32 chars, random. Generate with `openssl rand -base64 32`. |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Frontend checkout | Build + Runtime | Stripe publishable key — safe to expose. |
+| `STRIPE_SECRET_KEY` | Backend | Runtime | **Never expose to frontend.** Used to create Payment Intents and process refunds. |
+| `STRIPE_WEBHOOK_SECRET` | Backend webhook handler | Runtime | From Stripe Dashboard → Webhooks → signing secret. Used to verify webhook signatures. |
+| `NOWPAYMENTS_API_KEY` | Backend | Runtime | From NowPayments dashboard. Used to create crypto payments. |
+| `NOWPAYMENTS_IPN_SECRET` | Backend webhook handler | Runtime | ⚠️ Setup pending. From NowPayments dashboard → API Settings → IPN Secret. Used to verify webhook signatures. |
+| `RESEND_API_KEY` | Backend | Runtime | From resend.com dashboard. Used for all transactional emails (auth, order notifications, admin 2FA OTP). |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Backend | Runtime | Full JSON key file contents as a string. From Google Cloud Console → Service Accounts. Used for Sheets writes. |
+| `GOOGLE_SHEET_ID` | Backend | Runtime | Spreadsheet ID from the Google Sheets URL. The sheet must be shared with the service account email. |
+| `NEXT_PUBLIC_CLOUDFLARE_IMAGES_ACCOUNT_HASH` | Frontend | Build + Runtime | From Cloudflare Images dashboard. Used to construct CDN image URLs. |
+
+### Setup Order
+
+Set these up in this order — each depends on the service being configured first:
+
+1. Supabase — create project, copy URL + anon key + service role key
+2. JWT secret — generate locally, add to env
+3. Stripe — create account, get publishable + secret key, set up webhook and copy signing secret
+4. NowPayments — create account, get API key, configure IPN and copy secret ⚠️
+5. Resend — create account, verify domain, copy API key, configure Supabase SMTP
+6. Google Cloud — create project, enable Sheets API, create service account, download JSON key, create spreadsheet, share with service account email
+7. Cloudflare Images — enable in Cloudflare dashboard, copy account hash
+
+### Local Development
+
+```bash
+# .env.local (never commit this file)
+NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+JWT_SECRET=your-32-char-random-secret
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+NOWPAYMENTS_API_KEY=...
+NOWPAYMENTS_IPN_SECRET=...
+RESEND_API_KEY=re_...
+GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"..."}
+GOOGLE_SHEET_ID=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms
+NEXT_PUBLIC_CLOUDFLARE_IMAGES_ACCOUNT_HASH=abc123xyz
+```
+
+> For Stripe webhooks in local dev: use the Stripe CLI (`stripe listen --forward-to localhost:3000/api/v1/webhooks/stripe`) to forward webhook events to your local server. The CLI provides a temporary `STRIPE_WEBHOOK_SECRET` for local use only.
+
