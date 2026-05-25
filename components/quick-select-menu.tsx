@@ -3,16 +3,48 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { CategoryTabs } from "@/components/ui";
 
-const categories = ["All Games", "Action RPG", "Tactical Shooting", "Looter Shooting"];
+const categories = [
+  { label: "All Games", href: "/games" },
+  { label: "Action RPG", href: "/games" },
+  { label: "Tactical Shooting", href: "/games" },
+  { label: "Looter Shooting", href: "/games" },
+];
 
 const serviceColumns = [
-  { title: "Service 1", items: ["Service 1.1", "Service 1.2", "Service 1.3"] },
-  { title: "Service 2", items: ["Service 2.1", "Service 2.2", "Service 2.3", "Service 2.4", "Service 2.5"] },
-  { title: "Service 3", items: ["Service 3.1"] },
-  { title: "Service 4", items: ["Service 4.1", "Service 4.2", "Service 4.3", "Service 4.4"] },
-  { title: "Service 5", items: ["Service 5.1", "Service 5.2"] },
-  { title: "Service 6", items: ["Service 6.1", "Service 6.2", "Service 6.3"] },
+  {
+    title: "Rank Boost",
+    items: [
+      { label: "Valorant Placement", href: "/services/valorant/valorant-rank-boost" },
+      { label: "Mobile Legends Rank", href: "/services/mobile-legends/mobile-legends-rank" },
+      { label: "Apex Coaching", href: "/services/apex-legends/apex-legends-coaching" },
+    ],
+  },
+  {
+    title: "Dungeons",
+    items: [
+      { label: "Mythic+ Dungeons", href: "/services/world-of-warcraft/wow-mythic-plus" },
+      { label: "Timed Keystone Runs", href: "/services/world-of-warcraft/wow-mythic-plus" },
+      { label: "Loot Trader Runs", href: "/services/world-of-warcraft/wow-mythic-plus" },
+    ],
+  },
+  {
+    title: "Raids",
+    items: [
+      { label: "Destiny 2 Raid Clear", href: "/services/destiny-2/destiny-2-raid-clear" },
+      { label: "Flawless Trials", href: "/services/destiny-2/destiny-2-raid-clear" },
+      { label: "Pinnacle Progression", href: "/services/destiny-2/destiny-2-raid-clear" },
+    ],
+  },
+  {
+    title: "Item Farm",
+    items: [
+      { label: "Rare Item Farming", href: "/services/world-of-warcraft/rare-item-farming" },
+      { label: "Event Cosmetics", href: "/services/world-of-warcraft/rare-item-farming" },
+      { label: "Targeted Drop Runs", href: "/services/world-of-warcraft/rare-item-farming" },
+    ],
+  },
 ];
 
 export function QuickSelectMenu() {
@@ -38,62 +70,55 @@ export function QuickSelectMenu() {
         aria-expanded={isOpen}
         aria-controls="quick-select-overlay"
         onClick={() => setIsOpen((value) => !value)}
-        className="hidden h-13 w-14 rounded-md border border-[var(--border)] bg-[var(--panel)] md:block"
+        className="ms-focus-ring h-12 w-12 shrink-0 rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-card)] hover:border-[var(--ms-gradient-end)]"
       >
         <Image src="/assets/bar-menu.png" alt="Open quick select" width={26} height={26} className="mx-auto" />
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 bg-black/55 px-4 py-6 backdrop-blur-sm" onClick={() => setIsOpen(false)}>
+        <div className="fixed inset-0 z-50 bg-black/65 px-4 py-6 backdrop-blur-sm" onClick={() => setIsOpen(false)}>
           <section
             id="quick-select-overlay"
             role="dialog"
             aria-modal="true"
             aria-label="Quick service select"
-            className="mx-auto max-w-[913px] rounded border border-[var(--primary)] bg-[#0d0d22] p-5 text-white shadow-[0_0_0_1px_rgba(51,217,255,0.7),0_28px_90px_rgba(0,0,0,0.55)]"
+            className="mx-auto max-w-5xl rounded-lg border border-[var(--ms-gradient-end)] bg-[var(--ms-bg-card)] p-5 text-[var(--ms-heading)] shadow-[0_0_0_1px_rgba(34,211,238,0.45),0_28px_90px_rgba(0,0,0,0.55)]"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="mx-auto flex h-12 max-w-[496px] items-center rounded-md border border-[var(--border)] bg-[var(--field)] pl-5 text-[var(--muted)]">
-              <span className="mono text-sm tracking-[0.08em]">Search Game or Service</span>
-              <button className="ms-button ml-auto h-11 w-12 rounded-md" type="button">
-                <Image src="/assets/magnifien.png" alt="Search" width={22} height={22} />
+            <form className="mx-auto flex h-12 max-w-xl items-center rounded-md border border-[var(--ms-border)] bg-[var(--ms-field)] pl-5 text-[var(--ms-body)]">
+              <label htmlFor="quick-select-search" className="sr-only">
+                Search game or service
+              </label>
+              <input
+                id="quick-select-search"
+                type="search"
+                placeholder="Search Game or Service"
+                className="w-full bg-transparent mono text-sm tracking-[0.08em] outline-none"
+              />
+              <button className="ms-button ml-auto h-11 w-12 rounded-md" type="submit" aria-label="Search">
+                <Image src="/assets/magnifien.png" alt="" width={22} height={22} />
               </button>
+            </form>
+
+            <div className="mt-6 border-t border-[var(--ms-border)] pt-7">
+              <CategoryTabs items={categories} />
             </div>
 
-            <div className="mt-6 border-t border-[#302e68] pt-7">
-              <div className="flex flex-wrap items-center justify-center gap-5">
-                <button type="button" className="h-10 w-10 rounded-full bg-[#2b2a52] text-3xl leading-none">
-                  ←
-                </button>
-                {categories.map((category, index) => (
-                  <Link
-                    key={category}
-                    href="/games"
-                    onClick={() => setIsOpen(false)}
-                    className={`h-9 rounded px-4 pt-2 mono text-sm uppercase tracking-[0.18em] ${
-                      index === 0 ? "ms-button" : "border border-[var(--border)] bg-[var(--panel)]"
-                    }`}
-                  >
-                    {category}
-                  </Link>
-                ))}
-                <button type="button" className="h-10 w-10 rounded-full bg-[#2b2a52] text-3xl leading-none">
-                  →
-                </button>
-              </div>
-            </div>
-
-            <div className="grid gap-x-14 gap-y-10 px-7 pb-12 pt-16 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-x-12 gap-y-10 px-2 pb-8 pt-12 sm:grid-cols-2 lg:grid-cols-4">
               {serviceColumns.map((column) => (
                 <div key={column.title}>
-                  <h3 className="mono border-b border-[#302e68] pb-1 text-2xl font-bold text-[#a5a7c5]">
+                  <h3 className="mono border-b border-[var(--ms-border)] pb-2 text-xl font-bold uppercase tracking-[0.08em] text-[var(--ms-heading)]">
                     {column.title}
                   </h3>
-                  <ul className="mt-4 space-y-3 mono text-base text-[#7371aa]">
+                  <ul className="mt-4 space-y-3 text-sm text-[var(--ms-body)]">
                     {column.items.map((item) => (
-                      <li key={item}>
-                        <Link href="/games" onClick={() => setIsOpen(false)} className="hover:text-[var(--accent)]">
-                          {item}
+                      <li key={item.label}>
+                        <Link
+                          href={item.href}
+                          onClick={() => setIsOpen(false)}
+                          className="hover:text-[var(--ms-gradient-end)]"
+                        >
+                          {item.label}
                         </Link>
                       </li>
                     ))}

@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
-import { Sora, Space_Mono } from "next/font/google";
+import { GlobalChatBubble } from "@/components/global-chat-bubble";
+import { JetBrains_Mono, Montserrat } from "next/font/google";
 import "./globals.css";
 
-const sora = Sora({
+const montserrat = Montserrat({
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
   variable: "--font-body",
   display: "swap",
 });
 
-const spaceMono = Space_Mono({
-  weight: ["400", "700"],
+const jetBrainsMono = JetBrains_Mono({
+  weight: ["400", "500", "600", "700"],
   subsets: ["latin"],
   variable: "--font-mono",
   display: "swap",
@@ -27,9 +29,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${sora.variable} ${spaceMono.variable}`}>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${montserrat.variable} ${jetBrainsMono.variable}`}>
         {children}
+        <GlobalChatBubble />
       </body>
     </html>
   );
