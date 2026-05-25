@@ -1,52 +1,79 @@
 import Link from "next/link";
 import { PlaceholderAsset } from "@/components/asset-image";
+import { Frame18Sections } from "@/components/frame-18-sections";
 import { ServiceCard } from "@/components/service-card";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { Frame18Sections } from "@/components/frame-18-sections";
+import { Badge, CategoryTabs, GameCard } from "@/components/ui";
 import { gameServices, trustMetrics } from "@/lib/catalog";
 
-const gameCards = Array.from({ length: 8 }, (_, index) => gameServices[index % gameServices.length]);
+const categoryTabs = [
+  { label: "All Games", href: "/games" },
+  { label: "Action RPG", href: "/games" },
+  { label: "Tactical Shooting", href: "/games" },
+  { label: "Looter Shooting", href: "/games" },
+];
+
+const gameCards = [
+  {
+    name: "Diablo IV",
+    genre: "Action RPG",
+    platform: "Cross-play",
+    description: "Power level to max tier, farm legendary items, and clear seasonal content.",
+  },
+  {
+    name: "World of Warcraft",
+    genre: "MMORPG",
+    platform: "PC",
+    description: "Mythic dungeons, raids, vault rewards, and weekly character progression.",
+  },
+  {
+    name: "Valorant",
+    genre: "Tactical Shooter",
+    platform: "PC",
+    description: "Placement games, rank climbs, coaching, and duo queue support.",
+  },
+  {
+    name: "Destiny 2",
+    genre: "Looter Shooter",
+    platform: "Cross-play",
+    description: "Raid clears, exotic farms, trials support, and weekly pinnacle runs.",
+  },
+];
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[var(--background)] text-white">
+    <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
       <SiteHeader />
 
       <section className="ms-shell py-20">
-        <p className="text-sm font-black uppercase">
-          Featured & <span className="section-accent">Recommended</span>
+        <p className="mono text-sm font-black uppercase tracking-[0.2em] text-[var(--ms-body)]">
+          Featured <span className="section-accent">Recommended</span>
         </p>
         <div className="relative mt-6">
-          <button className="absolute -left-24 top-1/2 hidden h-14 w-14 -translate-y-1/2 rounded-full border border-[var(--border)] bg-[#20203b] text-3xl text-[var(--muted)] xl:block">
-            ‹
-          </button>
-          <button className="absolute -right-24 top-1/2 hidden h-14 w-14 -translate-y-1/2 rounded-full border border-[var(--border)] bg-[#20203b] text-3xl text-[var(--muted)] xl:block">
-            ›
-          </button>
-          <div className="grid overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] lg:grid-cols-[1fr_260px]">
+          <div className="grid overflow-hidden rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] lg:grid-cols-[1fr_280px]">
             <PlaceholderAsset alt="Void Descent seasonal event" className="min-h-[450px]" priority imageClassName="p-20">
               <div className="absolute bottom-8 left-8 max-w-xl">
-                <span className="rounded bg-[var(--accent)]/25 px-3 py-1 mono text-xs font-bold uppercase text-[var(--accent)]">
-                  New Update
-                </span>
-                <h1 className="mt-4 text-lg font-medium">Void Descent: Seasonal Event</h1>
-                <p className="mt-3 max-w-lg text-[var(--muted)]">
-                  Master the new challenge rifts and claim exclusive cosmic armor sets before the season ends.
+                <Badge variant="new" />
+                <h1 className="font-display mt-5 text-4xl font-black tracking-[-0.04em] sm:text-6xl">
+                  Void Descent Seasonal Event
+                </h1>
+                <p className="mt-4 max-w-lg text-lg leading-8 text-[var(--ms-body)]">
+                  Master new challenge rifts and claim exclusive cosmic armor sets before the season ends.
                 </p>
-                <Link href="/games" className="ms-button mt-6 h-10 px-6">
+                <Link href="/games" className="ms-button mt-6 h-11 px-6">
                   Learn More
                 </Link>
               </div>
             </PlaceholderAsset>
-            <aside className="border-l border-[var(--border)] p-5">
-              <p className="mono text-sm uppercase tracking-[0.18em] text-[var(--muted)]">Coming Soon</p>
+            <aside className="border-l border-[var(--ms-border)] p-5">
+              <p className="mono text-sm uppercase tracking-[0.18em] text-[var(--ms-body)]">Coming Soon</p>
               {["Elite Trials Return", "Mythic+ Cache Update", "Ranked Climb Events"].map((item) => (
                 <div key={item} className="mt-5 flex gap-4">
                   <PlaceholderAsset alt={`${item} preview`} className="h-12 w-20 rounded" imageClassName="p-3" />
                   <p className="text-sm leading-4">
-                    <span className="block font-black uppercase text-[var(--accent)]">Featured</span>
-                    <span className="text-[var(--muted)]">{item}</span>
+                    <Badge variant="featured" />
+                    <span className="mt-2 block text-[var(--ms-body)]">{item}</span>
                   </p>
                 </div>
               ))}
@@ -56,10 +83,12 @@ export default function Home() {
       </section>
 
       <section className="ms-shell py-10">
-        <div className="flex items-end justify-between">
-          <h2 className="text-3xl font-black tracking-[-0.04em]">Best <span className="section-accent">Offers</span></h2>
-          <Link href="/games" className="mono text-sm uppercase tracking-[0.3em] text-[var(--accent)]">
-            View all deals →
+        <div className="flex items-end justify-between gap-6">
+          <h2 className="font-display text-3xl font-black tracking-[-0.04em]">
+            Best <span className="section-accent">Offers</span>
+          </h2>
+          <Link href="/games" className="mono text-sm uppercase tracking-[0.3em] text-[var(--ms-gradient-end)]">
+            View all deals
           </Link>
         </div>
         <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
@@ -70,49 +99,35 @@ export default function Home() {
       </section>
 
       <section className="ms-shell py-14">
-        <div className="flex items-end justify-between">
-          <h2 className="text-3xl font-black tracking-[-0.04em]">All <span className="section-accent">Games</span></h2>
-          <Link href="/games" className="mono text-sm uppercase tracking-[0.3em] text-[var(--accent)]">
-            View all →
+        <div className="flex items-end justify-between gap-6">
+          <h2 className="font-display text-3xl font-black tracking-[-0.04em]">
+            All <span className="section-accent">Games</span>
+          </h2>
+          <Link href="/games" className="mono text-sm uppercase tracking-[0.3em] text-[var(--ms-gradient-end)]">
+            View all
           </Link>
         </div>
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-5">
-          <button className="h-10 w-10 rounded-full bg-[#282747] text-2xl">←</button>
-          {["All Games", "Action RPG", "Tactical Shooting", "Looter Shooting"].map((tab, index) => (
-            <button key={tab} className={`${index === 0 ? "ms-button" : "border border-[var(--border)] bg-[var(--panel)]"} h-9 rounded px-4 mono text-sm uppercase tracking-[0.22em]`}>
-              {tab}
-            </button>
-          ))}
-          <button className="h-10 w-10 rounded-full bg-[#282747] text-2xl">→</button>
+        <div className="mt-10">
+          <CategoryTabs items={categoryTabs} />
         </div>
         <div className="mt-12 grid gap-8 md:grid-cols-2 xl:grid-cols-4">
-          {gameCards.map((service, index) => (
-            <article key={`${service.slug}-${index}`} className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--panel)]">
-              <PlaceholderAsset alt="Diablo IV preview" className="h-52" />
-              <div className="p-5">
-                <div className="flex gap-2 mono text-[11px]">
-                  <span className="rounded bg-[#232744] px-2 py-1 text-[var(--accent)]">Action RPG</span>
-                  <span className="rounded bg-[#2a2943] px-2 py-1 text-[var(--muted)]">Cross-play</span>
-                </div>
-                <h3 className="mt-3 text-2xl font-black">Diablo IV</h3>
-                <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Power level to max tier, farm legendary unique items, and clear</p>
-              </div>
-            </article>
+          {gameCards.map((game) => (
+            <GameCard key={game.name} {...game} />
           ))}
         </div>
         <div className="mt-12 text-center">
-          <Link href="/games" className="inline-flex rounded-md bg-[#2a2a43] px-8 py-4 font-bold">
+          <Link href="/games" className="inline-flex rounded-md bg-[var(--ms-bg-card)] px-8 py-4 font-bold">
             Load More Games
           </Link>
         </div>
       </section>
 
-      <section className="mt-10 border-y border-[var(--border)] bg-[var(--panel)] py-8">
+      <section className="mt-10 border-y border-[var(--ms-border)] bg-[var(--ms-bg-card)] py-8">
         <div className="ms-shell grid grid-cols-2 gap-6 text-center md:grid-cols-4">
           {trustMetrics.concat({ value: "Top 1%", label: "Pro players" }).map((metric) => (
             <div key={metric.label}>
-              <p className="mono text-2xl font-bold">{metric.value}</p>
-              <p className="mono mt-2 text-xs uppercase tracking-[0.28em] text-[var(--muted)]">{metric.label}</p>
+              <p className="mono text-2xl font-bold text-[var(--ms-heading)]">{metric.value}</p>
+              <p className="mono mt-2 text-xs uppercase tracking-[0.28em] text-[var(--ms-body)]">{metric.label}</p>
             </div>
           ))}
         </div>

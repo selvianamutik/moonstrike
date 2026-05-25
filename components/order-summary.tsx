@@ -14,28 +14,28 @@ type OrderSummaryProps = {
 };
 
 export function OrderSummary({ ctaHref, ctaLabel, rows, serviceName, serviceMeta, total }: OrderSummaryProps) {
-  const ctaClassName = "mt-8 flex h-14 w-full items-center justify-center rounded-md bg-gradient-to-r from-[var(--primary)] to-[#c7b4ff] text-lg font-black";
+  const ctaClassName = "ms-button mt-8 flex h-14 w-full items-center justify-center rounded-md text-lg font-black";
 
   return (
-    <aside className="h-fit rounded-xl border border-[var(--border)] bg-[var(--panel-strong)] p-8 shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
-      <h2 className="border-b border-[var(--border)] pb-5 text-2xl font-black">Order Summary</h2>
-      <div className="flex gap-4 border-b border-[var(--border)] py-7">
+    <aside className="ms-card h-fit rounded-xl p-8 shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
+      <h2 className="border-b border-[var(--ms-border)] pb-5 text-2xl font-black">Order Summary</h2>
+      <div className="flex gap-4 border-b border-[var(--ms-border)] py-7">
         <PlaceholderAsset alt="Order item preview" className="h-20 w-20 rounded-md" imageClassName="p-3" />
         <div className="flex-1">
           <h3 className="font-bold">{serviceName}</h3>
-          <p className="mono mt-1 text-xs text-[var(--accent)]">{serviceMeta}</p>
+          <p className="mono mt-1 text-xs text-[var(--ms-price)]">{serviceMeta}</p>
         </div>
         <p className="font-bold">{total}</p>
       </div>
       {rows.map((row) => (
-        <div key={row.label} className="mt-6 flex justify-between text-[var(--muted)]">
+        <div key={row.label} className="mt-6 flex justify-between text-[var(--ms-body)]">
           <span>{row.label}</span>
-          <span className="text-white">{row.value}</span>
+          <span className="text-[var(--ms-heading)]">{row.value}</span>
         </div>
       ))}
-      <div className="mt-8 flex items-center justify-between border-t border-[var(--border)] pt-7">
+      <div className="mt-8 flex items-center justify-between border-t border-[var(--ms-border)] pt-7">
         <span className="font-bold">Total</span>
-        <span className="text-4xl font-black text-[var(--accent)] drop-shadow-[0_0_12px_rgba(51,217,255,0.7)]">
+        <span className="text-4xl font-black text-[var(--ms-price)] drop-shadow-[0_0_12px_rgba(34,211,238,0.45)]">
           {total}
         </span>
       </div>
@@ -44,7 +44,7 @@ export function OrderSummary({ ctaHref, ctaLabel, rows, serviceName, serviceMeta
           {ctaLabel}
         </Link>
       ) : null}
-      <p className="mono mt-6 text-center text-xs uppercase text-[var(--muted)]">256-bit SSL encrypted</p>
+      <p className="mono mt-6 text-center text-xs uppercase text-[var(--ms-body)]">256-bit SSL encrypted</p>
     </aside>
   );
 }
