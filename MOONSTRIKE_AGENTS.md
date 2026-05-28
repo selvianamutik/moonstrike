@@ -845,9 +845,9 @@ const { data: settings } = await supabase
 | Global Navbar | in-progress | Shared header exists. Cart icon/count, functional currency selector, and live search overlay are missing. |
 | Global Footer | done | Shared footer exists; privacy/social links still use placeholder `#` where routes are missing. |
 | Global Chat Bubble | in-progress | Fixed bottom-right UI exists with static messages. Supabase Realtime, send action, unread state, and anon session merge are pending. |
-| Customer Login | in-progress | UI exists. Supabase Auth, Google OAuth, forgot password, email verification, and auth redirects are pending. |
-| Customer Register | in-progress | UI exists. Supabase sign-up, Google OAuth, confirm password validation, and email verification are pending. |
-| Customer Profile | in-progress | Profile UI exists with mock data. Auth gate, edit profile, real totals, and persistence are pending. |
+| Customer Login | in-progress | Supabase email/password, Google OAuth redirect, forgot-password request, safe `next` redirects, and `/profile` + `/checkout` auth gates are wired. Cart merge API and full purchase gating are pending. |
+| Customer Register | in-progress | Supabase sign-up, Google OAuth, confirm password validation, and email verification/resend banner are wired. Username persistence beyond auth metadata is pending. |
+| Customer Profile | in-progress | Profile route is auth-gated and displays the Supabase user's email, auth metadata username/name, member-since date, and real logout. Edit profile, real order totals, and persistence are pending. |
 | Order History | in-progress | Mock order rows and status badges exist. Filter tabs are visual only. |
 | Order Detail | in-progress | Mock order detail, timeline, selected options, and refund button exist. Refund action/ownership checks are pending. |
 | Cart | in-progress | `/cart` UI build-verified with mock lines/totals. Quantity/remove/currency/auth-gate/API behavior is pending. |
@@ -1902,8 +1902,8 @@ Follow these during development — not as a post-launch fix.
 | Variable | Used in | When needed | Notes |
 |---|---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Frontend + Backend | Build + Runtime | Supabase project URL. Safe to expose — prefixed `NEXT_PUBLIC_`. |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Frontend client | Build + Runtime | Supabase anon key. Safe to expose — RLS enforces access. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Backend API routes only | Runtime | **Never expose to frontend.** Bypasses RLS. Used for all server-side DB writes. |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Frontend + SSR auth client | Build + Runtime | Supabase publishable key (`sb_publishable_...`). Safe to expose; RLS and user JWTs enforce access. `NEXT_PUBLIC_SUPABASE_ANON_KEY` is accepted only as a legacy fallback. |
+| `SUPABASE_SECRET_KEY` | Backend API routes only | Runtime | Supabase secret key (`sb_secret_...`). **Never expose to frontend.** Bypasses RLS. Legacy fallback: `SUPABASE_SERVICE_ROLE_KEY`. |
 | `JWT_SECRET` | Backend | Runtime | Signs and verifies admin JWTs. Min 32 chars, random. Generate with `openssl rand -base64 32`. |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Frontend checkout | Build + Runtime | Stripe publishable key — safe to expose. |
 | `STRIPE_SECRET_KEY` | Backend | Runtime | **Never expose to frontend.** Used to create Payment Intents and process refunds. |
@@ -1932,8 +1932,8 @@ Set these up in this order — each depends on the service being configured firs
 ```bash
 # .env.local (never commit this file)
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+SUPABASE_SECRET_KEY=sb_secret_...
 JWT_SECRET=your-32-char-random-secret
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 STRIPE_SECRET_KEY=sk_test_...
