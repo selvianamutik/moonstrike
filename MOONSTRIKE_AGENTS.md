@@ -823,15 +823,15 @@ const { data: settings } = await supabase
 | Feature | Status | Notes |
 |---|---|---|
 | Landing Page UI | not-started | Design ref: Moon_Strike_Landing_Page.png |
-| Games Page UI | not-started | Design ref: Moon_Strike_Game.png |
-| Game Services Page UI | not-started | Design ref: Moon_Strike_Services.png |
+| Games Page UI | not-started | Design ref: Moon_Strike_Games_Page.png |
+| Game Services Page UI | not-started | Design ref: Moon_Strike_Services_Page.png |
 | Hot Offers Page UI | not-started | `/hot-offers` — game tabs + hot offer service grid |
-| Service Detail UI | not-started | Design ref: Moon_Strike_Service_Detail.png |
-| Checkout Page UI | not-started | Design ref: Moon_Strike_-_Secure_Checkout.png |
-| Refund Policy UI | not-started | Design ref: Moon_Strike_-_Refund_Policy.png |
-| Terms of Service UI | not-started | Design ref: Moon_Strike_-_Terms_of_Service.png |
+| Service Detail UI | not-started | Design ref: Moon_Strike_Service_Detail_Page.png |
+| Checkout Page UI | not-started | Design ref: Moon_Strike_Secure_Checkout_Page.png |
+| Refund Policy UI | not-started | Design ref: Moon_Strike_Refund_Policy_Page.png |
+| Terms of Service UI | not-started | Design ref: Moon_Strike_Terms_of_Service_Page.png |
 | Privacy Policy UI | not-started | Same layout as ToS and Refund Policy. Content written during build. |
-| Quick Select Mega Menu | not-started | Design ref: quick_select.png |
+| Quick Select Mega Menu | not-started | Design ref: Quick_Select_Mega_Menu_Component.png |
 | Global Navbar | not-started | Shared component |
 | Global Footer | not-started | Shared component |
 | Global Chat Bubble | not-started | Fixed bottom-right, Supabase Realtime |
@@ -855,23 +855,23 @@ const { data: settings } = await supabase
 
 | Feature | Status | Notes |
 |---|---|---|
-| Admin Login | not-started | Design ref: Admin_Dashboard_-_Login.png |
-| Admin Dashboard Overview | not-started | Design ref: Admin_Dashboard_-_Overview.png |
-| Admin Users | not-started | Design ref: Admin_Dashboard_-_Users.png |
-| Admin Games | not-started | Design ref: Admin_Games_List.png |
-| Admin Services List | not-started | Design ref: Admin_Services_List.png |
-| Admin Service CMS | not-started | Design ref: Admin_Services_List_CMS.png — JSON optionsSchema |
+| Admin Login | not-started | Design ref: Admin_Login_Page.png |
+| Admin Dashboard Overview | not-started | Design ref: Admin_Dashboard_Page.png |
+| Admin Users | not-started | Design ref: Admin_Users_Page.png |
+| Admin Games | not-started | Design ref: Admin_Games_Page.png |
+| Admin Services List | not-started | Design ref: Admin_Services_Page.png |
+| Admin Service CMS | not-started | Design ref: Admin_Services_CMS_Page.png — JSON optionsSchema |
 | Admin Service Preview | not-started | /admin/services/[id]/preview — draft storefront render |
 | Admin Order Management | not-started | Filter tabs, date sort, status update actions |
 | Admin Order Detail | not-started | Status update, refund panel, chat link |
-| Admin Transactions | not-started | Design ref: Admin_Transactions_List.png |
-| Admin Content Library | not-started | 3 tabs: Landing Page Sections, Promo Banners, Media Library |
+| Admin Transactions | not-started | Design ref: Admin_Transactions_Page.png |
+| Admin Content Library | not-started | 3 tabs: Landing Page Sections, Promo Banners, Media Library, Design ref: Admin_Contents_Page.png |
 | Landing Page CMS blocks | not-started | Hero, Stats Bar, Benefits, Steps |
 | Promotional Banners CMS | not-started | Schedulable — Services page banner + seasonal |
 | Media Library CMS | not-started | Upload, CDN serve, usage tracking, delete guard |
 | Hot Offers auto-population | not-started | Query Service WHERE isHotOffer = true |
-| Admin Messages / Chat | not-started | [Support] + [Order #id] threads, anon session merge |
-| Admin Audit Logs | not-started | Design ref: Admin_Dashboard_-_Audit_Logs.png |
+| Admin Messages / Chat | not-started | [Support] + [Order #id] threads, anon session merge, Design ref: Admin_Message_Page.png |
+| Admin Audit Logs | not-started | Design ref: Admin_Logs_Page.png |
 | Admin Settings | not-started | Design ref: Admin_Settings_Page.png |
 | Admin Auth Guard | not-started | All /admin/* routes require admin session + 2FA |
 | Admin Sidebar | not-started | Shared across all admin pages |
