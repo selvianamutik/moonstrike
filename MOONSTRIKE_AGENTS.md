@@ -818,73 +818,83 @@ const { data: settings } = await supabase
 
 `STATUS: done | in-progress | not-started | blocked`
 
+### Current Implementation Audit (2026-05-28)
+
+- Reviewed scope: Next app routes/components, `lib/catalog.ts`, `lib/admin-mock.ts`, and `/design-refs/` prototype inventory.
+- Verification: `npm.cmd run lint` passes, and `npm.cmd run build` passes after installing dependencies and refreshing Next optional SWC packages.
+- Runtime route check: the built app was served on `http://localhost:3005`; implemented storefront/admin routes returned 200 for `/`, `/games`, `/services`, `/services/world-of-warcraft/wow-mythic-plus`, `/cart`, `/checkout`, `/profile`, `/profile/orders/MS-2401`, legal pages, and the main admin pages.
+- Missing routes versus PRD: `/hot-offers`, `/privacy-policy`, `/order-confirmed`, `/reset-password`, `/profile/edit`, and the documented `/[game-slug]/services` route are not implemented.
+- Data/integration state: current storefront/admin data is static mock data from `lib/catalog.ts` and `lib/admin-mock.ts`. There are no `app/api` routes, Supabase clients, payment gateway handlers, webhook handlers, storage uploads, Resend emails, or Google Sheets writes yet.
+- Design state: current UI follows the dark premium gamer direction and maps to the design-ref page set, but most game/service media are placeholder assets. Storefront CSS gradient tokens currently use `#4735A5 -> #A561CA`, which differs from the system token spec of `#8B5CF6 -> #22D3EE`.
+- Known issue: dynamic invalid service/order slugs render the custom not-found UI, but production route checks returned HTTP 200 for those dynamic misses. Top-level missing routes returned HTTP 404.
+
 ### Storefront
 
 | Feature | Status | Notes |
 |---|---|---|
-| Landing Page UI | not-started | Design ref: Moon_Strike_Landing_Page.png |
-| Games Page UI | not-started | Design ref: Moon_Strike_Games_Page.png |
-| Game Services Page UI | not-started | Design ref: Moon_Strike_Services_Page.png |
+| Landing Page UI | done | `/` build-verified. Matches the main design direction, but uses placeholder media and static content instead of CMS blocks. |
+| Games Page UI | done | `/games` build-verified with query-param filters and load-more. Infinite scroll is not implemented. |
+| Game Services Page UI | in-progress | `/services` build-verified as a global catalog. The PRD route `/[game-slug]/services` is missing. |
 | Hot Offers Page UI | not-started | `/hot-offers` — game tabs + hot offer service grid |
-| Service Detail UI | not-started | Design ref: Moon_Strike_Service_Detail_Page.png |
-| Checkout Page UI | not-started | Design ref: Moon_Strike_Secure_Checkout_Page.png |
-| Refund Policy UI | not-started | Design ref: Moon_Strike_Refund_Policy_Page.png |
-| Terms of Service UI | not-started | Design ref: Moon_Strike_Terms_of_Service_Page.png |
+| Service Detail UI | in-progress | `/services/[game]/[slug]` build-verified. Static configurator only; `optionsSchema`, live price changes, add-to-cart, and buy-now behavior are pending. |
+| Checkout Page UI | in-progress | `/checkout` build-verified against mock cart data. Payment tabs are visual only; Stripe/PayPal/Crypto actions are pending. |
+| Refund Policy UI | done | Design ref: Moon_Strike_Refund_Policy_Page.png |
+| Terms of Service UI | done | Design ref: Moon_Strike_Terms_of_Service_Page.png |
 | Privacy Policy UI | not-started | Same layout as ToS and Refund Policy. Content written during build. |
-| Quick Select Mega Menu | not-started | Design ref: Quick_Select_Mega_Menu_Component.png |
-| Global Navbar | not-started | Shared component |
-| Global Footer | not-started | Shared component |
-| Global Chat Bubble | not-started | Fixed bottom-right, Supabase Realtime |
-| Customer Login | not-started | Email/password + Google OAuth via Supabase Auth |
-| Customer Register | not-started | Email/password + Google OAuth via Supabase Auth |
-| Customer Profile | not-started | Order History + Transaction History tabs |
-| Order History | not-started | Filter tabs, status badges, View Detail |
-| Order Detail | not-started | Options breakdown, timeline, refund request + wallet prompt |
-| Cart | not-started | `/cart` page — service rows + totals + currency toggle + proceed to checkout |
-| Search | not-started | Service titles only — image + title card, zero-state message |
-| Currency toggle | not-started | Fixed USD/EUR — no conversion, toggle persists |
-| Region toggle | not-started | USA/EUROPE — persists across navigation |
-| Light mode theme | not-started | CSS variable swap on `<html data-theme="light">` |
-| Theme toggle | not-started | Persisted in user preference |
-| TrustPilot integration | not-started | Read-only API |
+| Quick Select Mega Menu | done | Overlay UI implemented from `Quick_Select_Mega_Menu_Component.png`; links/search are hardcoded/static. |
+| Global Navbar | in-progress | Shared header exists. Cart icon/count, functional currency selector, and live search overlay are missing. |
+| Global Footer | done | Shared footer exists; privacy/social links still use placeholder `#` where routes are missing. |
+| Global Chat Bubble | in-progress | Fixed bottom-right UI exists with static messages. Supabase Realtime, send action, unread state, and anon session merge are pending. |
+| Customer Login | in-progress | UI exists. Supabase Auth, Google OAuth, forgot password, email verification, and auth redirects are pending. |
+| Customer Register | in-progress | UI exists. Supabase sign-up, Google OAuth, confirm password validation, and email verification are pending. |
+| Customer Profile | in-progress | Profile UI exists with mock data. Auth gate, edit profile, real totals, and persistence are pending. |
+| Order History | in-progress | Mock order rows and status badges exist. Filter tabs are visual only. |
+| Order Detail | in-progress | Mock order detail, timeline, selected options, and refund button exist. Refund action/ownership checks are pending. |
+| Cart | in-progress | `/cart` UI build-verified with mock lines/totals. Quantity/remove/currency/auth-gate/API behavior is pending. |
+| Search | in-progress | Services/games pages support submit-based query filtering; global real-time overlay is not wired. |
+| Currency toggle | in-progress | Header has a visual `US USD / EUR` button only. No global state, conversion, persistence, or cart/detail sync yet. |
+| Region toggle | in-progress | Selector UI exists on service catalog/detail. No persistence, filtering, or shared state yet. |
+| Light mode theme | done | CSS variable swap exists for `<html data-theme="light">`; visual QA across all pages still recommended. |
+| Theme toggle | done | Toggle persists to `localStorage` and updates `<html data-theme>`. Header only exposes it at `xl` width. |
+| TrustPilot integration | not-started | Static review cards exist; TrustBox/API integration is pending. |
 | Notifications | not-started | In-app bell + email for customers. See §13 |
-| Mobile / responsive layouts | not-started | Built alongside desktop pages |
-| Not Found page (404) | not-started | `app/not-found.tsx` — also called via `notFound()` on bad slugs/order IDs |
+| Mobile / responsive layouts | in-progress | Tailwind breakpoints are present across pages. Dedicated browser screenshot QA is still pending. |
+| Not Found page (404) | in-progress | `app/not-found.tsx` exists. Top-level missing routes return 404; dynamic bad slugs render the UI but returned HTTP 200 in production checks. |
 
 ### Admin Terminal
 
 | Feature | Status | Notes |
 |---|---|---|
-| Admin Login | not-started | Design ref: Admin_Login_Page.png |
-| Admin Dashboard Overview | not-started | Design ref: Admin_Dashboard_Page.png |
-| Admin Users | not-started | Design ref: Admin_Users_Page.png |
-| Admin Games | not-started | Design ref: Admin_Games_Page.png |
-| Admin Services List | not-started | Design ref: Admin_Services_Page.png |
-| Admin Service CMS | not-started | Design ref: Admin_Services_CMS_Page.png — JSON optionsSchema |
-| Admin Service Preview | not-started | /admin/services/[id]/preview — draft storefront render |
-| Admin Order Management | not-started | Filter tabs, date sort, status update actions |
-| Admin Order Detail | not-started | Status update, refund panel, chat link |
-| Admin Transactions | not-started | Design ref: Admin_Transactions_Page.png |
-| Admin Content Library | not-started | 3 tabs: Landing Page Sections, Promo Banners, Media Library, Design ref: Admin_Contents_Page.png |
-| Landing Page CMS blocks | not-started | Hero, Stats Bar, Benefits, Steps |
-| Promotional Banners CMS | not-started | Schedulable — Services page banner + seasonal |
-| Media Library CMS | not-started | Upload, CDN serve, usage tracking, delete guard |
-| Hot Offers auto-population | not-started | Query Service WHERE isHotOffer = true |
-| Admin Messages / Chat | not-started | [Support] + [Order #id] threads, anon session merge, Design ref: Admin_Message_Page.png |
-| Admin Audit Logs | not-started | Design ref: Admin_Logs_Page.png |
-| Admin Settings | not-started | Design ref: Admin_Settings_Page.png |
+| Admin Login | in-progress | UI exists. Admin JWT, 2FA OTP, session timeout, and server-side guard are pending. |
+| Admin Dashboard Overview | done | `/admin/dashboard` build-verified. KPI/chart/table data is static. |
+| Admin Users | in-progress | UI/search/actions exist with mock data. Ban/self-ban guards are client alerts only. |
+| Admin Games | in-progress | UI/filtering exists with mock data. Create/edit persistence is pending. |
+| Admin Services List | in-progress | UI/filtering exists with mock data. CRUD persistence is pending. |
+| Admin Service CMS | in-progress | Form UI exists for badges/options/benefits/requirements. JSONB save, validation, upload, and storefront binding are pending. |
+| Admin Service Preview | done | /admin/services/[id]/preview — draft storefront render |
+| Admin Order Management | in-progress | Filter tabs/date sort exist with mock orders. Status transitions are not persisted. |
+| Admin Order Detail | in-progress | Status update/refund/chat UI exists. Gateway refund APIs and audit logging are pending. |
+| Admin Transactions | in-progress | UI exists with mock transactions. Refund actions are alerts only. |
+| Admin Content Library | in-progress | Landing/banners/media tabs exist with mock data. Real CMS persistence and storefront rendering are pending. |
+| Landing Page CMS blocks | in-progress | Admin content rows/forms exist. Storefront still uses hardcoded sections. |
+| Promotional Banners CMS | in-progress | Admin banner rows exist. Scheduling/query fallback logic is pending. |
+| Media Library CMS | in-progress | Media tab/upload UI exists. Supabase Storage, CDN URLs, usage tracking, and delete guard are pending. |
+| Hot Offers auto-population | in-progress | Static mock filtering exists for `isHotOffer`. DB query and `hotOfferAt` sorting are pending. |
+| Admin Messages / Chat | in-progress | Inbox UI exists with mock support/order threads. Realtime, persistence, attachments, and anon merge are pending. |
+| Admin Audit Logs | in-progress | Logs UI exists with mock audit entries. Backend middleware/log writes are pending. |
+| Admin Settings | in-progress | Settings form exists with local "saved" state. Persistence and enforcement are pending. |
 | Admin Auth Guard | not-started | All /admin/* routes require admin session + 2FA |
-| Admin Sidebar | not-started | Shared across all admin pages |
-| Admin Top Bar | not-started | Shared across all admin pages |
-| System Pulse indicator | not-started | Live status in admin footer |
-| CSV export | not-started | Dashboard + Logs + Transactions |
+| Admin Sidebar | done | Shared across all admin pages |
+| Admin Top Bar | done | Shared across all admin pages |
+| System Pulse indicator | in-progress | Static "System Pulse: Stable" footer exists. Live status source is pending. |
+| CSV export | in-progress | Export buttons exist. Actual CSV generation/download is pending. |
 
 ### System
 
 | Feature | Status | Notes |
 |---|---|---|
 | Auto-complete cron (7-day window) | not-started | Supabase scheduled function — moves `delivered` orders to `completed` after 7 days if no refund request |
-| Order state machine | not-started | See §11 — no escrow, direct gateway refund |
+| Order state machine | in-progress | Mock admin/client status labels and next-action helpers exist. Backend enforcement and audit logging are pending. |
 | Stripe integration | not-started | Checkout + auto-routed refund API |
 | NowPayments integration | not-started | Checkout + auto-routed refund + wallet address collection |
 | NowPayments webhook verification | not-started | HMAC-SHA512 middleware with timing-safe comparison. `NOWPAYMENTS_IPN_SECRET` setup pending. See §13 |
@@ -895,6 +905,7 @@ const { data: settings } = await supabase
 | Real-time chat | not-started | Supabase Realtime WebSocket |
 | Admin 2FA enforcement | not-started | Email OTP on first login / new device. Default session timeout: 8 hours. |
 | Anonymous cart API routes | not-started | All anonymous cart operations go through server-side routes with service role key |
+| Backend API routes | not-started | No `app/api` routes exist yet. Needed for cart, payments, webhooks, chat, CMS, admin mutations, and notification flows. |
 
 ---
 
