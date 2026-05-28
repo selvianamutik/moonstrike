@@ -26,7 +26,13 @@ const messages = [
 export function GlobalChatBubble() {
   const pathname = usePathname();
 
-  if (pathname === "/login" || pathname === "/register" || pathname.startsWith("/admin")) {
+  if (
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/reset-password" ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/admin")
+  ) {
     return null;
   }
 
