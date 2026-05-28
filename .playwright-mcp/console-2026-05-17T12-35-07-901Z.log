@@ -1,0 +1,6 @@
+[     127ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2477
+[     570ms] [LOG] [Fast Refresh] done in 548ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2477
+[     665ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2477
+[     720ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2477
+[    1032ms] [WARNING] Image with src "/assets/bar-menu.png" has either width or height modified, but not the other. If you use CSS to change the size of your image, also include the styles 'width: "auto"' or 'height: "auto"' to maintain the aspect ratio. @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2477
+[    1033ms] [WARNING] Image with src "/no-image/no-img.png" has "fill" and a height value of 0. This is likely because the parent element of the image has not been styled to have a set height. @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_115brz8._.js:2477

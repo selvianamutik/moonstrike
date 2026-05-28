@@ -1,0 +1,153 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - link "Moon Strike" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - button "Open quick select" [ref=e6]:
+        - img "Open quick select" [ref=e7]
+      - generic [ref=e9]: Search
+      - button "$ USD ↔" [ref=e10]
+      - navigation [ref=e11]:
+        - link "▣ Services" [ref=e12] [cursor=pointer]:
+          - /url: /games
+          - generic [ref=e13]: ▣
+          - text: Services
+        - link "◇ About" [ref=e14] [cursor=pointer]:
+          - /url: "#about"
+          - generic [ref=e15]: ◇
+          - text: About
+        - link "♟ Profiles" [ref=e16] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e17]: ♟
+          - text: Profiles
+    - generic [ref=e18]:
+      - generic [ref=e19]:
+        - generic [ref=e20]:
+          - generic [ref=e21]:
+            - paragraph [ref=e22]: Cart / guest session
+            - heading "Your selected services" [level=1] [ref=e23]
+          - link "Add more services →" [ref=e24] [cursor=pointer]:
+            - /url: /games
+        - generic [ref=e25]:
+          - article [ref=e26]:
+            - generic [ref=e27]:
+              - img "Mythic+ Dungeons Boost preview" [ref=e29]
+              - generic [ref=e31]:
+                - generic [ref=e32]:
+                  - heading "Mythic+ 15 Run" [level=2] [ref=e33]
+                  - generic [ref=e34]: USA
+                - paragraph [ref=e35]: Secure timed dungeon runs with keystone level selection and loot preferences.
+                - generic [ref=e36]:
+                  - generic [ref=e37]:
+                    - generic [ref=e38]: "Key Level:"
+                    - text: "+15"
+                  - generic [ref=e39]:
+                    - generic [ref=e40]: "Number of Runs:"
+                    - text: 1 run
+                  - generic [ref=e41]:
+                    - generic [ref=e42]: "Delivery Type:"
+                    - text: Express Delivery
+                  - generic [ref=e43]:
+                    - generic [ref=e44]: "Loot Option:"
+                    - text: VIP Traders
+              - generic [ref=e45]:
+                - generic [ref=e46]:
+                  - button "-" [ref=e47]
+                  - generic [ref=e48]: "1"
+                  - button "+" [ref=e49]
+                - paragraph [ref=e50]: $69.00
+                - button "Remove" [ref=e51]
+          - article [ref=e52]:
+            - generic [ref=e53]:
+              - img "Valorant Rank Boost preview" [ref=e55]
+              - generic [ref=e57]:
+                - generic [ref=e58]:
+                  - heading "Ranked Placement" [level=2] [ref=e59]
+                  - generic [ref=e60]: Europe
+                - paragraph [ref=e61]: Climb from your current rank to a target division with vetted high-MMR boosters.
+                - generic [ref=e62]:
+                  - generic [ref=e63]:
+                    - generic [ref=e64]: "Current Rank:"
+                    - text: Gold II
+                  - generic [ref=e65]:
+                    - generic [ref=e66]: "Target Rank:"
+                    - text: Diamond I
+                  - generic [ref=e67]:
+                    - generic [ref=e68]: "Queue Type:"
+                    - text: Duo option
+              - generic [ref=e69]:
+                - generic [ref=e70]:
+                  - button "-" [ref=e71]
+                  - generic [ref=e72]: "1"
+                  - button "+" [ref=e73]
+                - paragraph [ref=e74]: $107.00
+                - button "Remove" [ref=e75]
+      - complementary [ref=e76]:
+        - heading "Order Summary" [level=2] [ref=e77]
+        - generic [ref=e78]:
+          - img "Order item preview" [ref=e80]
+          - generic [ref=e82]:
+            - heading "2 configured services" [level=3] [ref=e83]
+            - paragraph [ref=e84]: Cart ready for checkout
+          - paragraph [ref=e85]: $175.68
+        - generic [ref=e86]:
+          - generic [ref=e87]: Subtotal
+          - generic [ref=e88]: $176.00
+        - generic [ref=e89]:
+          - generic [ref=e90]: Service Fee
+          - generic [ref=e91]: $9.68
+        - generic [ref=e92]:
+          - generic [ref=e93]: Discount
+          - generic [ref=e94]: "-$10.00"
+        - generic [ref=e95]:
+          - generic [ref=e96]: Taxes
+          - generic [ref=e97]: $0.00
+        - generic [ref=e98]:
+          - generic [ref=e99]: Total
+          - generic [ref=e100]: $175.68
+        - link "Proceed to Checkout" [ref=e101] [cursor=pointer]:
+          - /url: /checkout
+        - paragraph [ref=e102]: 256-bit SSL encrypted
+    - generic [ref=e104]:
+      - generic [ref=e105]:
+        - link "Moon Strike" [ref=e106] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e107]:
+          - generic [ref=e108]:
+            - heading "Sitemap" [level=3] [ref=e109]
+            - list [ref=e110]:
+              - listitem [ref=e111]: Instagram
+              - listitem [ref=e112]: Youtube
+              - listitem [ref=e113]: Tiktok
+              - listitem [ref=e114]: X
+          - generic [ref=e115]:
+            - heading "Legal" [level=3] [ref=e116]
+            - list [ref=e117]:
+              - listitem [ref=e118]: Privacy Policy
+              - listitem [ref=e119]:
+                - link "Terms of Service" [ref=e120] [cursor=pointer]:
+                  - /url: /terms
+              - listitem [ref=e121]:
+                - link "Refund Policy" [ref=e122] [cursor=pointer]:
+                  - /url: /refund
+          - generic [ref=e123]:
+            - heading "Genres" [level=3] [ref=e124]
+            - list [ref=e125]:
+              - listitem [ref=e126]: Action RPG
+              - listitem [ref=e127]: tactical shooting
+              - listitem [ref=e128]: MMORPG
+              - listitem [ref=e129]: MOBA
+              - listitem [ref=e130]: Sports Action
+              - listitem [ref=e131]: Tactical Shooter
+          - generic [ref=e132]:
+            - heading "Social Media" [level=3] [ref=e133]
+            - list [ref=e134]:
+              - listitem [ref=e135]: Instagram
+              - listitem [ref=e136]: Youtube
+              - listitem [ref=e137]: Tiktok
+              - listitem [ref=e138]: X
+      - paragraph [ref=e139]: MoonStrike is not endorsed by, directly affiliated with, maintained, or sponsored by Blizzard Entertainment, Bungie, Electronic Arts, Grinding Gear Games, Activision Publishing, Square Enix Co., Valve, Battlestate Games, Wargaming.net Limited, Amazon Technologies, Jagex Limited, Riot Games, Smilegate RPG, Digital Extremes. Our service focuses on enhancing players' in-game skills and occasionally gifting in-game items to users.
+      - paragraph [ref=e140]: © 2024 Moon Strike. Dominate the Game.
+  - button "Open Next.js Dev Tools" [ref=e146] [cursor=pointer]:
+    - img [ref=e147]
+  - alert [ref=e150]

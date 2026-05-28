@@ -1,0 +1,389 @@
+- generic [ref=e1]:
+  - main [ref=e15]:
+    - generic [ref=e17]:
+      - link "Moon Strike" [ref=e18] [cursor=pointer]:
+        - /url: /
+      - button "Open quick select" [expanded] [active] [ref=e19]:
+        - img "Open quick select" [ref=e20]
+      - dialog "Quick service select" [ref=e332]:
+        - generic [ref=e333]:
+          - generic [ref=e334]: Search Game or Service
+          - button "Search" [ref=e335]:
+            - img "Search" [ref=e336]
+        - generic [ref=e338]:
+          - button "←" [ref=e339]
+          - link "All Games" [ref=e340] [cursor=pointer]:
+            - /url: /games
+          - link "Action RPG" [ref=e341] [cursor=pointer]:
+            - /url: /games
+          - link "Tactical Shooting" [ref=e342] [cursor=pointer]:
+            - /url: /games
+          - link "Looter Shooting" [ref=e343] [cursor=pointer]:
+            - /url: /games
+          - button "→" [ref=e344]
+        - generic [ref=e345]:
+          - generic [ref=e346]:
+            - heading "Service 1" [level=3] [ref=e347]
+            - list [ref=e348]:
+              - listitem [ref=e349]:
+                - link "Service 1.1" [ref=e350] [cursor=pointer]:
+                  - /url: /games
+              - listitem [ref=e351]:
+                - link "Service 1.2" [ref=e352] [cursor=pointer]:
+                  - /url: /games
+              - listitem [ref=e353]:
+                - link "Service 1.3" [ref=e354] [cursor=pointer]:
+                  - /url: /games
+          - generic [ref=e355]:
+            - heading "Service 2" [level=3] [ref=e356]
+            - list [ref=e357]:
+              - listitem [ref=e358]:
+                - link "Service 2.1" [ref=e359] [cursor=pointer]:
+                  - /url: /games
+              - listitem [ref=e360]:
+                - link "Service 2.2" [ref=e361] [cursor=pointer]:
+                  - /url: /games
+              - listitem [ref=e362]:
+                - link "Service 2.3" [ref=e363] [cursor=pointer]:
+                  - /url: /games
+              - listitem [ref=e364]:
+                - link "Service 2.4" [ref=e365] [cursor=pointer]:
+                  - /url: /games
+              - listitem [ref=e366]:
+                - link "Service 2.5" [ref=e367] [cursor=pointer]:
+                  - /url: /games
+          - generic [ref=e368]:
+            - heading "Service 3" [level=3] [ref=e369]
+            - list [ref=e370]:
+              - listitem [ref=e371]:
+                - link "Service 3.1" [ref=e372] [cursor=pointer]:
+                  - /url: /games
+          - generic [ref=e373]:
+            - heading "Service 4" [level=3] [ref=e374]
+            - list [ref=e375]:
+              - listitem [ref=e376]:
+                - link "Service 4.1" [ref=e377] [cursor=pointer]:
+                  - /url: /games
+              - listitem [ref=e378]:
+                - link "Service 4.2" [ref=e379] [cursor=pointer]:
+                  - /url: /games
+              - listitem [ref=e380]:
+                - link "Service 4.3" [ref=e381] [cursor=pointer]:
+                  - /url: /games
+              - listitem [ref=e382]:
+                - link "Service 4.4" [ref=e383] [cursor=pointer]:
+                  - /url: /games
+          - generic [ref=e384]:
+            - heading "Service 5" [level=3] [ref=e385]
+            - list [ref=e386]:
+              - listitem [ref=e387]:
+                - link "Service 5.1" [ref=e388] [cursor=pointer]:
+                  - /url: /games
+              - listitem [ref=e389]:
+                - link "Service 5.2" [ref=e390] [cursor=pointer]:
+                  - /url: /games
+          - generic [ref=e391]:
+            - heading "Service 6" [level=3] [ref=e392]
+            - list [ref=e393]:
+              - listitem [ref=e394]:
+                - link "Service 6.1" [ref=e395] [cursor=pointer]:
+                  - /url: /games
+              - listitem [ref=e396]:
+                - link "Service 6.2" [ref=e397] [cursor=pointer]:
+                  - /url: /games
+              - listitem [ref=e398]:
+                - link "Service 6.3" [ref=e399] [cursor=pointer]:
+                  - /url: /games
+      - generic [ref=e22]: Search
+      - button "$ USD ↔" [ref=e23]
+      - navigation [ref=e24]:
+        - link "▣ Services" [ref=e25] [cursor=pointer]:
+          - /url: /games
+          - generic [ref=e26]: ▣
+          - text: Services
+        - link "◇ About" [ref=e27] [cursor=pointer]:
+          - /url: "#about"
+          - generic [ref=e28]: ◇
+          - text: About
+        - link "♟ Profiles" [ref=e29] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e30]: ♟
+          - text: Profiles
+    - generic [ref=e31]:
+      - paragraph [ref=e32]: Featured & Recommended
+      - generic [ref=e33]:
+        - button "‹" [ref=e34]
+        - button "›" [ref=e35]
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - img "Void Descent seasonal event" [ref=e38]
+            - generic [ref=e40]:
+              - text: New Update
+              - 'heading "Void Descent: Seasonal Event" [level=1] [ref=e41]'
+              - paragraph [ref=e42]: Master the new challenge rifts and claim exclusive cosmic armor sets before the season ends.
+              - link "Learn More" [ref=e43] [cursor=pointer]:
+                - /url: /games
+          - complementary [ref=e44]:
+            - paragraph [ref=e45]: Coming Soon
+            - generic [ref=e46]:
+              - img "Elite Trials Return preview" [ref=e48]
+              - paragraph [ref=e50]:
+                - generic [ref=e51]: Featured
+                - text: Elite Trials Return
+            - generic [ref=e52]:
+              - img "Mythic+ Cache Update preview" [ref=e54]
+              - paragraph [ref=e56]:
+                - generic [ref=e57]: Featured
+                - text: Mythic+ Cache Update
+            - generic [ref=e58]:
+              - img "Ranked Climb Events preview" [ref=e60]
+              - paragraph [ref=e62]:
+                - generic [ref=e63]: Featured
+                - text: Ranked Climb Events
+    - generic [ref=e64]:
+      - generic [ref=e65]:
+        - heading "Best Offers" [level=2] [ref=e66]
+        - link "View all deals →" [ref=e67] [cursor=pointer]:
+          - /url: /games
+      - generic [ref=e68]:
+        - article [ref=e69]:
+          - generic [ref=e70]:
+            - img "Valorant Rank Boost preview" [ref=e71]
+            - generic [ref=e73]: HOT
+          - generic [ref=e74]:
+            - heading "Ranked Placement" [level=3] [ref=e75]
+            - paragraph [ref=e76]: Climb from your current rank to a target division with vetted high-MMR boosters.
+            - generic [ref=e77]:
+              - generic [ref=e78]: $29.00
+              - link "Buy Now" [ref=e79] [cursor=pointer]:
+                - /url: /services/valorant-rank-boost
+        - article [ref=e80]:
+          - generic [ref=e81]:
+            - img "Destiny 2 Raid Clear preview" [ref=e82]
+            - generic [ref=e84]: HOT
+          - generic [ref=e85]:
+            - heading "Flawless Trials" [level=3] [ref=e86]
+            - paragraph [ref=e87]: Book guided raid clears, exotic farming, and weekly pinnacle progression.
+            - generic [ref=e88]:
+              - generic [ref=e89]: $39.00
+              - link "Buy Now" [ref=e90] [cursor=pointer]:
+                - /url: /services/destiny-2-raid-clear
+        - article [ref=e91]:
+          - generic [ref=e92]:
+            - img "Mythic+ Dungeons Boost preview" [ref=e93]
+            - generic [ref=e95]: HOT
+          - generic [ref=e96]:
+            - heading "Mythic+ 15 Run" [level=3] [ref=e97]
+            - paragraph [ref=e98]: Secure timed dungeon runs with keystone level selection and loot preferences.
+            - generic [ref=e99]:
+              - generic [ref=e100]: $24.00
+              - link "Buy Now" [ref=e101] [cursor=pointer]:
+                - /url: /services/wow-mythic-plus
+        - article [ref=e102]:
+          - generic [ref=e103]:
+            - img "Mobile Legends Rank preview" [ref=e104]
+            - generic [ref=e106]: HOT
+          - generic [ref=e107]:
+            - heading "Leveling 1-70" [level=3] [ref=e108]
+            - paragraph [ref=e109]: Fast rank progression for busy players who need reliable win-rate support.
+            - generic [ref=e110]:
+              - generic [ref=e111]: $19.00
+              - link "Buy Now" [ref=e112] [cursor=pointer]:
+                - /url: /services/mobile-legends-rank
+    - generic [ref=e113]:
+      - generic [ref=e114]:
+        - heading "All Games" [level=2] [ref=e115]
+        - link "View all →" [ref=e116] [cursor=pointer]:
+          - /url: /games
+      - generic [ref=e117]:
+        - button "←" [ref=e118]
+        - button "All Games" [ref=e119]
+        - button "Action RPG" [ref=e120]
+        - button "Tactical Shooting" [ref=e121]
+        - button "Looter Shooting" [ref=e122]
+        - button "→" [ref=e123]
+      - generic [ref=e124]:
+        - article [ref=e125]:
+          - img "Diablo IV preview" [ref=e127]
+          - generic [ref=e129]:
+            - generic [ref=e130]:
+              - generic [ref=e131]: Action RPG
+              - generic [ref=e132]: Cross-play
+            - heading "Diablo IV" [level=3] [ref=e133]
+            - paragraph [ref=e134]: Power level to max tier, farm legendary unique items, and clear
+        - article [ref=e135]:
+          - img "Diablo IV preview" [ref=e137]
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - generic [ref=e141]: Action RPG
+              - generic [ref=e142]: Cross-play
+            - heading "Diablo IV" [level=3] [ref=e143]
+            - paragraph [ref=e144]: Power level to max tier, farm legendary unique items, and clear
+        - article [ref=e145]:
+          - img "Diablo IV preview" [ref=e147]
+          - generic [ref=e149]:
+            - generic [ref=e150]:
+              - generic [ref=e151]: Action RPG
+              - generic [ref=e152]: Cross-play
+            - heading "Diablo IV" [level=3] [ref=e153]
+            - paragraph [ref=e154]: Power level to max tier, farm legendary unique items, and clear
+        - article [ref=e155]:
+          - img "Diablo IV preview" [ref=e157]
+          - generic [ref=e159]:
+            - generic [ref=e160]:
+              - generic [ref=e161]: Action RPG
+              - generic [ref=e162]: Cross-play
+            - heading "Diablo IV" [level=3] [ref=e163]
+            - paragraph [ref=e164]: Power level to max tier, farm legendary unique items, and clear
+        - article [ref=e165]:
+          - img "Diablo IV preview" [ref=e167]
+          - generic [ref=e169]:
+            - generic [ref=e170]:
+              - generic [ref=e171]: Action RPG
+              - generic [ref=e172]: Cross-play
+            - heading "Diablo IV" [level=3] [ref=e173]
+            - paragraph [ref=e174]: Power level to max tier, farm legendary unique items, and clear
+        - article [ref=e175]:
+          - img "Diablo IV preview" [ref=e177]
+          - generic [ref=e179]:
+            - generic [ref=e180]:
+              - generic [ref=e181]: Action RPG
+              - generic [ref=e182]: Cross-play
+            - heading "Diablo IV" [level=3] [ref=e183]
+            - paragraph [ref=e184]: Power level to max tier, farm legendary unique items, and clear
+        - article [ref=e185]:
+          - img "Diablo IV preview" [ref=e187]
+          - generic [ref=e189]:
+            - generic [ref=e190]:
+              - generic [ref=e191]: Action RPG
+              - generic [ref=e192]: Cross-play
+            - heading "Diablo IV" [level=3] [ref=e193]
+            - paragraph [ref=e194]: Power level to max tier, farm legendary unique items, and clear
+        - article [ref=e195]:
+          - img "Diablo IV preview" [ref=e197]
+          - generic [ref=e199]:
+            - generic [ref=e200]:
+              - generic [ref=e201]: Action RPG
+              - generic [ref=e202]: Cross-play
+            - heading "Diablo IV" [level=3] [ref=e203]
+            - paragraph [ref=e204]: Power level to max tier, farm legendary unique items, and clear
+      - link "Load More Games" [ref=e206] [cursor=pointer]:
+        - /url: /games
+    - generic [ref=e208]:
+      - generic [ref=e209]:
+        - paragraph [ref=e210]: 50K+
+        - paragraph [ref=e211]: Gamers served
+      - generic [ref=e212]:
+        - paragraph [ref=e213]: 98.7%
+        - paragraph [ref=e214]: Completion rate
+      - generic [ref=e215]:
+        - paragraph [ref=e216]: 24/7
+        - paragraph [ref=e217]: Support lane
+      - generic [ref=e218]:
+        - paragraph [ref=e219]: Top 1%
+        - paragraph [ref=e220]: Pro players
+    - generic [ref=e221]:
+      - heading "Why Choose Us?" [level=2] [ref=e222]
+      - img "Moon Strike benefits preview" [ref=e224]
+      - generic [ref=e226]:
+        - article [ref=e227]:
+          - generic [ref=e228]: $
+          - generic [ref=e229]:
+            - heading "benefits 1" [level=3] [ref=e230]
+            - paragraph [ref=e231]: deskripsi
+        - article [ref=e232]:
+          - generic [ref=e233]: $
+          - generic [ref=e234]:
+            - heading "benefits 2" [level=3] [ref=e235]
+            - paragraph [ref=e236]: deskripsi
+        - article [ref=e237]:
+          - generic [ref=e238]: $
+          - generic [ref=e239]:
+            - heading "benefits 3" [level=3] [ref=e240]
+            - paragraph [ref=e241]: deskripsi
+      - generic [ref=e242]:
+        - heading "Up & Running in 4 Simple steps" [level=2] [ref=e243]
+        - paragraph [ref=e244]: Deskripsi
+      - generic [ref=e245]:
+        - article [ref=e246]:
+          - generic [ref=e248]:
+            - heading "1. Choose Your Service" [level=3] [ref=e249]
+            - paragraph [ref=e250]: Pick the service you need - leveling, gear, raids, or anything else. Customize options to fit your goals.
+        - article [ref=e251]:
+          - generic [ref=e253]:
+            - heading "2. We Log Into Your Account" [level=3] [ref=e254]
+            - paragraph [ref=e255]: Share your account credentials securely. Our professional boosters get to work immediately after verification.
+        - article [ref=e256]:
+          - generic [ref=e258]:
+            - heading "3. Receive Daily Progress Updates" [level=3] [ref=e259]
+            - paragraph [ref=e260]: Stay in the loop with real-time progress reports. Chat with your booster directly via our support system.
+        - article [ref=e261]:
+          - generic [ref=e263]:
+            - heading "4. Enjoy the Result" [level=3] [ref=e264]
+            - paragraph [ref=e265]: Service done. Log back in and dominate. Your character is ready - fully leveled, geared, and unstoppable.
+      - generic [ref=e266]:
+        - heading "Rating TrustPilot" [level=2] [ref=e267]
+        - generic [ref=e268]:
+          - button "‹" [ref=e269]
+          - article [ref=e270]:
+            - heading "Nama user" [level=3] [ref=e271]
+            - paragraph [ref=e273]: Komentar
+          - article [ref=e274]:
+            - heading "Nama user" [level=3] [ref=e275]
+            - paragraph [ref=e277]: Komentar
+          - article [ref=e278]:
+            - heading "Nama user" [level=3] [ref=e279]
+            - paragraph [ref=e281]: Komentar
+          - article [ref=e282]:
+            - heading "Nama user" [level=3] [ref=e283]
+            - paragraph [ref=e285]: Komentar
+          - button "›" [ref=e286]
+      - generic [ref=e287]:
+        - img "PayPal" [ref=e288]
+        - img "Mastercard" [ref=e289]
+        - img "Apple Pay" [ref=e290]
+        - img "Google Pay" [ref=e291]
+        - img "Stripe" [ref=e292]
+    - generic [ref=e294]:
+      - generic [ref=e295]:
+        - link "Moon Strike" [ref=e296] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e297]:
+          - generic [ref=e298]:
+            - heading "Sitemap" [level=3] [ref=e299]
+            - list [ref=e300]:
+              - listitem [ref=e301]: Instagram
+              - listitem [ref=e302]: Youtube
+              - listitem [ref=e303]: Tiktok
+              - listitem [ref=e304]: X
+          - generic [ref=e305]:
+            - heading "Legal" [level=3] [ref=e306]
+            - list [ref=e307]:
+              - listitem [ref=e308]: Privacy Policy
+              - listitem [ref=e309]:
+                - link "Terms of Service" [ref=e310] [cursor=pointer]:
+                  - /url: /terms
+              - listitem [ref=e311]:
+                - link "Refund Policy" [ref=e312] [cursor=pointer]:
+                  - /url: /refund
+          - generic [ref=e313]:
+            - heading "Genres" [level=3] [ref=e314]
+            - list [ref=e315]:
+              - listitem [ref=e316]: Action RPG
+              - listitem [ref=e317]: tactical shooting
+              - listitem [ref=e318]: MMORPG
+              - listitem [ref=e319]: MOBA
+              - listitem [ref=e320]: Sports Action
+              - listitem [ref=e321]: Tactical Shooter
+          - generic [ref=e322]:
+            - heading "Social Media" [level=3] [ref=e323]
+            - list [ref=e324]:
+              - listitem [ref=e325]: Instagram
+              - listitem [ref=e326]: Youtube
+              - listitem [ref=e327]: Tiktok
+              - listitem [ref=e328]: X
+      - paragraph [ref=e329]: MoonStrike is not endorsed by, directly affiliated with, maintained, or sponsored by Blizzard Entertainment, Bungie, Electronic Arts, Grinding Gear Games, Activision Publishing, Square Enix Co., Valve, Battlestate Games, Wargaming.net Limited, Amazon Technologies, Jagex Limited, Riot Games, Smilegate RPG, Digital Extremes. Our service focuses on enhancing players' in-game skills and occasionally gifting in-game items to users.
+      - paragraph [ref=e330]: © 2024 Moon Strike. Dominate the Game.
+  - button "Open Next.js Dev Tools" [ref=e10] [cursor=pointer]:
+    - img [ref=e11]
+  - alert [ref=e14]

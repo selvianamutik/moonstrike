@@ -1,0 +1,11 @@
+/* Admin terminal — uses storefront tokens from globals.css */
+.admin-theme {
+  --admin-bg: var(--ms-primary);
+  --admin-surface: var(--ms-secondary);
+  --admin-surface-elevated: #161828;
+  --admin-border: var(--ms-accent);
+  --admin-text: var(--ms-text-primary);
+  --admin-muted: var(--ms-text-secondary);
+  --admin-accent: #8b5cf6;
+  --admin-cyan: #22d3ee;
+}

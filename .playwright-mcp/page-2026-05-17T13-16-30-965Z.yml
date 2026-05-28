@@ -1,0 +1,148 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - link "Moon Strike" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - button "Open quick select" [ref=e6]:
+        - img "Open quick select" [ref=e7]
+      - generic [ref=e9]: Search
+      - button "$ USD ↔" [ref=e10]
+      - navigation [ref=e11]:
+        - link "▣ Services" [ref=e12] [cursor=pointer]:
+          - /url: /games
+          - generic [ref=e13]: ▣
+          - text: Services
+        - link "◇ About" [ref=e14] [cursor=pointer]:
+          - /url: "#about"
+          - generic [ref=e15]: ◇
+          - text: About
+        - link "♟ Profiles" [ref=e16] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e17]: ♟
+          - text: Profiles
+    - generic [ref=e18]:
+      - generic [ref=e19]:
+        - paragraph [ref=e20]: Order detail
+        - generic [ref=e21]:
+          - generic [ref=e22]:
+            - heading "MS-2401" [level=1] [ref=e23]
+            - paragraph [ref=e24]: Mythic+ Dungeons Boost for Guest Customer
+          - generic [ref=e25]: in progress
+        - generic [ref=e26]:
+          - heading "Progress tracker" [level=2] [ref=e27]
+          - generic [ref=e28]:
+            - generic [ref=e30]: Waiting Payment
+            - generic [ref=e32]: Paid
+            - generic [ref=e34]: Assigned
+            - generic [ref=e36]: In Progress
+            - generic [ref=e38]: Completed
+        - generic [ref=e39]:
+          - article [ref=e40]:
+            - heading "Service & options" [level=2] [ref=e41]
+            - generic [ref=e42]:
+              - generic [ref=e43]:
+                - generic [ref=e44]: Service
+                - generic [ref=e45]: Mythic+ 15 Run
+              - generic [ref=e46]:
+                - generic [ref=e47]: Region
+                - generic [ref=e48]: USA
+              - generic [ref=e49]:
+                - generic [ref=e50]: Key Level
+                - generic [ref=e51]: "+15"
+              - generic [ref=e52]:
+                - generic [ref=e53]: Number of Runs
+                - generic [ref=e54]: 1 run
+              - generic [ref=e55]:
+                - generic [ref=e56]: Delivery Type
+                - generic [ref=e57]: Express Delivery
+              - generic [ref=e58]:
+                - generic [ref=e59]: Loot Option
+                - generic [ref=e60]: VIP Traders
+          - article [ref=e61]:
+            - heading "Payment & transaction" [level=2] [ref=e62]
+            - generic [ref=e63]:
+              - generic [ref=e64]:
+                - generic [ref=e65]: Payment Status
+                - generic [ref=e66]: paid
+              - generic [ref=e67]:
+                - generic [ref=e68]: Transaction ID
+                - generic [ref=e69]: TRX-88421
+              - generic [ref=e70]:
+                - generic [ref=e71]: Created
+                - generic [ref=e72]: 2026-05-17
+        - generic [ref=e74]:
+          - generic [ref=e75]:
+            - heading "Order chat" [level=2] [ref=e76]
+            - paragraph [ref=e77]: Internal chat placeholder for support, booster updates, and proof of completion.
+          - generic [ref=e78]:
+            - button "Open Chat" [ref=e79]
+            - button "Confirm Completion" [ref=e80]
+      - complementary [ref=e81]:
+        - heading "Order Summary" [level=2] [ref=e82]
+        - generic [ref=e83]:
+          - img "Order item preview" [ref=e85]
+          - generic [ref=e87]:
+            - heading "Mythic+ 15 Run" [level=3] [ref=e88]
+            - paragraph [ref=e89]: USA / paid
+          - paragraph [ref=e90]: $72.79
+        - generic [ref=e91]:
+          - generic [ref=e92]: Subtotal
+          - generic [ref=e93]: $69.00
+        - generic [ref=e94]:
+          - generic [ref=e95]: Service Fee
+          - generic [ref=e96]: $3.79
+        - generic [ref=e97]:
+          - generic [ref=e98]: Discount
+          - generic [ref=e99]: "-$0.00"
+        - generic [ref=e100]:
+          - generic [ref=e101]: Taxes
+          - generic [ref=e102]: $0.00
+        - generic [ref=e103]:
+          - generic [ref=e104]: Total
+          - generic [ref=e105]: $72.79
+        - link "Dispute / Refund Policy" [ref=e106] [cursor=pointer]:
+          - /url: /refund
+        - paragraph [ref=e107]: 256-bit SSL encrypted
+    - generic [ref=e109]:
+      - generic [ref=e110]:
+        - link "Moon Strike" [ref=e111] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e112]:
+          - generic [ref=e113]:
+            - heading "Sitemap" [level=3] [ref=e114]
+            - list [ref=e115]:
+              - listitem [ref=e116]: Instagram
+              - listitem [ref=e117]: Youtube
+              - listitem [ref=e118]: Tiktok
+              - listitem [ref=e119]: X
+          - generic [ref=e120]:
+            - heading "Legal" [level=3] [ref=e121]
+            - list [ref=e122]:
+              - listitem [ref=e123]: Privacy Policy
+              - listitem [ref=e124]:
+                - link "Terms of Service" [ref=e125] [cursor=pointer]:
+                  - /url: /terms
+              - listitem [ref=e126]:
+                - link "Refund Policy" [ref=e127] [cursor=pointer]:
+                  - /url: /refund
+          - generic [ref=e128]:
+            - heading "Genres" [level=3] [ref=e129]
+            - list [ref=e130]:
+              - listitem [ref=e131]: Action RPG
+              - listitem [ref=e132]: tactical shooting
+              - listitem [ref=e133]: MMORPG
+              - listitem [ref=e134]: MOBA
+              - listitem [ref=e135]: Sports Action
+              - listitem [ref=e136]: Tactical Shooter
+          - generic [ref=e137]:
+            - heading "Social Media" [level=3] [ref=e138]
+            - list [ref=e139]:
+              - listitem [ref=e140]: Instagram
+              - listitem [ref=e141]: Youtube
+              - listitem [ref=e142]: Tiktok
+              - listitem [ref=e143]: X
+      - paragraph [ref=e144]: MoonStrike is not endorsed by, directly affiliated with, maintained, or sponsored by Blizzard Entertainment, Bungie, Electronic Arts, Grinding Gear Games, Activision Publishing, Square Enix Co., Valve, Battlestate Games, Wargaming.net Limited, Amazon Technologies, Jagex Limited, Riot Games, Smilegate RPG, Digital Extremes. Our service focuses on enhancing players' in-game skills and occasionally gifting in-game items to users.
+      - paragraph [ref=e145]: © 2024 Moon Strike. Dominate the Game.
+  - button "Open Next.js Dev Tools" [ref=e151] [cursor=pointer]:
+    - img [ref=e152]
+  - alert [ref=e155]

@@ -1,0 +1,147 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - link "Moon Strike" [ref=e4] [cursor=pointer]:
+      - /url: /
+    - navigation [ref=e5]:
+      - link "Games" [ref=e6] [cursor=pointer]:
+        - /url: "#games"
+      - link "Tiers" [ref=e7] [cursor=pointer]:
+        - /url: "#tiers"
+      - link "Dashboard" [ref=e8] [cursor=pointer]:
+        - /url: /dashboard
+    - link "Order Now" [ref=e9] [cursor=pointer]:
+      - /url: https://wa.me/6280000000000?text=Hi%20Moon%20Strike%2C%20I%20want%20to%20order%20a%20boosting%20service.
+  - generic [ref=e10]:
+    - generic [ref=e11]:
+      - paragraph [ref=e12]: Boosting / Coaching / Rare Items
+      - heading "Skip the grind. Strike the moon." [level=1] [ref=e13]
+      - paragraph [ref=e14]: A premium marketplace for gamers who need rank boosts, dungeon clears, coaching sessions, and rare item support without unsafe off-platform deals.
+      - generic [ref=e15]:
+        - link "Browse Services" [ref=e16] [cursor=pointer]:
+          - /url: "#games"
+        - link "Compare Tiers" [ref=e17] [cursor=pointer]:
+          - /url: "#tiers"
+    - generic [ref=e18]:
+      - generic [ref=e19]:
+        - generic [ref=e20]:
+          - paragraph [ref=e21]: 50K+
+          - paragraph [ref=e22]: Gamers served
+        - generic [ref=e23]:
+          - paragraph [ref=e24]: 98.7%
+          - paragraph [ref=e25]: Completion rate
+        - generic [ref=e26]:
+          - paragraph [ref=e27]: 24/7
+          - paragraph [ref=e28]: Support lane
+      - generic [ref=e29]:
+        - paragraph [ref=e30]: Live order lane
+        - generic [ref=e31]:
+          - generic [ref=e32]:
+            - generic [ref=e33]:
+              - paragraph [ref=e34]: Valorant Immortal Push
+              - paragraph [ref=e35]: ETA 1-3 hours
+            - generic [ref=e36]: Active
+          - generic [ref=e37]:
+            - generic [ref=e38]:
+              - paragraph [ref=e39]: Destiny 2 Raid Clear
+              - paragraph [ref=e40]: ETA 2-4 hours
+            - generic [ref=e41]: Active
+          - generic [ref=e42]:
+            - generic [ref=e43]:
+              - paragraph [ref=e44]: WoW Mythic Dungeon
+              - paragraph [ref=e45]: ETA 3-5 hours
+            - generic [ref=e46]: Active
+  - generic [ref=e47]:
+    - generic [ref=e48]:
+      - generic [ref=e49]:
+        - paragraph [ref=e50]: Game directory
+        - heading "Choose your battlefield" [level=2] [ref=e51]
+      - paragraph [ref=e52]: Static catalog for the MVP. Search and dynamic pricing can be added as the next client-side slice.
+    - generic [ref=e53]:
+      - article [ref=e54]:
+        - generic [ref=e55]:
+          - generic [ref=e56]:
+            - paragraph [ref=e57]: Competitive FPS
+            - heading "Valorant Rank Boost" [level=3] [ref=e58]
+          - generic [ref=e59]: from $29
+        - paragraph [ref=e60]: Climb from your current rank to a target division with vetted high-MMR boosters.
+        - generic [ref=e61]:
+          - generic [ref=e62]: Rank boost
+          - generic [ref=e63]: Duo option
+          - generic [ref=e64]: Express
+        - link "View service" [ref=e65] [cursor=pointer]:
+          - /url: /services/valorant-rank-boost
+      - article [ref=e66]:
+        - generic [ref=e67]:
+          - generic [ref=e68]:
+            - paragraph [ref=e69]: Raid completion
+            - heading "Destiny 2 Raid Clear" [level=3] [ref=e70]
+          - generic [ref=e71]: from $39
+        - paragraph [ref=e72]: Book guided raid clears, exotic farming, and weekly pinnacle progression.
+        - generic [ref=e73]:
+          - generic [ref=e74]: Raid
+          - generic [ref=e75]: Loot
+          - generic [ref=e76]: Guided
+        - link "View service" [ref=e77] [cursor=pointer]:
+          - /url: /services/destiny-2-raid-clear
+      - article [ref=e78]:
+        - generic [ref=e79]:
+          - generic [ref=e80]:
+            - paragraph [ref=e81]: MMO progression
+            - heading "WoW Mythic+ Dungeon" [level=3] [ref=e82]
+          - generic [ref=e83]: from $24
+        - paragraph [ref=e84]: Secure timed dungeon runs with keystone level selection and loot preferences.
+        - generic [ref=e85]:
+          - generic [ref=e86]: Dungeon
+          - generic [ref=e87]: Timed
+          - generic [ref=e88]: Loot
+        - link "View service" [ref=e89] [cursor=pointer]:
+          - /url: /services/wow-mythic-plus
+      - article [ref=e90]:
+        - generic [ref=e91]:
+          - generic [ref=e92]:
+            - paragraph [ref=e93]: Mobile MOBA
+            - heading "Mobile Legends Rank" [level=3] [ref=e94]
+          - generic [ref=e95]: from $19
+        - paragraph [ref=e96]: Fast rank progression for busy players who need reliable win-rate support.
+        - generic [ref=e97]:
+          - generic [ref=e98]: Rank
+          - generic [ref=e99]: Mobile
+          - generic [ref=e100]: Fast queue
+        - link "View service" [ref=e101] [cursor=pointer]:
+          - /url: /services/mobile-legends-rank
+      - article [ref=e102]:
+        - generic [ref=e103]:
+          - generic [ref=e104]:
+            - paragraph [ref=e105]: Coaching
+            - heading "Apex Legends Coaching" [level=3] [ref=e106]
+          - generic [ref=e107]: from $35
+        - paragraph [ref=e108]: Mechanics review, ranked strategy, legend selection, and VOD feedback.
+        - generic [ref=e109]:
+          - generic [ref=e110]: Coaching
+          - generic [ref=e111]: VOD
+          - generic [ref=e112]: Ranked
+        - link "View service" [ref=e113] [cursor=pointer]:
+          - /url: /services/apex-legends-coaching
+      - article [ref=e114]:
+        - generic [ref=e115]:
+          - generic [ref=e116]:
+            - paragraph [ref=e117]: Item service
+            - heading "Rare Item Farming" [level=3] [ref=e118]
+          - generic [ref=e119]: from $45
+        - paragraph [ref=e120]: Targeted farming for rare drops, cosmetics, and event-limited rewards.
+        - generic [ref=e121]:
+          - generic [ref=e122]: Items
+          - generic [ref=e123]: Farming
+          - generic [ref=e124]: Events
+        - link "View service" [ref=e125] [cursor=pointer]:
+          - /url: /services/rare-item-farming
+  - generic [ref=e127]:
+    - generic [ref=e128]:
+      - heading "Standard" [level=3] [ref=e129]
+      - paragraph [ref=e130]: Best for planned rank progress with normal queue timing.
+    - generic [ref=e131]:
+      - heading "Express" [level=3] [ref=e132]
+      - paragraph [ref=e133]: Priority matching for faster delivery windows.
+    - generic [ref=e134]:
+      - heading "Premium" [level=3] [ref=e135]
+      - paragraph [ref=e136]: Top-rated boosters, progress updates, and dedicated support.
