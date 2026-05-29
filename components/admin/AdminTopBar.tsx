@@ -10,6 +10,7 @@ export function AdminTopBar() {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [adminName, setAdminName] = useState("Admin");
   const ref = useRef<HTMLDivElement>(null);
 
   const q = query.trim().toLowerCase();
@@ -31,6 +32,33 @@ export function AdminTopBar() {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAdmin() {
+      const response = await fetch("/api/admin/me");
+      const result = (await response.json().catch(() => null)) as {
+        admin?: { displayName?: string };
+      } | null;
+
+      if (isMounted && response.ok && result?.admin?.displayName) {
+        setAdminName(result.admin.displayName);
+      }
+    }
+
+    loadAdmin();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  async function handleLogout() {
+    await fetch("/api/admin/logout", { method: "POST" }).catch(() => null);
+    router.replace("/admin/login");
+    router.refresh();
+  }
 
   return (
     <header className="fixed top-0 right-0 left-[240px] h-16 bg-[var(--ms-primary)] border-b border-[var(--ms-accent)] flex items-center justify-between px-8 z-40">
@@ -117,11 +145,11 @@ export function AdminTopBar() {
         <div className="h-8 w-px bg-[var(--ms-accent)]" />
         <button
           type="button"
-          onClick={() => router.push("/admin/login")}
+          onClick={handleLogout}
           className="flex items-center gap-3"
         >
           <div className="flex flex-col items-end">
-            <span className="text-sm font-medium text-white">Admin Alpha</span>
+            <span className="text-sm font-medium text-white">{adminName}</span>
             <span className="text-xs font-bold text-[#EF4444] tracking-wider hover:text-red-400">LOGOUT</span>
           </div>
           <div className="w-10 h-10 rounded-full bg-[var(--ms-accent)] border border-[#22D3EE]/30 flex items-center justify-center">

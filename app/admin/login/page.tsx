@@ -1,18 +1,46 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
-import { AtSign, Lock, LogIn, Eye, EyeOff, Shield, ShieldCheck } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AtSign, Eye, EyeOff, Lock, LogIn, Shield, ShieldCheck } from "lucide-react";
 
 export default function AdminLogin() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("admin@moonstrike.io");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    router.push("/admin/dashboard");
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, remember }),
+      });
+      const result = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+
+      if (!response.ok) {
+        setError(result?.error ?? "Admin login failed.");
+        return;
+      }
+
+      router.replace(searchParams.get("next") || "/admin/dashboard");
+      router.refresh();
+    } catch {
+      setError("Unable to reach the admin login service.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -33,6 +61,8 @@ export default function AdminLogin() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
               className="w-full bg-[#050816] border border-[#172554] text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-[#8B5CF6] focus:border-[#8B5CF6] placeholder-[#475569]"
               placeholder="admin@moonstrike.io"
             />
@@ -44,17 +74,16 @@ export default function AdminLogin() {
                 <Lock size={14} className="text-[#22D3EE]" />
                 Password
               </label>
-              <button type="button" className="text-xs text-[#8B5CF6] hover:text-[#A78BFA]">
-                Forgot Password?
-              </button>
             </div>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
                 className="w-full bg-[#050816] border border-[#172554] text-white rounded-lg px-4 py-3 pr-12 text-sm outline-none focus:ring-1 focus:ring-[#8B5CF6] focus:border-[#8B5CF6]"
-                placeholder="••••••••"
+                placeholder="Password"
               />
               <button
                 type="button"
@@ -68,15 +97,27 @@ export default function AdminLogin() {
           </div>
 
           <label className="flex items-center gap-2 text-sm text-[#94A3B8] cursor-pointer">
-            <input type="checkbox" className="rounded border-[#172554] bg-[#050816] text-[#8B5CF6]" />
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="rounded border-[#172554] bg-[#050816] text-[#8B5CF6]"
+            />
             Remember this terminal session
           </label>
 
+          {error && (
+            <p className="rounded-lg border border-[#EF4444]/40 bg-[#EF4444]/10 px-4 py-3 text-sm text-[#FCA5A5]">
+              {error}
+            </p>
+          )}
+
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-lg bg-[#8B5CF6] text-white font-bold text-sm hover:bg-[#7C3AED] transition-colors shadow-[0_0_20px_rgba(139,92,246,0.4)]"
+            disabled={isSubmitting}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-lg bg-[#8B5CF6] text-white font-bold text-sm hover:bg-[#7C3AED] disabled:cursor-not-allowed disabled:opacity-70 transition-colors shadow-[0_0_20px_rgba(139,92,246,0.4)]"
           >
-            Enter Terminal
+            {isSubmitting ? "Authenticating..." : "Enter Terminal"}
             <LogIn size={18} />
           </button>
         </form>
@@ -92,7 +133,7 @@ export default function AdminLogin() {
       <div className="flex items-center gap-6 mt-8 text-xs text-[#64748B]">
         <span className="flex items-center gap-1.5">
           <ShieldCheck size={14} className="text-[#22D3EE]" />
-          2FA Protected
+          Admin Session
         </span>
         <span className="flex items-center gap-1.5">
           <Shield size={14} className="text-[#22D3EE]" />

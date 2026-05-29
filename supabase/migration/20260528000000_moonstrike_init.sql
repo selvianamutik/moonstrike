@@ -7,7 +7,7 @@
 -- ── EXTENSIONS ────────────────────────────────────────────────────────────────
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";  -- for gen_random_uuid() and bcrypt ops
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";  -- for gen_random_uuid()
 
 
 -- =============================================================================
@@ -192,20 +192,20 @@ CREATE INDEX idx_orders_created_at          ON orders (created_at DESC);
 
 -- =============================================================================
 -- SECTION 5 — ADMIN USERS
--- Custom auth — bcrypt + signed JWT. NOT Supabase Auth.
+-- Custom auth — scrypt password hash + signed JWT. NOT Supabase Auth.
 -- =============================================================================
 
 CREATE TABLE admin_users (
   id             UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
   display_name   TEXT         NOT NULL,
   email          TEXT         NOT NULL UNIQUE,
-  password_hash  TEXT         NOT NULL,  -- bcrypt hash — never plain text
+  password_hash  TEXT         NOT NULL,  -- scrypt hash — never plain text
   role           TEXT         NOT NULL DEFAULT 'ADMIN' CHECK (role = 'ADMIN'),
   status         admin_status NOT NULL DEFAULT 'active',
   avatar         TEXT         NOT NULL DEFAULT '',
   last_login     TIMESTAMPTZ,
   known_devices  TEXT[]       NOT NULL DEFAULT '{}',
-    -- Device fingerprint hashes verified via 2FA OTP
+    -- Reserved for future trusted-device/session metadata. Admin OTP is not used.
   created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
@@ -581,6 +581,6 @@ USING (status = 'active');
 -- Next steps:
 --   1. Run `supabase db push` or paste into the Supabase SQL editor
 --   2. Set up env vars per §15 of MOONSTRIKE_AGENTS.md
---   3. Seed a first admin user via a server-side script (bcrypt hash the password)
+--   3. Seed the single admin user via the seed script (scrypt hash the password)
 --   4. Enable Supabase Realtime for the `messages` table in the dashboard
 -- =============================================================================
