@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Badge, CategoryTabs, GameCard } from "@/components/ui";
 import { gameServices, trustMetrics } from "@/lib/catalog";
+import { getActiveLandingCms } from "@/lib/cms/landing";
 
 const categoryTabs = [
   { label: "All Games", href: "/games" },
@@ -41,28 +42,33 @@ const gameCards = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const { hero, benefits } = await getActiveLandingCms();
+
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
       <SiteHeader />
 
       <section className="ms-shell py-20">
         <p className="mono text-sm font-black uppercase tracking-[0.2em] text-[var(--ms-body)]">
-          Featured <span className="section-accent">Recommended</span>
+          {hero.label}
         </p>
         <div className="relative mt-6">
           <div className="grid overflow-hidden rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] lg:grid-cols-[1fr_280px]">
             <PlaceholderAsset alt="Void Descent seasonal event" className="min-h-[450px]" priority imageClassName="p-20">
+              {hero.imageUrl && (
+                <img src={hero.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-80" />
+              )}
               <div className="absolute bottom-8 left-8 max-w-xl">
-                <Badge variant="new" />
+                <Badge variant={hero.badgeVariant} />
                 <h1 className="font-display mt-5 text-4xl font-black tracking-[-0.04em] sm:text-6xl">
-                  Void Descent Seasonal Event
+                  {hero.headline}
                 </h1>
                 <p className="mt-4 max-w-lg text-lg leading-8 text-[var(--ms-body)]">
-                  Master new challenge rifts and claim exclusive cosmic armor sets before the season ends.
+                  {hero.subtext}
                 </p>
-                <Link href="/games" className="ms-button mt-6 h-11 px-6">
-                  Learn More
+                <Link href={hero.ctaHref} className="ms-button mt-6 h-11 px-6">
+                  {hero.ctaText}
                 </Link>
               </div>
             </PlaceholderAsset>
@@ -133,7 +139,7 @@ export default function Home() {
         </div>
       </section>
 
-      <Frame18Sections />
+      <Frame18Sections benefits={benefits} />
 
       <SiteFooter />
     </main>

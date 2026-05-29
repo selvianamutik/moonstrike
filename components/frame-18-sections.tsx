@@ -1,12 +1,7 @@
 import Image from "next/image";
 import { PlaceholderAsset } from "@/components/asset-image";
 import { StarRating } from "@/components/ui";
-
-const benefits = [
-  ["Verified Pro Players", "Every booster is vetted for account safety, game knowledge, and consistent delivery."],
-  ["Progress Visibility", "Customers get clear updates during the run, with support ready for order questions."],
-  ["Secure Checkout", "Payment flow stays separated from frontend UI and routes through supported providers."],
-];
+import type { LandingBenefitsData } from "@/lib/cms/landing";
 
 const steps = [
   ["1. Choose Your Service", "Pick the boost, coaching, raid, or item service that matches your goal."],
@@ -22,27 +17,35 @@ const reviews = [
   ["IonRush", "Good experience for a ranked push. I knew exactly what was happening."],
 ];
 
-export function Frame18Sections() {
+export function Frame18Sections({ benefits }: { benefits: LandingBenefitsData }) {
   return (
     <section id="about" className="ms-shell mt-24 text-[var(--ms-heading)]">
       <h2 className="font-display text-center text-4xl font-black tracking-[-0.04em]">
-        Why <span className="section-accent">Choose Us</span>?
+        {benefits.title.replace(benefits.accent, "").trim()}{" "}
+        <span className="section-accent">{benefits.accent}</span>?
       </h2>
 
-      <PlaceholderAsset
-        alt="Moon Strike benefits preview"
-        className="mx-auto mt-8 h-72 max-w-5xl rounded-xl border border-[var(--ms-border)]"
-        priority
-      />
+      {benefits.imageUrl ? (
+        <div className="relative mx-auto mt-8 h-72 max-w-5xl overflow-hidden rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)]">
+          <img src={benefits.imageUrl} alt={benefits.imageAlt} className="h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/35" />
+        </div>
+      ) : (
+        <PlaceholderAsset
+          alt={benefits.imageAlt}
+          className="mx-auto mt-8 h-72 max-w-5xl rounded-xl border border-[var(--ms-border)]"
+          priority
+        />
+      )}
 
       <div className="mx-auto mt-6 grid max-w-6xl gap-6 md:grid-cols-3">
-        {benefits.map(([title, body]) => (
-          <article key={title} className="ms-card ms-card-hover rounded-lg p-7">
+        {benefits.items.map((item) => (
+          <article key={item.title} className="ms-card ms-card-hover rounded-lg p-7">
             <span className="mono flex h-12 w-12 items-center justify-center rounded-full border border-[var(--ms-gradient-end)] text-lg font-bold text-[var(--ms-gradient-end)]">
-              MS
+              {item.icon}
             </span>
-            <h3 className="mt-5 text-xl font-bold text-[var(--ms-heading)]">{title}</h3>
-            <p className="mt-3 text-sm leading-6 text-[var(--ms-body)]">{body}</p>
+            <h3 className="mt-5 text-xl font-bold text-[var(--ms-heading)]">{item.title}</h3>
+            <p className="mt-3 text-sm leading-6 text-[var(--ms-body)]">{item.detail}</p>
           </article>
         ))}
       </div>
