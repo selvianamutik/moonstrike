@@ -34,7 +34,23 @@ export function useAuth() {
 
   const signUp = useCallback(
     async (email: string, password: string, username: string) => {
-      const { error } = await supabase.auth.signUp({
+      const checkResponse = await fetch('/api/auth/register-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      const checkPayload = await checkResponse.json().catch(() => ({}))
+
+      if (!checkResponse.ok) {
+        return {
+          data: null,
+          error: new Error(
+            checkPayload.error ?? 'Unable to create account right now.'
+          ),
+        }
+      }
+
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -42,7 +58,20 @@ export function useAuth() {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       })
-      return { error }
+
+      if (
+        error?.message.toLowerCase().includes('recovery email') ||
+        error?.message.toLowerCase().includes('confirmation email')
+      ) {
+        return {
+          data,
+          error: new Error(
+            'This email may already be registered or email delivery failed. Try logging in, continue with Google, or reset your password.'
+          ),
+        }
+      }
+
+      return { data, error }
     },
     [supabase]
   )
@@ -67,16 +96,34 @@ export function useAuth() {
 
   const sendPasswordReset = useCallback(
     async (email: string) => {
-      const redirectTo = new URL('/auth/callback', window.location.origin)
-      redirectTo.searchParams.set('next', '/reset-password')
-
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: redirectTo.toString(),
+      const response = await fetch('/api/auth/password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
       })
-      return { error }
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        return {
+          error: new Error(payload.error ?? 'Unable to send reset link.'),
+        }
+      }
+
+      return { error: null, data: payload }
     },
-    [supabase]
+    []
   )
+
+  const resendVerificationEmail = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    })
+    return { error }
+  }, [supabase])
 
   const updatePassword = useCallback(
     async (newPassword: string) => {
@@ -97,6 +144,7 @@ export function useAuth() {
     signInWithGoogle,
     signOut,
     sendPasswordReset,
+    resendVerificationEmail,
     updatePassword,
   }
 }
