@@ -16,7 +16,20 @@ function getSafeNext(value: string | null) {
 function getCallbackMessage(key: string | null) {
   if (!key) return null
   if (key === 'auth_callback_failed') return 'Authentication failed. Please try again.'
+  if (key === 'server_error') {
+    return 'The auth provider returned a server error. Check the provider settings and try again.'
+  }
+  if (key === 'access_denied') {
+    return 'Sign-in was cancelled before Moon Strike received access.'
+  }
   return key.replaceAll('_', ' ')
+}
+
+function getAuthErrorMessage(params: URLSearchParams) {
+  const description = params.get('error_description')
+  if (description) return description
+
+  return getCallbackMessage(params.get('error'))
 }
 
 function PasswordToggle({
@@ -50,6 +63,7 @@ function AuthCard() {
     signUp,
     signInWithGoogle,
     sendPasswordReset,
+    resendVerificationEmail,
     user,
     loading,
   } = useAuth()
@@ -70,9 +84,10 @@ function AuthCard() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(
-    getCallbackMessage(searchParams.get('error'))
-  )
+  const [error, setError] = useState<string | null>(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    return getAuthErrorMessage(params)
+  })
   const [notice, setNotice] = useState<string | null>(() => {
     if (searchParams.get('reset') === 'success') {
       return 'Password updated. You can log in with your new password.'
@@ -84,6 +99,25 @@ function AuthCard() {
   })
   const [registerSuccess, setRegisterSuccess] = useState(false)
   const [resetSuccess, setResetSuccess] = useState(false)
+  const [resetMessage, setResetMessage] = useState<string | null>(null)
+  const [verificationMessage, setVerificationMessage] = useState<string | null>(null)
+  const [isResendingVerification, setIsResendingVerification] = useState(false)
+
+  useEffect(() => {
+    if (!window.location.hash) return
+
+    const hashParams = new URLSearchParams(window.location.hash.slice(1))
+    if (hashParams.get('type') === 'recovery' && hashParams.get('access_token')) {
+      router.replace(`/reset-password${window.location.hash}`)
+      return
+    }
+
+    const hashError = getAuthErrorMessage(hashParams)
+    if (hashError) {
+      setError(hashError)
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
+  }, [])
 
   useEffect(() => {
     if (!loading && user?.email_confirmed_at) router.push(next)
@@ -95,6 +129,7 @@ function AuthCard() {
     setNotice(null)
     setRegisterSuccess(false)
     setResetSuccess(false)
+    setResetMessage(null)
 
     const params = new URLSearchParams(searchParams.toString())
     params.delete('error')
@@ -147,11 +182,16 @@ function AuthCard() {
     }
 
     setIsSubmitting(true)
-    const { error: signUpError } = await signUp(email, password, username.trim())
+    const { data, error: signUpError } = await signUp(email, password, username.trim())
     setIsSubmitting(false)
 
     if (signUpError) {
       setError(signUpError.message)
+      return
+    }
+
+    if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      setError('This email is already registered. Log in, reset your password, or resend verification if the account is still unverified.')
       return
     }
 
@@ -163,9 +203,10 @@ function AuthCard() {
     setError(null)
     setNotice(null)
     setResetSuccess(false)
+    setResetMessage(null)
     setIsSubmitting(true)
 
-    const { error: resetError } = await sendPasswordReset(resetEmail)
+    const { error: resetError, data } = await sendPasswordReset(resetEmail)
     setIsSubmitting(false)
 
     if (resetError) {
@@ -174,12 +215,35 @@ function AuthCard() {
     }
 
     setResetSuccess(true)
+    setResetMessage(data?.expiresHint ?? null)
   }
 
   const handleGoogle = async () => {
     setError(null)
     const { error: googleError } = await signInWithGoogle(next)
     if (googleError) setError(googleError.message)
+  }
+
+  const handleResendVerification = async () => {
+    const targetEmail = user?.email ?? email
+    setError(null)
+    setVerificationMessage(null)
+
+    if (!targetEmail) {
+      setError('Enter your email address first, then resend verification.')
+      return
+    }
+
+    setIsResendingVerification(true)
+    const { error: resendError } = await resendVerificationEmail(targetEmail)
+    setIsResendingVerification(false)
+
+    if (resendError) {
+      setError(resendError.message)
+      return
+    }
+
+    setVerificationMessage('Verification email sent. Check your inbox and return after confirming.')
   }
 
   if (loading) {
@@ -237,6 +301,28 @@ function AuthCard() {
           <p className="mono mt-6 rounded-md border border-[var(--ms-border)] bg-[var(--ms-hover-bg)] px-4 py-3 text-xs leading-5 text-[var(--ms-body)]">
             {notice}
           </p>
+        )}
+
+        {searchParams.get('unverified') === '1' && (
+          <div className="mt-6 rounded-md border border-[var(--ms-border)] bg-[var(--ms-hover-bg)] px-4 py-4">
+            <h2 className="font-display text-base font-black">Verify your email</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">
+              You are signed in, but this account must verify its email before opening protected account pages.
+            </p>
+            {verificationMessage && (
+              <p className="mono mt-3 text-xs leading-5 text-[var(--ms-gradient-end)]">
+                {verificationMessage}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleResendVerification}
+              disabled={isResendingVerification}
+              className="ms-button mt-4 h-10 px-4 mono text-xs uppercase tracking-[0.14em] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isResendingVerification ? 'Sending...' : 'Resend Verification'}
+            </button>
+          </div>
         )}
 
         {mode === 'login' && (
@@ -402,6 +488,7 @@ function AuthCard() {
             {resetSuccess && (
               <p className="mono mt-5 rounded-md border border-[var(--ms-border)] bg-[var(--ms-hover-bg)] px-4 py-3 text-xs leading-5 text-[var(--ms-body)]">
                 Reset link sent. Check your inbox, then follow the link to set a new password.
+                {resetMessage ? ` ${resetMessage}` : ''}
               </p>
             )}
 

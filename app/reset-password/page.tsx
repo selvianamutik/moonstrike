@@ -25,6 +25,34 @@ export default function ResetPasswordPage() {
     const supabase = createClient()
     let mounted = true
 
+    const hashParams = new URLSearchParams(window.location.hash.slice(1))
+    const accessToken = hashParams.get('access_token')
+    const refreshToken = hashParams.get('refresh_token')
+    const type = hashParams.get('type')
+
+    if (type === 'recovery' && accessToken && refreshToken) {
+      supabase.auth
+        .setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        })
+        .then(({ error }) => {
+          if (!mounted) return
+
+          if (error) {
+            setStatus('invalid')
+            return
+          }
+
+          window.history.replaceState(null, '', window.location.pathname)
+          setStatus('ready')
+        })
+
+      return () => {
+        mounted = false
+      }
+    }
+
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return
       setStatus(data.session ? 'ready' : 'invalid')

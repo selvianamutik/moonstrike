@@ -845,9 +845,9 @@ const { data: settings } = await supabase
 | Global Navbar | in-progress | Shared header exists. Cart icon/count, functional currency selector, and live search overlay are missing. |
 | Global Footer | done | Shared footer exists; privacy/social links still use placeholder `#` where routes are missing. |
 | Global Chat Bubble | in-progress | Fixed bottom-right UI exists with static messages. Supabase Realtime, send action, unread state, and anon session merge are pending. |
-| Customer Login | in-progress | Supabase email/password, Google OAuth redirect, forgot-password request, safe `next` redirects, and `/profile` + `/checkout` auth gates are wired. Cart merge API and full purchase gating are pending. |
-| Customer Register | in-progress | Supabase sign-up, Google OAuth, confirm password validation, and email verification/resend banner are wired. Username persistence beyond auth metadata is pending. |
-| Customer Profile | in-progress | Profile route is auth-gated and displays the Supabase user's email, auth metadata username/name, member-since date, and real logout. Edit profile, real order totals, and persistence are pending. |
+| Customer Login | in-progress | Supabase email/password, Google OAuth redirect, rate-limited forgot-password API, safe `next` redirects, clearer callback errors, unverified resend action, and `/profile` + `/checkout` auth gates are wired. Cart merge API and full purchase gating are pending. |
+| Customer Register | in-progress | Supabase sign-up, provider-aware existing-email precheck, app-level registration rate limit, Google OAuth, confirm password validation, and email verification/resend banner are wired. Username persistence beyond auth metadata is pending. |
+| Customer Profile | in-progress | Profile route is auth-gated and displays the Supabase user's email, auth metadata username/name, member-since date, and real logout. `/profile/edit` supports auth metadata username updates, password changes, Google identity linking, and adding email/password login to OAuth users. Avatar upload, username uniqueness, real order totals, and profile table persistence are pending. |
 | Order History | in-progress | Mock order rows and status badges exist. Filter tabs are visual only. |
 | Order Detail | in-progress | Mock order detail, timeline, selected options, and refund button exist. Refund action/ownership checks are pending. |
 | Cart | in-progress | `/cart` UI build-verified with mock lines/totals. Quantity/remove/currency/auth-gate/API behavior is pending. |

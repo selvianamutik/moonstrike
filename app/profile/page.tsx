@@ -3,68 +3,20 @@ import { PlaceholderAsset } from "@/components/asset-image";
 import { LogoutButton } from "@/components/common/LogoutButton";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { requireVerifiedUser } from "@/lib/auth/session";
+import { formatMemberSince, getUserDisplayName, getUserInitials } from "@/lib/auth/user-display";
 import { calculateOrderTotals, getProfileOrders } from "@/lib/catalog";
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
 
 const filters = ["All", "In Progress", "Delivered", "Completed", "Refund Requested", "Refunded"];
 
-function getDisplayName(userMetadata: Record<string, unknown>, email?: string) {
-  const metadataName =
-    userMetadata.username ||
-    userMetadata.full_name ||
-    userMetadata.name ||
-    userMetadata.preferred_username;
-
-  if (typeof metadataName === "string" && metadataName.trim()) {
-    return metadataName.trim();
-  }
-
-  return email?.split("@")[0] || "Moon Strike Player";
-}
-
-function getInitials(displayName: string, email?: string) {
-  const source = displayName || email || "MS";
-  const parts = source
-    .replace(/[^a-zA-Z0-9\s]/g, " ")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  }
-
-  return source.slice(0, 2).toUpperCase();
-}
-
-function formatMemberSince(date?: string) {
-  if (!date) return "Unknown";
-
-  return new Intl.DateTimeFormat("en", {
-    month: "long",
-    year: "numeric",
-  }).format(new Date(date));
-}
+export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login?next=/profile");
-  }
-
-  if (!user.email_confirmed_at) {
-    redirect("/login?unverified=1&next=/profile");
-  }
-
+  const user = await requireVerifiedUser("/profile");
   const orders = getProfileOrders();
   const totalSpent = orders.reduce((total, order) => total + calculateOrderTotals(order.subtotal).total, 0);
-  const displayName = getDisplayName(user.user_metadata, user.email);
-  const initials = getInitials(displayName, user.email);
+  const displayName = getUserDisplayName(user);
+  const initials = getUserInitials(displayName, user.email);
   const memberSince = formatMemberSince(user.created_at);
 
   return (
@@ -97,9 +49,9 @@ export default async function ProfilePage() {
             </div>
           </dl>
 
-          <button type="button" className="mt-6 h-11 w-full rounded-md border border-[var(--ms-border)] text-sm text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
+          <Link href="/profile/edit" className="mt-6 flex h-11 w-full items-center justify-center rounded-md border border-[var(--ms-border)] text-sm text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
             Edit Profile
-          </button>
+          </Link>
           <LogoutButton />
         </aside>
 
