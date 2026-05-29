@@ -668,19 +668,19 @@ Orders only exist post-payment. No pre-payment state. No escrow — refunds go d
 
 ### AdminUser
 
-One role only: `ADMIN`. Admin = booster. No partial-access roles. Auth is manual (bcrypt + signed JWT) — not Supabase Auth. See §8 and §10.2.
+One role only: `ADMIN`. Admin = booster. No partial-access roles. Auth is manual (scrypt password hash + signed JWT cookie) — not Supabase Auth. See §8 and §10.2.
 
 | Field | Type | Notes |
 |---|---|---|
 | id | string | |
 | displayName | string | |
 | email | string | |
-| passwordHash | string | bcrypt hash — never plain text |
+| passwordHash | string | scrypt hash — never plain text |
 | role | string | Always `"ADMIN"` |
 | status | string | `"active" \| "suspended" \| "banned"` |
 | avatar | string | |
 | lastLogin | Date | |
-| knownDevices | string[] | Device fingerprint hashes verified via 2FA OTP. On login: known device → skip OTP; unknown → require OTP. Clearable from Settings to force re-verification. |
+| knownDevices | string[] | Reserved for future trusted-device/session metadata. Admin OTP is not used. |
 | createdAt | Date | |
 
 ---
@@ -865,7 +865,7 @@ const { data: settings } = await supabase
 
 | Feature | Status | Notes |
 |---|---|---|
-| Admin Login | in-progress | UI exists. Admin JWT, 2FA OTP, session timeout, and server-side guard are pending. |
+| Admin Login | in-progress | Real password login issues a signed HttpOnly admin session cookie. Seed/reseed script creates the single admin account. |
 | Admin Dashboard Overview | done | `/admin/dashboard` build-verified. KPI/chart/table data is static. |
 | Admin Users | in-progress | UI/search/actions exist with mock data. Ban/self-ban guards are client alerts only. |
 | Admin Games | in-progress | UI/filtering exists with mock data. Create/edit persistence is pending. |
@@ -883,7 +883,7 @@ const { data: settings } = await supabase
 | Admin Messages / Chat | in-progress | Inbox UI exists with mock support/order threads. Realtime, persistence, attachments, and anon merge are pending. |
 | Admin Audit Logs | in-progress | Logs UI exists with mock audit entries. Backend middleware/log writes are pending. |
 | Admin Settings | in-progress | Settings form exists with local "saved" state. Persistence and enforcement are pending. |
-| Admin Auth Guard | not-started | All /admin/* routes require admin session + 2FA |
+| Admin Auth Guard | in-progress | Middleware verifies the signed admin cookie for all /admin/* routes except /admin/login. |
 | Admin Sidebar | done | Shared across all admin pages |
 | Admin Top Bar | done | Shared across all admin pages |
 | System Pulse indicator | in-progress | Static "System Pulse: Stable" footer exists. Live status source is pending. |
@@ -903,7 +903,7 @@ const { data: settings } = await supabase
 | Audit log (every admin action) | not-started | Backend middleware |
 | Google Sheets integration | not-started | Orders + Transactions tabs. See §13 |
 | Real-time chat | not-started | Supabase Realtime WebSocket |
-| Admin 2FA enforcement | not-started | Email OTP on first login / new device. Default session timeout: 8 hours. |
+| Admin second factor | removed | Extra login factors are intentionally out of scope. One seeded admin account uses password + signed cookie session. |
 | Anonymous cart API routes | not-started | All anonymous cart operations go through server-side routes with service role key |
 | Backend API routes | not-started | No `app/api` routes exist yet. Needed for cart, payments, webhooks, chat, CMS, admin mutations, and notification flows. |
 
@@ -920,7 +920,7 @@ const { data: settings } = await supabase
 | Backend | Supabase |
 | Database | Supabase PostgreSQL — dynamic fields as JSONB |
 | Auth (customers) | Supabase Auth — email/password + Google OAuth |
-| Auth (admin) | Manual — bcrypt password in `admin_users` table, signed JWT on successful login + 2FA. Verified server-side on every `/admin/*` request. Single Supabase project — no separate project needed. |
+| Auth (admin) | Manual — scrypt password hash in `admin_users` table, signed HttpOnly JWT cookie on successful login. No OTP. Verified server-side on every `/admin/*` request. Single Supabase project — no separate project needed. |
 | Image hosting | Supabase Storage (origin) + Cloudflare Images (CDN + transforms) |
 | Payment | Stripe (card, PayPal, Google Pay, Apple Pay) + NowPayments (crypto) |
 | SMTP | Resend — auth emails + order notifications. See §13. |
@@ -939,7 +939,7 @@ const { data: settings } = await supabase
 
 | Feature | Decision |
 |---|---|
-| Auth | Customer: email/password + Google OAuth via Supabase Auth (free under 50K MAU). Admin: manual bcrypt + JWT — no separate Supabase project. |
+| Auth | Customer: email/password + Google OAuth via Supabase Auth (free under 50K MAU). Admin: manual scrypt + signed cookie JWT — no separate Supabase project. |
 | Booster role | No separate booster role — Admin = booster. One role only. |
 | Order state machine | No escrow — refunds go directly to the payment gateway. See §11. |
 | Search | Real-time overlay, debounced 300ms. Service titles only — image + name, max 6 results. Closes on click outside or Escape. |
@@ -1005,7 +1005,7 @@ The Admin Terminal is a **separate application** from the storefront with its ow
 
 **Single role: ADMIN** — full access to all sections. Admin = booster. No partial-access roles.
 
-**Admin auth:** Uses manual bcrypt + JWT authentication (not Supabase Auth). Admin credentials live in the `admin_users` table. On successful login + 2FA, the backend issues a signed JWT with `role: "admin"`. Every `/admin/*` route verifies this JWT server-side. This runs in the same single Supabase project as the storefront — no separate project needed.
+**Admin auth:** Uses manual scrypt password hashing + signed HttpOnly JWT cookie authentication (not Supabase Auth). Admin credentials live in the `admin_users` table. On successful login, the backend issues a signed JWT with `role: "admin"`. Every `/admin/*` route verifies this JWT server-side. This runs in the same single Supabase project as the storefront — no separate project needed.
 
 ### 10.1 Admin Design System
 
@@ -1052,22 +1052,18 @@ Centered card. No sidebar or header.
 - Remember this terminal session checkbox
 - Enter Terminal button (purple)
 - Contact System Admin help link
-- Security badges: 2FA Protected · SSL Encrypted
+- Security badges: Admin Session · SSL Encrypted
 
 **Admin account creation rules:**
 - Admin accounts are **never self-registered**. There is no public admin registration page.
-- The first admin account is seeded directly into the database (via a protected one-time script that bcrypt-hashes the password).
-- After that, only existing admins can create new admin accounts from `/admin/users/new`.
-
-**2FA — email OTP on first login or new device:**
-- On first login (or any new device), the backend sends a one-time passcode to the admin's email via Resend
-- Admin enters the OTP to complete login; on success the device fingerprint hash is added to `AdminUser.knownDevices`
-- Subsequent logins from a known device skip OTP
-- Failed logins logged to Audit Logs. Session timeout after inactivity (default: 8 hours, configurable in Settings).
+- Moon Strike currently supports one admin account only.
+- Seed/reseed the admin account with `npm run admin:seed` or `npm run admin:reseed`.
+- The seed script hashes the password with scrypt and enforces the single-admin rule by removing other `admin_users` rows.
+- Admin OTP/2FA is intentionally not used.
 
 **"Remember this terminal session" checkbox:**
-- **Unchecked (default):** JWT expires after 8 hours of inactivity. Admin must re-login after timeout.
-- **Checked:** JWT expiry extends to 30 days. Intended for dedicated admin devices. 2FA is still required on the first login from that device. Can be revoked from Settings.
+- **Unchecked (default):** JWT expires after 8 hours. Admin must re-login after timeout.
+- **Checked:** JWT expiry extends to 30 days. Intended for dedicated admin devices.
 - Implementation: set JWT expiry to `8h` or `30d` at token issuance time based on checkbox value.
 
 ---
@@ -1472,35 +1468,36 @@ async function issueRefund(orderId: string) {
 ### Tiers
 
 ```
-Anonymous (no session)   →  Strictest — unknown, untrusted
-Authenticated customer   →  Moderate  — known, untrusted for payments
-Admin                    →  Relaxed   — trusted, still protected
+Anonymous (no session)   ->  Strictest - unknown, untrusted
+Authenticated customer   ->  Moderate  - known, untrusted for payments
+Admin                    ->  Strict at login, relaxed after session verification
 ```
 
 ### Limits
 
 | Endpoint | Anonymous | Customer | Admin | Reason |
 |---|---|---|---|---|
-| `POST /api/auth/login` (customer) | 10 / 15 min / IP | — | — | Brute force |
-| `POST /admin/login` | 5 / 15 min / IP | — | 10 / 15 min / IP | Brute force |
+| `POST /api/auth/register-check` | 5 / 15 min / IP+email | - | - | Duplicate account probing / spam |
+| `POST /api/auth/password-reset` | 3 / 15 min / IP+email | - | - | Email spam |
+| `POST /api/admin/login` | 20 / 15 min / IP + 5 / 15 min / IP+email | - | - | Admin brute force |
 | `GET /api/search` | 15 / 1 min / IP | 40 / 1 min / user | unlimited | Scraping |
 | `GET /api/games` | 20 / 1 min / IP | 60 / 1 min / user | unlimited | Scraping |
 | `GET /api/services` | 20 / 1 min / IP | 60 / 1 min / user | unlimited | Scraping |
 | `POST /api/checkout` | blocked | 5 / 1 min / user | unlimited | Auth required |
 | `POST /api/orders` | blocked | 3 / 1 min / user | unlimited | Duplicate prevention |
 | `POST /api/refunds` | blocked | 2 / 1 hour / user | unlimited | Abuse prevention |
-| Payment webhooks | signature check only | — | — | Replay attack prevention |
+| Payment webhooks | signature check only | - | - | Replay attack prevention |
 
 **Rules:**
-- Violations return HTTP 429 + Audit Log entry with status `blocked`
-- Payment webhook endpoints use signature verification — IP-based limiting does not apply
-- Limits above are starting estimates — tune after launch with real traffic data
-- Supabase Auth has its own built-in rate limiting on `/auth/v1/token`. Verify it is enabled: Supabase Dashboard → Authentication → Rate Limits. The custom customer login limit above is a defense-in-depth layer — both should be active.
+- Violations return HTTP 429. Admin login includes a `Retry-After` response header.
+- Audit Log entries with status `blocked` should be added once admin audit persistence is wired.
+- Payment webhook endpoints use signature verification - IP-based limiting does not apply.
+- Limits above are starting estimates - tune after launch with real traffic data.
+- Supabase Auth has its own built-in rate limiting on `/auth/v1/token`. Verify it is enabled: Supabase Dashboard -> Authentication -> Rate Limits. App-level auth limits are defense-in-depth - both should be active.
 
-**Implementation:** Supabase API gateway rate limiting.
+**Implementation:** Current auth endpoints use in-memory per-runtime counters. Move these to Redis/Upstash or Supabase-backed counters before production if running multiple server instances.
 
 ---
-
 ## 13. Implementation Notes
 
 ### Notifications
@@ -1531,7 +1528,6 @@ Resend is a developer-focused email API. It handles transactional emails — no 
 **What it sends for Moon Strike:**
 - Auth emails: email confirmation on register, password reset link (both triggered by Supabase Auth automatically when configured)
 - Order notification emails: boost complete, refund approved, refund denied (triggered by your backend on state transitions)
-- Admin 2FA OTP emails (triggered by backend on admin login)
 
 **How it works:**
 1. Create a free account at resend.com (100 emails/day free, 3,000/month)
@@ -1736,7 +1732,7 @@ Test every flow end-to-end as a real user before going live. Use Stripe test car
 | Support chat → login → name updates | History preserved, username shown going forward |
 | Admin search | Finds orders by ID, transactions by ID, users by email/username |
 | Unverified user tries to purchase | Blocked, verification banner shown, resend email works |
-| Admin login + 2FA | OTP email arrives, login completes, session persists for 8 hours |
+| Admin login | Seeded admin credentials log in, cookie session is created, and protected admin routes open |
 | Admin session timeout | After 8 hours inactivity, redirected to /admin/login |
 | Light mode toggle | Colors swap correctly, layout unchanged, preference persists on reload |
 | 404 page — bad game slug | notFound() renders correctly, no redirect to homepage |
@@ -1757,7 +1753,7 @@ All items must be checked before going live. Items marked **CRITICAL** are non-n
 | NowPayments webhook signature verified | **CRITICAL** | Without this, fake payments can create real orders — See §13 |
 | Stripe webhook signature verified | **CRITICAL** | Same risk as above |
 | Admin routes server-side auth-gated | **CRITICAL** | `/admin/*` must verify JWT server-side, not just client-side |
-| Admin 2FA enforced | **CRITICAL** | Email OTP on every new device login |
+| Single admin account enforced | **CRITICAL** | Admin account is seeded/reseeded only; no public admin registration and no extra admin accounts |
 | HTTPS only | **CRITICAL** | Enforce via hosting platform — no HTTP fallback |
 | Anonymous cart goes through server-side routes only | **CRITICAL** | Supabase client never used for anonymous cart reads/writes — service role key only via API routes |
 | Avatar upload validates file type + size | High | Accept JPEG/PNG only, reject all others, compress before storing |
@@ -1905,12 +1901,15 @@ Follow these during development — not as a post-launch fix.
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Frontend + SSR auth client | Build + Runtime | Supabase publishable key (`sb_publishable_...`). Safe to expose; RLS and user JWTs enforce access. `NEXT_PUBLIC_SUPABASE_ANON_KEY` is accepted only as a legacy fallback. |
 | `SUPABASE_SECRET_KEY` | Backend API routes only | Runtime | Supabase secret key (`sb_secret_...`). **Never expose to frontend.** Bypasses RLS. Legacy fallback: `SUPABASE_SERVICE_ROLE_KEY`. |
 | `JWT_SECRET` | Backend | Runtime | Signs and verifies admin JWTs. Min 32 chars, random. Generate with `openssl rand -base64 32`. |
+| `ADMIN_EMAIL` | Seed script | Local reseed + deploy setup | Email for the single seeded admin account. Defaults to `admin@moonstrike.io` if omitted. |
+| `ADMIN_PASSWORD` | Seed script | Local reseed + deploy setup | Password for the single seeded admin account. Required for `npm run admin:seed` / `npm run admin:reseed`. |
+| `ADMIN_DISPLAY_NAME` | Seed script | Local reseed + deploy setup | Display name for the single seeded admin account. Defaults to `Admin Alpha`. |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Frontend checkout | Build + Runtime | Stripe publishable key — safe to expose. |
 | `STRIPE_SECRET_KEY` | Backend | Runtime | **Never expose to frontend.** Used to create Payment Intents and process refunds. |
 | `STRIPE_WEBHOOK_SECRET` | Backend webhook handler | Runtime | From Stripe Dashboard → Webhooks → signing secret. Used to verify webhook signatures. |
 | `NOWPAYMENTS_API_KEY` | Backend | Runtime | From NowPayments dashboard. Used to create crypto payments. |
 | `NOWPAYMENTS_IPN_SECRET` | Backend webhook handler | Runtime | ⚠️ Setup pending. From NowPayments dashboard → API Settings → IPN Secret. Used to verify webhook signatures. |
-| `RESEND_API_KEY` | Backend | Runtime | From resend.com dashboard. Used for all transactional emails (auth, order notifications, admin 2FA OTP). |
+| `RESEND_API_KEY` | Backend | Runtime | From resend.com dashboard. Used for transactional emails (auth and order notifications). |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Backend | Runtime | Full JSON key file contents as a string. From Google Cloud Console → Service Accounts. Used for Sheets writes. |
 | `GOOGLE_SHEET_ID` | Backend | Runtime | Spreadsheet ID from the Google Sheets URL. The sheet must be shared with the service account email. |
 | `NEXT_PUBLIC_CLOUDFLARE_IMAGES_ACCOUNT_HASH` | Frontend | Build + Runtime | From Cloudflare Images dashboard. Used to construct CDN image URLs. |
@@ -1935,6 +1934,9 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 SUPABASE_SECRET_KEY=sb_secret_...
 JWT_SECRET=your-32-char-random-secret
+ADMIN_EMAIL=admin@moonstrike.io
+ADMIN_PASSWORD=change-this-before-seeding
+ADMIN_DISPLAY_NAME=Admin Alpha
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
