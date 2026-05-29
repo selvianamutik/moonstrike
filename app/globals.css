@@ -129,6 +129,50 @@ input::placeholder {
   color: var(--ms-body);
 }
 
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:autofill,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+textarea:autofill,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus,
+select:autofill {
+  appearance: none;
+  background-color: var(--ms-field) !important;
+  background-image: none !important;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: var(--ms-heading);
+  caret-color: var(--ms-heading);
+  -webkit-box-shadow: 0 0 0 1000px var(--ms-field) inset;
+  box-shadow: 0 0 0 1000px var(--ms-field) inset;
+  border-color: var(--ms-border);
+  color: var(--ms-heading);
+  transition: background-color 999999s ease-in-out 0s;
+}
+
+html[data-theme="light"] input:-webkit-autofill,
+html[data-theme="light"] input:-webkit-autofill:hover,
+html[data-theme="light"] input:-webkit-autofill:focus,
+html[data-theme="light"] input:autofill,
+html[data-theme="light"] textarea:-webkit-autofill,
+html[data-theme="light"] textarea:-webkit-autofill:hover,
+html[data-theme="light"] textarea:-webkit-autofill:focus,
+html[data-theme="light"] textarea:autofill,
+html[data-theme="light"] select:-webkit-autofill,
+html[data-theme="light"] select:-webkit-autofill:hover,
+html[data-theme="light"] select:-webkit-autofill:focus,
+html[data-theme="light"] select:autofill {
+  background-color: var(--ms-field) !important;
+  -webkit-text-fill-color: var(--ms-heading);
+  -webkit-box-shadow: 0 0 0 1000px var(--ms-field) inset;
+  box-shadow: 0 0 0 1000px var(--ms-field) inset;
+}
+
 .moon-grid {
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),

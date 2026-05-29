@@ -1,14 +1,23 @@
 import Link from "next/link";
 import { PlaceholderAsset } from "@/components/asset-image";
+import { LogoutButton } from "@/components/common/LogoutButton";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { requireVerifiedUser } from "@/lib/auth/session";
+import { formatMemberSince, getUserDisplayName, getUserInitials } from "@/lib/auth/user-display";
 import { calculateOrderTotals, getProfileOrders } from "@/lib/catalog";
 
 const filters = ["All", "In Progress", "Delivered", "Completed", "Refund Requested", "Refunded"];
 
-export default function ProfilePage() {
+export const dynamic = "force-dynamic";
+
+export default async function ProfilePage() {
+  const user = await requireVerifiedUser("/profile");
   const orders = getProfileOrders();
   const totalSpent = orders.reduce((total, order) => total + calculateOrderTotals(order.subtotal).total, 0);
+  const displayName = getUserDisplayName(user);
+  const initials = getUserInitials(displayName, user.email);
+  const memberSince = formatMemberSince(user.created_at);
 
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
@@ -17,18 +26,18 @@ export default function ProfilePage() {
         <aside className="ms-card h-fit rounded-xl p-6 lg:sticky lg:top-32">
           <div className="flex items-center gap-4">
             <div className="flex h-16 w-16 items-center justify-center rounded-full border border-[var(--ms-gradient-end)] bg-[var(--ms-hover-bg)] font-display text-2xl font-black">
-              MS
+              {initials}
             </div>
             <div>
-              <h1 className="text-xl font-black">Guest Customer</h1>
-              <p className="mt-1 text-sm text-[var(--ms-body)]">guest@moonstrike.gg</p>
+              <h1 className="text-xl font-black">{displayName}</h1>
+              <p className="mt-1 break-all text-sm text-[var(--ms-body)]">{user.email}</p>
             </div>
           </div>
 
           <dl className="mt-8 space-y-4 border-y border-[var(--ms-border)] py-6">
             <div className="flex justify-between gap-4">
               <dt className="text-[var(--ms-body)]">Member since</dt>
-              <dd>May 2026</dd>
+              <dd>{memberSince}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-[var(--ms-body)]">Total Orders</dt>
@@ -40,12 +49,10 @@ export default function ProfilePage() {
             </div>
           </dl>
 
-          <button type="button" className="mt-6 h-11 w-full rounded-md border border-[var(--ms-border)] text-sm text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
+          <Link href="/profile/edit" className="mt-6 flex h-11 w-full items-center justify-center rounded-md border border-[var(--ms-border)] text-sm text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
             Edit Profile
-          </button>
-          <Link href="/login" className="mt-3 flex h-11 w-full items-center justify-center rounded-md border border-[var(--ms-danger)]/60 text-sm text-[var(--ms-danger)] hover:bg-[var(--ms-danger)]/10">
-            Logout
           </Link>
+          <LogoutButton />
         </aside>
 
         <div>
