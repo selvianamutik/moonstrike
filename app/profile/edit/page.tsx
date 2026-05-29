@@ -14,6 +14,12 @@ export default async function ProfileEditPage() {
         (provider): provider is string => typeof provider === 'string'
       )
     : []
+  const initialProviders =
+    (user.user_metadata?.has_email_password === true ||
+      user.app_metadata?.has_email_password === true) &&
+    !providers.includes('email')
+      ? [...providers, 'email_password']
+      : providers
 
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
@@ -32,7 +38,7 @@ export default async function ProfileEditPage() {
           <ProfileEditForm
             email={user.email ?? ''}
             initialUsername={displayName}
-            initialProviders={providers}
+            initialProviders={initialProviders}
           />
         </div>
       </section>
