@@ -7,6 +7,7 @@ import {
   signAdminToken,
   verifyAdminPassword,
 } from '@/lib/admin/auth'
+import { writeAuditLog } from '@/lib/admin/audit'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const WINDOW_MS = 15 * 60 * 1000
@@ -85,6 +86,13 @@ export async function POST(request: NextRequest) {
   const emailLimit = incrementRateLimit(emailKey, MAX_EMAIL_REQUESTS)
 
   if (ipLimit.limited || emailLimit.limited) {
+    await writeAuditLog({
+      action: `Admin login rate limit blocked for ${email}`,
+      status: 'blocked',
+      request,
+      actorLabel: email,
+    })
+
     return rateLimitResponse(
       Math.max(ipLimit.resetAt, emailLimit.resetAt)
     )
@@ -98,6 +106,13 @@ export async function POST(request: NextRequest) {
     .maybeSingle<AdminUserRow>()
 
   if (error || !admin || admin.status !== 'active') {
+    await writeAuditLog({
+      action: `Admin login failed for ${email}`,
+      status: 'blocked',
+      request,
+      actorLabel: email,
+    })
+
     return NextResponse.json(
       { error: 'Invalid admin credentials.' },
       { status: 401 }
@@ -105,6 +120,13 @@ export async function POST(request: NextRequest) {
   }
 
   if (!verifyAdminPassword(password, admin.password_hash)) {
+    await writeAuditLog({
+      action: `Admin login failed for ${email}`,
+      status: 'blocked',
+      request,
+      actorLabel: email,
+    })
+
     return NextResponse.json(
       { error: 'Invalid admin credentials.' },
       { status: 401 }
@@ -117,6 +139,13 @@ export async function POST(request: NextRequest) {
   try {
     token = signAdminToken(admin, maxAge)
   } catch {
+    await writeAuditLog({
+      action: 'Admin login failed because JWT_SECRET is missing or invalid',
+      status: 'critical',
+      request,
+      actorLabel: email,
+    })
+
     return NextResponse.json(
       { error: 'Admin authentication is not configured.' },
       { status: 500 }
@@ -138,6 +167,17 @@ export async function POST(request: NextRequest) {
     .eq('id', admin.id)
 
   clearRateLimit(emailKey)
+
+  await writeAuditLog({
+    action: 'Admin login successful',
+    status: 'success',
+    request,
+    admin: {
+      id: admin.id,
+      email: admin.email,
+      displayName: admin.display_name,
+    },
+  })
 
   return NextResponse.json({
     admin: {

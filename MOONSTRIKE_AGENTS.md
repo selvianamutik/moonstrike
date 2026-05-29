@@ -875,13 +875,13 @@ const { data: settings } = await supabase
 | Admin Order Management | in-progress | Filter tabs/date sort exist with mock orders. Status transitions are not persisted. |
 | Admin Order Detail | in-progress | Status update/refund/chat UI exists. Gateway refund APIs and audit logging are pending. |
 | Admin Transactions | in-progress | UI exists with mock transactions. Refund actions are alerts only. |
-| Admin Content Library | in-progress | Landing/banners/media tabs exist with mock data. Real CMS persistence and storefront rendering are pending. |
-| Landing Page CMS blocks | in-progress | Admin content rows/forms exist. Storefront still uses hardcoded sections. |
+| Admin Content Library | in-progress | Landing hero and Why Choose Us read/write `content_blocks`. Banners/media and other landing blocks still need persistence. |
+| Landing Page CMS blocks | in-progress | Landing hero and Why Choose Us render from active CMS data with fallback defaults. Stats/steps still use hardcoded sections. |
 | Promotional Banners CMS | in-progress | Admin banner rows exist. Scheduling/query fallback logic is pending. |
 | Media Library CMS | in-progress | Media tab/upload UI exists. Supabase Storage, CDN URLs, usage tracking, and delete guard are pending. |
 | Hot Offers auto-population | in-progress | Static mock filtering exists for `isHotOffer`. DB query and `hotOfferAt` sorting are pending. |
 | Admin Messages / Chat | in-progress | Inbox UI exists with mock support/order threads. Realtime, persistence, attachments, and anon merge are pending. |
-| Admin Audit Logs | in-progress | Logs UI exists with mock audit entries. Backend middleware/log writes are pending. |
+| Admin Audit Logs | in-progress | Logs UI exists with mock audit entries. Admin login/logout/rate-limit failures and CMS hero saves now write `audit_logs`. Broader admin actions still pending. |
 | Admin Settings | in-progress | Settings form exists with local "saved" state. Persistence and enforcement are pending. |
 | Admin Auth Guard | in-progress | Middleware verifies the signed admin cookie for all /admin/* routes except /admin/login. |
 | Admin Sidebar | done | Shared across all admin pages |
@@ -1904,6 +1904,7 @@ Follow these during development — not as a post-launch fix.
 | `ADMIN_EMAIL` | Seed script | Local reseed + deploy setup | Email for the single seeded admin account. Defaults to `admin@moonstrike.io` if omitted. |
 | `ADMIN_PASSWORD` | Seed script | Local reseed + deploy setup | Password for the single seeded admin account. Required for `npm run admin:seed` / `npm run admin:reseed`. |
 | `ADMIN_DISPLAY_NAME` | Seed script | Local reseed + deploy setup | Display name for the single seeded admin account. Defaults to `Admin Alpha`. |
+| `SUPABASE_MEDIA_BUCKET` | Backend API routes only | Runtime | Supabase Storage bucket for CMS uploads. Defaults to `media`; upload route creates it as public if missing. |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Frontend checkout | Build + Runtime | Stripe publishable key — safe to expose. |
 | `STRIPE_SECRET_KEY` | Backend | Runtime | **Never expose to frontend.** Used to create Payment Intents and process refunds. |
 | `STRIPE_WEBHOOK_SECRET` | Backend webhook handler | Runtime | From Stripe Dashboard → Webhooks → signing secret. Used to verify webhook signatures. |
