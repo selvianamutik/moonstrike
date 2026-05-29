@@ -110,13 +110,38 @@ export function ProfileEditForm({
         )
       : []
     setProviders(
-      user.user_metadata?.has_email_password === true &&
+      (user.user_metadata?.has_email_password === true ||
+        user.app_metadata?.has_email_password === true) &&
         !nextProviders.includes('email')
         ? [...nextProviders, 'email_password']
         : nextProviders
     )
 
     return { supabase, user, providers: nextProviders }
+  }
+
+  const refreshSessionState = async () => {
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return null
+
+    const nextProviders = Array.isArray(user.app_metadata.providers)
+      ? user.app_metadata.providers.filter(
+          (provider): provider is string => typeof provider === 'string'
+        )
+      : []
+
+    setProviders(
+      user.user_metadata?.has_email_password === true &&
+        !nextProviders.includes('email')
+        ? [...nextProviders, 'email_password']
+        : nextProviders
+    )
+
+    return user
   }
 
   const handleProfileSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -255,13 +280,32 @@ export function ProfileEditForm({
       password: accountPassword,
       data: { has_email_password: true },
     })
-    setIsAddingPassword(false)
 
     if (error) {
-      setAccountError(error.message)
-      return
+      const passwordAlreadyExists = error.message
+        .toLowerCase()
+        .includes('different from the old password')
+
+      if (!passwordAlreadyExists) {
+        setIsAddingPassword(false)
+        setAccountError(error.message)
+        return
+      }
+
+      const { error: metadataError } = await activeSession.supabase.auth.updateUser({
+        data: { has_email_password: true },
+      })
+
+      if (metadataError) {
+        setIsAddingPassword(false)
+        setAccountError(metadataError.message)
+        return
+      }
     }
 
+    await activeSession.supabase.auth.refreshSession()
+    await refreshSessionState()
+    setIsAddingPassword(false)
     setAccountPassword('')
     setConfirmAccountPassword('')
     setProviders((current) =>
