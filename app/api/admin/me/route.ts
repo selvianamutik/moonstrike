@@ -1,11 +1,8 @@
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { ADMIN_SESSION_COOKIE, verifyAdminToken } from '@/lib/admin/auth'
+import { getAdminSession } from '@/lib/admin/session'
 
 export async function GET() {
-  const cookieStore = await cookies()
-  const token = cookieStore.get(ADMIN_SESSION_COOKIE)?.value
-  const admin = token ? verifyAdminToken(token) : null
+  const admin = await getAdminSession()
 
   if (!admin) {
     return NextResponse.json({ admin: null }, { status: 401 })
@@ -13,9 +10,9 @@ export async function GET() {
 
   return NextResponse.json({
     admin: {
-      id: admin.sub,
+      id: admin.id,
       email: admin.email,
-      displayName: admin.name,
+      displayName: admin.displayName,
     },
   })
 }
