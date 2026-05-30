@@ -99,24 +99,43 @@ export function RegionSelector({ active = "USA" }: { active?: "USA" | "EUROPE" }
 type GameCardProps = {
   description: string;
   genre: string;
+  href?: string;
+  image?: string;
   name: string;
   platform?: string;
 };
 
-export function GameCard({ description, genre, name, platform = "Cross-play" }: GameCardProps) {
-  return (
-    <article className="ms-card ms-card-hover overflow-hidden rounded-lg">
-      <PlaceholderAsset alt={`${name} preview`} className="h-52" />
-      <div className="p-5">
-        <div className="flex flex-wrap gap-2">
+export function GameCard({ description, genre, href, image, name, platform = "Cross-play" }: GameCardProps) {
+  const content = (
+    <article className="ms-card ms-card-hover flex h-full flex-col overflow-hidden rounded-lg">
+      {image ? (
+        <div className="relative h-52 overflow-hidden bg-[var(--ms-bg-card)]">
+          <img src={image} alt={`${name} preview`} className="h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/35" />
+        </div>
+      ) : (
+        <PlaceholderAsset alt={`${name} preview`} className="h-52" />
+      )}
+      <div className="flex flex-1 flex-col p-5">
+        <div className="flex min-h-8 flex-wrap content-start gap-2">
           <Badge>{genre}</Badge>
           <Badge variant="soon">{platform}</Badge>
         </div>
-        <h3 className="font-display mt-4 text-2xl font-black tracking-[-0.03em] text-[var(--ms-heading)]">{name}</h3>
-        <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">{description}</p>
+        <h3 className="font-display mt-4 line-clamp-2 min-h-16 text-2xl font-black tracking-[-0.03em] text-[var(--ms-heading)]">{name}</h3>
+        <p className="mt-2 line-clamp-3 min-h-[4.5rem] text-sm leading-6 text-[var(--ms-body)]">{description}</p>
       </div>
     </article>
   );
+
+  if (href) {
+    return (
+      <Link href={href} className="block h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ms-gradient-end)]">
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
 }
 
 type StarRatingProps = {
