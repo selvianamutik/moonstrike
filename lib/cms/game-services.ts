@@ -1,5 +1,11 @@
-import { gameServices, type GameCatalogItem, type GameService } from '@/lib/catalog'
+import type { GameCatalogItem, GameService } from '@/lib/catalog'
 import { listActiveCatalogGames } from '@/lib/cms/games'
+import {
+  getActiveServiceByGameAndSlug,
+  listActiveServicesForGame,
+  serviceRowToCatalogService,
+  type ServiceRow,
+} from '@/lib/cms/services'
 
 export function serviceCategorySlug(value: string) {
   return value
@@ -14,24 +20,32 @@ export async function getActiveGameBySlug(slug: string) {
   return games.find((game) => game.slug === slug) ?? null
 }
 
-export function getServicesForGame(game: Pick<GameCatalogItem, 'slug'>) {
-  return gameServices.filter((service) => service.gameSlug === game.slug)
+export async function getServicesForGame(game: Pick<GameCatalogItem, 'slug'>) {
+  return listActiveServicesForGame(game.slug)
 }
 
-export function getCategoryServicesForGame(game: Pick<GameCatalogItem, 'slug'>, categorySlug: string) {
-  return getServicesForGame(game).filter(
-    (service) => serviceCategorySlug(service.serviceCategory) === categorySlug
-  )
+export async function getCategoryServicesForGame(game: Pick<GameCatalogItem, 'slug'>, categorySlug: string) {
+  const services = await getServicesForGame(game)
+  return services.filter((service) => service.service_category_slug === categorySlug)
 }
 
-export function getHotServicesForGame(game: Pick<GameCatalogItem, 'slug'>) {
-  return getServicesForGame(game).filter((service) => service.isHotOffer)
+export async function getHotServicesForGame(game: Pick<GameCatalogItem, 'slug'>) {
+  const services = await getServicesForGame(game)
+  return services.filter((service) => service.is_hot_offer)
 }
 
-export function getServiceForGame(game: Pick<GameCatalogItem, 'slug'>, serviceSlug: string) {
-  return getServicesForGame(game).find((service) => service.slug === serviceSlug) ?? null
+export async function getServiceForGame(game: Pick<GameCatalogItem, 'slug'>, serviceSlug: string) {
+  return getActiveServiceByGameAndSlug(game.slug, serviceSlug)
 }
 
-export function getGameServiceDetailHref(service: Pick<GameService, 'gameSlug' | 'slug'>) {
+export function serviceRowsToCatalogServices(services: ServiceRow[]) {
+  return services.map(serviceRowToCatalogService)
+}
+
+export function getGameServiceDetailHref(service: Pick<GameService, 'gameSlug' | 'slug' | 'serviceCategorySlug'>) {
+  if (service.serviceCategorySlug) {
+    return `/${service.gameSlug}/${service.serviceCategorySlug}/${service.slug}`
+  }
+
   return `/${service.gameSlug}/${service.slug}`
 }

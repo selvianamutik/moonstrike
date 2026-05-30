@@ -1,12 +1,19 @@
-"use client";
-
 import React from "react";
-import { useRouter } from "next/navigation";
+import { redirect } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { ServiceForm } from "@/components/admin/ServiceForm";
+import { getAdminSession } from "@/lib/admin/session";
+import { listAdminGames } from "@/lib/cms/games";
+import { listServiceCategories } from "@/lib/cms/service-categories";
 
-export default function NewServicePage() {
-  const router = useRouter();
+export default async function NewServicePage() {
+  const admin = await getAdminSession();
+
+  if (!admin) {
+    redirect("/admin/login?next=/admin/services/new");
+  }
+
+  const [games, categories] = await Promise.all([listAdminGames(), listServiceCategories()]);
 
   return (
     <div className="max-w-7xl mx-auto flex flex-col gap-6">
@@ -19,7 +26,7 @@ export default function NewServicePage() {
         title="Create New Service"
         description="Configure a new boosting or coaching offering for the marketplace."
       />
-      <ServiceForm onDiscard={() => router.push("/admin/services")} onSubmit={() => router.push("/admin/services")} />
+      <ServiceForm categories={categories} games={games} />
     </div>
   );
 }

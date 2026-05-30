@@ -4,24 +4,38 @@ import { Badge } from "@/components/ui";
 import { getServiceDetailHref, type GameService } from "@/lib/catalog";
 
 export function ServiceCard({ service }: { service: GameService }) {
+  const href = getServiceDetailHref(service);
+
   return (
-    <article className="ms-card ms-card-hover overflow-hidden rounded-lg">
-      <PlaceholderAsset alt={`${service.name} preview`} className="h-48">
-        {service.isHotOffer ? <span className="absolute left-3 top-3"><Badge variant="hot" /></span> : null}
-      </PlaceholderAsset>
-      <div className="p-6">
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="featured">{service.serviceCategory}</Badge>
+    <Link href={href} className="group block h-full rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ms-gradient-end)]">
+      <article className="ms-card ms-card-hover h-full overflow-hidden rounded-lg">
+        <div className="relative h-48 overflow-hidden bg-[var(--ms-bg-card)]">
+          {service.image ? (
+            <>
+              <img src={service.image} alt={`${service.name} preview`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/35" />
+            </>
+          ) : (
+            <PlaceholderAsset alt={`${service.name} preview`} className="h-full" />
+          )}
+          {service.isHotOffer ? <span className="absolute left-3 top-3"><Badge variant="hot" /></span> : null}
         </div>
-        <h3 className="mt-4 text-lg font-bold text-[var(--ms-heading)]">{service.offerTitle ?? service.name}</h3>
-        <p className="mt-3 min-h-12 text-sm leading-6 text-[var(--ms-body)]">{service.description}</p>
-        <div className="mt-6 flex items-center justify-between gap-3">
-          <span className="mono text-base font-bold text-[var(--ms-price)]">${service.startingPrice.toFixed(2)}</span>
-          <Link href={getServiceDetailHref(service)} className="ms-button h-10 px-5 mono text-sm">
-            Buy Now
-          </Link>
+        <div className="flex h-[calc(100%-12rem)] flex-col p-6">
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="featured">{service.serviceCategory}</Badge>
+          </div>
+          <h3 className="mt-4 text-lg font-bold text-[var(--ms-heading)] group-hover:text-[var(--ms-gradient-end)]">
+            {service.offerTitle ?? service.name}
+          </h3>
+          <p className="mt-3 min-h-12 text-sm leading-6 text-[var(--ms-body)]">{service.description}</p>
+          <div className="mt-auto flex items-center justify-between gap-3 pt-6">
+            <span className="mono text-base font-bold text-[var(--ms-price)]">${service.startingPrice.toFixed(2)}</span>
+            <span className="ms-button inline-flex h-10 items-center px-5 mono text-sm">
+              Buy Now
+            </span>
+          </div>
         </div>
-      </div>
-    </article>
+      </article>
+    </Link>
   );
 }

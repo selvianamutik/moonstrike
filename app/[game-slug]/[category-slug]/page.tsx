@@ -1,5 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { GameServicesCatalog } from "@/components/game-services-catalog";
+import { ServiceDetail } from "@/components/service-detail";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import {
@@ -8,21 +9,25 @@ import {
   getHotServicesForGame,
   getServicesForGame,
   getServiceForGame,
+  serviceRowsToCatalogServices,
 } from "@/lib/cms/game-services";
 
 export default async function GameSlugPage({
   params,
 }: {
-  params: Promise<{ "game-slug": string; slug: string }>;
+  params: Promise<{ "game-slug": string; "category-slug": string }>;
 }) {
-  const { "game-slug": gameSlug, slug } = await params;
+  const { "game-slug": gameSlug, "category-slug": categorySlug } = await params;
   const game = await getActiveGameBySlug(gameSlug);
 
   if (!game) notFound();
 
-  const gameServices = getServicesForGame(game);
+  const gameServices = await getServicesForGame(game);
+  const navigationServices = serviceRowsToCatalogServices(gameServices);
 
-  if (slug === "hot-offers") {
+  if (categorySlug === "hot-offers") {
+    const hotServices = await getHotServicesForGame(game);
+
     return (
       <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
         <SiteHeader />
@@ -30,8 +35,8 @@ export default async function GameSlugPage({
           <GameServicesCatalog
             activeSlug="hot-offers"
             game={game}
-            navigationServices={gameServices}
-            services={getHotServicesForGame(game)}
+            navigationServices={navigationServices}
+            services={serviceRowsToCatalogServices(hotServices)}
           />
         </section>
         <SiteFooter />
@@ -39,7 +44,7 @@ export default async function GameSlugPage({
     );
   }
 
-  const categoryServices = getCategoryServicesForGame(game, slug);
+  const categoryServices = await getCategoryServicesForGame(game, categorySlug);
 
   if (categoryServices.length > 0) {
     return (
@@ -47,10 +52,10 @@ export default async function GameSlugPage({
         <SiteHeader />
         <section className="ms-shell py-16">
           <GameServicesCatalog
-            activeSlug={slug}
+            activeSlug={categorySlug}
             game={game}
-            navigationServices={gameServices}
-            services={categoryServices}
+            navigationServices={navigationServices}
+            services={serviceRowsToCatalogServices(categoryServices)}
           />
         </section>
         <SiteFooter />
@@ -58,19 +63,14 @@ export default async function GameSlugPage({
     );
   }
 
-  const service = getServiceForGame(game, slug);
+  const service = await getServiceForGame(game, categorySlug);
 
   if (service) {
-    return (
-      <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
-        <SiteHeader />
-        <section className="ms-shell py-20">
-          <h1 className="font-display text-4xl font-black tracking-[-0.04em]">{service.name}</h1>
-          <p className="mt-4 max-w-3xl text-[var(--ms-body)]">{service.description}</p>
-        </section>
-        <SiteFooter />
-      </main>
-    );
+    if (service.service_category_slug) {
+      redirect(`/${game.slug}/${service.service_category_slug}/${service.slug}`);
+    }
+
+    return <ServiceDetail service={service} />;
   }
 
   notFound();
