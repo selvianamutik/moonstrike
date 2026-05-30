@@ -6,6 +6,8 @@ export type GameService = {
   offerTitle?: string;
   category: string;
   serviceCategory: string;
+  serviceCategorySlug?: string | null;
+  image?: string;
   description: string;
   startingPrice: number;
   isHotOffer: boolean;
@@ -268,7 +270,11 @@ export function getServiceByGameAndSlug(gameSlug: string, serviceSlug: string) {
   return gameServices.find((service) => service.gameSlug === gameSlug && service.slug === serviceSlug);
 }
 
-export function getServiceDetailHref(service: Pick<GameService, "gameSlug" | "slug">) {
+export function getServiceDetailHref(service: Pick<GameService, "gameSlug" | "slug" | "serviceCategorySlug">) {
+  if (service.serviceCategorySlug) {
+    return `/${service.gameSlug}/${service.serviceCategorySlug}/${service.slug}`;
+  }
+
   return `/${service.gameSlug}/${service.slug}`;
 }
 

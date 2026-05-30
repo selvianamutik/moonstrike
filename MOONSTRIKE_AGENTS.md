@@ -138,9 +138,9 @@
 
 ---
 
-### 3.2 Game Services Page (`/[game-slug]`, `/[game-slug]/[service-category-slug]`)
+### 3.2 Game Services Page (`/[game-slug]`, `/[game-slug]/[category-slug]`)
 
-**Route:** `/[game-slug]` (base) · `/[game-slug]/[service-category-slug]` (filtered by category)
+**Route:** `/[game-slug]` (base) · `/[game-slug]/[category-slug]` (filtered by category)
 
 **Purpose:** Browse all boosting services for a specific game, filterable by service category.
 
@@ -160,7 +160,7 @@
 
 `HOT OFFERS` is always the second tab and always hardcoded. Selecting it navigates to `/[game-slug]/hot-offers`. It filters by `isHotOffer = true`. Never query `serviceCategory = "HOT OFFERS"` — that row will never exist in the DB.
 
-All remaining tabs are auto-populated from `ServiceCategory` records where `gameId = this game`, ordered by `sortOrder ASC`. Selecting one navigates to `/[game-slug]/[service-category.slug]`.
+All remaining tabs are auto-populated from `ServiceCategory` records where `gameId = this game`, ordered by `sortOrder ASC`. Selecting one navigates to `/[game-slug]/[category.slug]`.
 
 Tab → URL → filter mapping:
 
@@ -172,10 +172,10 @@ Tab → URL → filter mapping:
 
 **Routing rules:**
 
-On page load, read `[service-category-slug]` from the URL:
+On page load, read `[category-slug]` from the URL:
 - No segment → render ALL tab as active, no category filter
 - `hot-offers` → render HOT OFFERS tab as active, filter `isHotOffer = true`
-- Any other value → look up `ServiceCategory` where `slug = [service-category-slug]` AND `gameId = this game`. If found → render that tab as active, filter by `serviceCategoryId`. If not found → call `notFound()`.
+- Any other value → look up `ServiceCategory` where `slug = [category-slug]` AND `gameId = this game`. If found → render that tab as active, filter by `serviceCategoryId`. If not found → call `notFound()`.
 
 If no Game record matches `[game-slug]` → call `notFound()`.
 
@@ -217,7 +217,7 @@ If no Game record matches `[game-slug]` → call `notFound()`.
 
 ---
 
-### 3.5 Service Detail Page (`/[game-slug]/[service-slug]`)
+### 3.5 Service Detail Page (`/[game-slug]/[category-slug]/[service-slug]`)
 
 **Purpose:** Full service view with configurator. Primary conversion page.
 
@@ -243,7 +243,7 @@ If no Game record matches `[game-slug]` → call `notFound()`.
 
 > All service content is admin-managed via CMS: title, description, badges, image, What You Get items, requirements list, and option schema. Nothing on this page is hardcoded.
 
-If no Service record matches `[service-slug]` for the given game → call `notFound()` to render the 404 page.
+If no Service record matches `[service-slug]` for the given game and category -> call `notFound()` to render the 404 page.
 
 ---
 
@@ -419,7 +419,7 @@ Triggered by "Services" nav item click. Floating overlay panel.
 2. Service grid below the tabs:
 - **"All" tab:** services grouped by game name (game name as a section header), then by `serviceCategory` as column headers, individual service links below each column
 - **Single game tab:** service categories as column headers, individual service links below each column — no game header needed
-3. Each service link → navigates to `/[game-slug]/[service-slug]`
+3. Each service link → navigates to `/[game-slug]/[category-slug]/[service-slug]`
 
 **Data source:** Auto-queried from `Service` table — no CMS entry needed. Filtered by selected game tab. Only `status = "active"` services shown.
 
@@ -440,7 +440,8 @@ Triggered by "Services" nav item click. Floating overlay panel.
 
 **Implementation:** Next.js `app/not-found.tsx` — automatically caught by the framework for any unresolved route. Also call `notFound()` explicitly in:
 - `/[game-slug]` — if no Game record matches the slug
-- `/[game-slug]/[slug]` — if slug matches neither a ServiceCategory nor a Service for the given game
+- `/[game-slug]/[category-slug]` - if no ServiceCategory matches the slug for the given game
+- `/[game-slug]/[category-slug]/[service-slug]` - if no Service matches the slug for the given game/category pair
 - `/profile/orders/[id]` — if the order doesn't belong to the logged-in user
 - `/order-confirmed` — if no orders found for `checkoutSessionId` belonging to the logged-in user
 
@@ -453,7 +454,7 @@ Triggered by "Services" nav item click. Floating overlay panel.
 ```
 Landing Page
  ├── Click game card     → /[game-slug]  → click category tab → /[game-slug]/[category-slug]
- ├── Click game card     → /[game-slug]  → click service → /[game-slug]/[service-slug]
+ ├── Click game card     → /[game-slug]  → click service → /[game-slug]/[category-slug]/[service-slug]
  ├── Click offer card    → Service Detail → Configure → Buy Now → Cart → Checkout
  ├── VIEW ALL DEALS      → /hot-offers
  ├── Navbar > Services   → Quick Select mega menu → sub-service → Service Detail
@@ -464,10 +465,10 @@ Games Page (/games)
 
 /[game-slug]
  ├── Click category tab  → /[game-slug]/[category-slug]
- └── Click service card  → /[game-slug]/[service-slug]
+ └── Click service card  → /[game-slug]/[category-slug]/[service-slug]
 
 Hot Offers (/hot-offers)
- └── Click service card  → /[game-slug]/[service-slug]
+ └── Click service card  → /[game-slug]/[category-slug]/[service-slug]
 
 Checkout
  └── On success          → /order-confirmed?session=[checkoutSessionId]
@@ -901,9 +902,9 @@ const { data: settings } = await supabase
 |---|---|---|
 | Landing Page UI | done | `/` build-verified. Matches the main design direction, but uses placeholder media and static content instead of CMS blocks. |
 | Games Page UI | done | `/games` build-verified with query-param filters and load-more. Infinite scroll is not implemented. |
-| Game Services Page UI | in-progress | `/services` build-verified as a global catalog. The PRD route `/[game-slug]` (with `/[game-slug]/[category-slug]` and `/[game-slug]/[service-slug]` sub-routes) is missing. |
+| Game Services Page UI | in-progress | `/[game-slug]`, `/[game-slug]/hot-offers`, and `/[game-slug]/[category-slug]` are DB-backed. Infinite scroll and promo banner CMS are pending. |
 | Hot Offers Page UI | not-started | `/hot-offers` — game tabs + hot offer service grid |
-| Service Detail UI | in-progress | `/services/[game]/[slug]` build-verified. Static configurator only; `optionsSchema`, live price changes, add-to-cart, and buy-now behavior are pending. |
+| Service Detail UI | in-progress | `/[game-slug]/[category-slug]/[service-slug]` is DB-backed. `optionsSchema` and live USD/EUR price changes are wired. Cart add/buy-now behavior is pending. |
 | Checkout Page UI | in-progress | `/checkout` build-verified against mock cart data. Payment tabs are visual only; Stripe/PayPal/Crypto actions are pending. |
 | Refund Policy UI | done | Design ref: Moon_Strike_Refund_Policy_Page.png |
 | Terms of Service UI | done | Design ref: Moon_Strike_Terms_of_Service_Page.png |
@@ -1037,15 +1038,13 @@ src/
    page.tsx                    Landing
    games/
    [game-slug]/
-     page.tsx                  Game Services Page (ALL tab — no category filter)
-     [slug]/
-       page.tsx                Either: service-category filtered view OR service detail
-                               Resolved at request time:
-                               1. Check if slug matches a ServiceCategory.slug for this game → render category-filtered services page
-                               2. Else check if slug matches a Service.slug for this game → render Service Detail
-                               3. Else → notFound()
+     page.tsx                  Game Services Page (ALL tab - no category filter)
+     [category-slug]/
+       page.tsx                Service-category filtered view
+       [service-slug]/
+         page.tsx              Service Detail
 
-> The `[slug]` catch-all handles both category tabs and service detail in one dynamic segment. Resolution order: category first, then service, then 404.
+> Service detail URLs include the category slug: `/[game-slug]/[category-slug]/[service-slug]`. The legacy short form `/[game-slug]/[service-slug]` may redirect to the canonical category-aware route when resolvable.
 
    hot-offers/
    cart/
@@ -1266,18 +1265,15 @@ Rendered as pill badges below the service title on Service Detail. Leave empty t
 
 ### 10.7b Admin Service Preview (`/admin/services/[id]/preview`)
 
-Full-page storefront render using draft data. Read-only — no checkout.
+Full-page storefront render using draft data. Read-only - no checkout.
 
-- Amber banner: `PREVIEW MODE — This service is not yet published`
-- Buttons: Back to Editor · Deploy Now
-- Renders identical components as the public Service Detail page (§3.5)
-- What admins see = what customers see
+- Amber banner: `PREVIEW MODE - This service is not yet published`
+- Back to Editor link in the admin page header
+- Renders the same `ServiceDetail` component as the public Service Detail page (�3.5)
+- Add to Cart and Buy Now are disabled in preview mode
+- What admins see = what customers see, except checkout actions are intentionally disabled
 
-**Deploy Now behavior:**
-1. Runs the same field validation as Save in the CMS editor: minimum 1 `whatYouGet` entry, all required fields filled, `basePriceUSD` and `basePriceEUR` > 0.
-2. If validation fails: show inline errors on the preview page. Stay on preview — do not publish.
-3. If validation passes: sets `service.status → "active"`, redirect to `/admin/services` with a success toast: "Service published."
-4. If the service is already `active` (re-previewing a live service): button label changes to `Update Live`. Same behavior — no confirmation dialog needed.
+> Publishing is handled by saving the service status from the editor. A dedicated Deploy Now action can be added later if needed.
 
 ---
 
@@ -1396,7 +1392,7 @@ Full-page storefront render using draft data. Read-only — no checkout.
 /[game-slug]                    Game Services Page (ALL tab)
 /[game-slug]/hot-offers         Game Services Page (HOT OFFERS tab)
 /[game-slug]/[category-slug]    Game Services Page (filtered by service category)
-/[game-slug]/[service-slug]     Service Detail
+/[game-slug]/[category-slug]/[service-slug]     Service Detail
 /cart                           Cart Page
 /checkout                       Checkout
 /order-confirmed                Order Confirmed (?session=[checkoutSessionId])
@@ -2185,3 +2181,6 @@ NEXT_PUBLIC_CLOUDFLARE_IMAGES_ACCOUNT_HASH=abc123xyz
 ```
 
 > For Stripe webhooks in local dev: use the Stripe CLI (`stripe listen --forward-to localhost:3000/api/v1/webhooks/stripe`) to forward webhook events to your local server. The CLI provides a temporary `STRIPE_WEBHOOK_SECRET` for local use only.
+
+
+

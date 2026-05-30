@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "admin:seed": "node scripts/seed-admin.mjs",
-    "admin:reseed": "node scripts/seed-admin.mjs"
+    "admin:reseed": "node scripts/seed-admin.mjs",
+    "catalog:seed": "node scripts/seed-catalog.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
