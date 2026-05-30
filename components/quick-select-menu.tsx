@@ -16,33 +16,33 @@ const serviceColumns = [
   {
     title: "Rank Boost",
     items: [
-      { label: "Valorant Placement", href: "/services/valorant/valorant-rank-boost" },
-      { label: "Mobile Legends Rank", href: "/services/mobile-legends/mobile-legends-rank" },
-      { label: "Apex Coaching", href: "/services/apex-legends/apex-legends-coaching" },
+      { label: "Valorant Placement", href: "/valorant/valorant-rank-boost" },
+      { label: "Mobile Legends Rank", href: "/mobile-legends/mobile-legends-rank" },
+      { label: "Apex Coaching", href: "/apex-legends/apex-legends-coaching" },
     ],
   },
   {
     title: "Dungeons",
     items: [
-      { label: "Mythic+ Dungeons", href: "/services/world-of-warcraft/wow-mythic-plus" },
-      { label: "Timed Keystone Runs", href: "/services/world-of-warcraft/wow-mythic-plus" },
-      { label: "Loot Trader Runs", href: "/services/world-of-warcraft/wow-mythic-plus" },
+      { label: "Mythic+ Dungeons", href: "/world-of-warcraft/wow-mythic-plus" },
+      { label: "Timed Keystone Runs", href: "/world-of-warcraft/wow-mythic-plus" },
+      { label: "Loot Trader Runs", href: "/world-of-warcraft/wow-mythic-plus" },
     ],
   },
   {
     title: "Raids",
     items: [
-      { label: "Destiny 2 Raid Clear", href: "/services/destiny-2/destiny-2-raid-clear" },
-      { label: "Flawless Trials", href: "/services/destiny-2/destiny-2-raid-clear" },
-      { label: "Pinnacle Progression", href: "/services/destiny-2/destiny-2-raid-clear" },
+      { label: "Destiny 2 Raid Clear", href: "/destiny-2/destiny-2-raid-clear" },
+      { label: "Flawless Trials", href: "/destiny-2/destiny-2-raid-clear" },
+      { label: "Pinnacle Progression", href: "/destiny-2/destiny-2-raid-clear" },
     ],
   },
   {
     title: "Item Farm",
     items: [
-      { label: "Rare Item Farming", href: "/services/world-of-warcraft/rare-item-farming" },
-      { label: "Event Cosmetics", href: "/services/world-of-warcraft/rare-item-farming" },
-      { label: "Targeted Drop Runs", href: "/services/world-of-warcraft/rare-item-farming" },
+      { label: "Rare Item Farming", href: "/world-of-warcraft/rare-item-farming" },
+      { label: "Event Cosmetics", href: "/world-of-warcraft/rare-item-farming" },
+      { label: "Targeted Drop Runs", href: "/world-of-warcraft/rare-item-farming" },
     ],
   },
 ];

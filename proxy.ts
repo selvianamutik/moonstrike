@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
-import { getSupabasePublishableKey, getSupabaseUrl } from './lib/supabase/env'
 import { NextResponse, type NextRequest } from 'next/server'
+import { getSupabasePublishableKey, getSupabaseUrl } from './lib/supabase/env'
 
 const PROTECTED_ROUTES = ['/profile', '/checkout']
 const ADMIN_SESSION_COOKIE = 'ms_admin_session'
@@ -78,7 +78,7 @@ async function verifyAdminToken(token?: string) {
   }
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
   const { pathname } = request.nextUrl
   const returnTo = `${pathname}${request.nextUrl.search}`
@@ -144,7 +144,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Block unverified users from /profile
   if (isProtected && user && !user.email_confirmed_at) {
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = '/login'

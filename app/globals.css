@@ -242,6 +242,33 @@ html[data-theme="light"] .ms-button {
   transform: translateY(-3px);
 }
 
+@keyframes ms-genre-exit-next {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(-60px); }
+}
+@keyframes ms-genre-exit-previous {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(60px); }
+}
+@keyframes ms-genre-enter-next {
+  from { opacity: 0; transform: translateX(60px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes ms-genre-enter-previous {
+  from { opacity: 0; transform: translateX(-60px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.ms-genre-exit-next     { animation: ms-genre-exit-next     240ms ease-in  both; }
+.ms-genre-exit-previous { animation: ms-genre-exit-previous 240ms ease-in  both; }
+.ms-genre-enter-next    { animation: ms-genre-enter-next    240ms ease-out both; }
+.ms-genre-enter-previous{ animation: ms-genre-enter-previous 240ms ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ms-genre-exit-next, .ms-genre-exit-previous,
+  .ms-genre-enter-next, .ms-genre-enter-previous { animation: none; }
+}
+
 .ms-focus-ring:focus-visible {
   outline: 2px solid var(--ms-gradient-end);
   outline-offset: 3px;

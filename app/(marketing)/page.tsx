@@ -1,49 +1,20 @@
 import Link from "next/link";
 import { PlaceholderAsset } from "@/components/asset-image";
 import { Frame18Sections } from "@/components/frame-18-sections";
+import { LandingGamesSection } from "@/components/landing-games-section";
 import { ServiceCard } from "@/components/service-card";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { Badge, CategoryTabs, GameCard } from "@/components/ui";
+import { Badge } from "@/components/ui";
 import { gameServices, trustMetrics } from "@/lib/catalog";
+import { listActiveCatalogGames } from "@/lib/cms/games";
 import { getActiveLandingCms } from "@/lib/cms/landing";
 
-const categoryTabs = [
-  { label: "All Games", href: "/games" },
-  { label: "Action RPG", href: "/games" },
-  { label: "Tactical Shooting", href: "/games" },
-  { label: "Looter Shooting", href: "/games" },
-];
-
-const gameCards = [
-  {
-    name: "Diablo IV",
-    genre: "Action RPG",
-    platform: "Cross-play",
-    description: "Power level to max tier, farm legendary items, and clear seasonal content.",
-  },
-  {
-    name: "World of Warcraft",
-    genre: "MMORPG",
-    platform: "PC",
-    description: "Mythic dungeons, raids, vault rewards, and weekly character progression.",
-  },
-  {
-    name: "Valorant",
-    genre: "Tactical Shooter",
-    platform: "PC",
-    description: "Placement games, rank climbs, coaching, and duo queue support.",
-  },
-  {
-    name: "Destiny 2",
-    genre: "Looter Shooter",
-    platform: "Cross-play",
-    description: "Raid clears, exotic farms, trials support, and weekly pinnacle runs.",
-  },
-];
-
 export default async function Home() {
-  const { hero, benefits } = await getActiveLandingCms();
+  const [{ hero, benefits }, gameCards] = await Promise.all([
+    getActiveLandingCms(),
+    listActiveCatalogGames(),
+  ]);
 
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
@@ -104,29 +75,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="ms-shell py-14">
-        <div className="flex items-end justify-between gap-6">
-          <h2 className="font-display text-3xl font-black tracking-[-0.04em]">
-            All <span className="section-accent">Games</span>
-          </h2>
-          <Link href="/games" className="mono text-sm uppercase tracking-[0.3em] text-[var(--ms-gradient-end)]">
-            View all
-          </Link>
-        </div>
-        <div className="mt-10">
-          <CategoryTabs items={categoryTabs} />
-        </div>
-        <div className="mt-12 grid gap-8 md:grid-cols-2 xl:grid-cols-4">
-          {gameCards.map((game) => (
-            <GameCard key={game.name} {...game} />
-          ))}
-        </div>
-        <div className="mt-12 text-center">
-          <Link href="/games" className="inline-flex rounded-md bg-[var(--ms-bg-card)] px-8 py-4 font-bold">
-            Load More Games
-          </Link>
-        </div>
-      </section>
+      <LandingGamesSection games={gameCards} />
 
       <section className="mt-10 border-y border-[var(--ms-border)] bg-[var(--ms-bg-card)] py-8">
         <div className="ms-shell grid grid-cols-2 gap-6 text-center md:grid-cols-4">
