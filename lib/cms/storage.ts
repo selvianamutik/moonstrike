@@ -20,3 +20,12 @@ export function getChangedStoragePaths(
 
   return oldPaths.filter((path) => !newPaths.has(path))
 }
+
+export function getStoragePathFromPublicUrl(url: string) {
+  const marker = `/storage/v1/object/public/${CMS_MEDIA_BUCKET}/`
+  const markerIndex = url.indexOf(marker)
+
+  if (markerIndex === -1) return null
+
+  return decodeURIComponent(url.slice(markerIndex + marker.length))
+}

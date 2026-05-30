@@ -19,6 +19,7 @@ export type GameCatalogItem = {
   genreGroup: string;
   platform: string;
   description: string;
+  image?: string;
   isTopTitle: boolean;
 };
 
@@ -268,7 +269,7 @@ export function getServiceByGameAndSlug(gameSlug: string, serviceSlug: string) {
 }
 
 export function getServiceDetailHref(service: Pick<GameService, "gameSlug" | "slug">) {
-  return `/services/${service.gameSlug}/${service.slug}`;
+  return `/${service.gameSlug}/${service.slug}`;
 }
 
 export function getCartLines() {

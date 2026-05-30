@@ -9,6 +9,7 @@ type AdminStatCardProps = {
   icon?: React.ReactNode;
   subtitle?: string;
   progressColor?: string;
+  progressPercent?: number;
   progressWidth?: string;
 };
 
@@ -20,8 +21,12 @@ export function AdminStatCard({
   icon,
   subtitle,
   progressColor = "bg-[#8B5CF6]",
+  progressPercent,
   progressWidth = "w-[50%]",
 }: AdminStatCardProps) {
+  const normalizedProgressPercent =
+    typeof progressPercent === "number" ? Math.min(100, Math.max(0, progressPercent)) : undefined;
+
   return (
     <div className="bg-[#0F172A] border border-[#172554] rounded-xl p-5 hover:border-[#8B5CF6] transition-colors">
       <div className="flex items-center justify-between mb-4">
@@ -42,7 +47,10 @@ export function AdminStatCard({
       {subtitle && <div className="text-xs text-[#64748B] mb-3">{subtitle}</div>}
       {!subtitle && progressWidth && (
         <div className="h-1 w-full bg-[#172554] rounded-full overflow-hidden mt-3">
-          <div className={`h-full ${progressColor} ${progressWidth}`} />
+          <div
+            className={`h-full ${progressColor} ${normalizedProgressPercent === undefined ? progressWidth : ""}`}
+            style={normalizedProgressPercent === undefined ? undefined : { width: `${normalizedProgressPercent}%` }}
+          />
         </div>
       )}
     </div>
