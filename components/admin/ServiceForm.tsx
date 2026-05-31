@@ -511,6 +511,16 @@ export function ServiceForm({
                     </option>
                   ))}
                 </select>
+                {availableCategories.length === 0 && (
+                  <p className="mt-2 text-xs text-amber-300">No categories yet for this game. Add one from the Services list.</p>
+                )}
+              </AdminFormField>
+              <AdminFormField label="Status">
+                <select className={adminSelectClass} value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
+                  <option value="draft">draft</option>
+                  <option value="active">active</option>
+                  <option value="archived">archived</option>
+                </select>
               </AdminFormField>
               <AdminFormField label="Status">
                 <select className={adminSelectClass} value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
