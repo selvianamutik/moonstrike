@@ -7,13 +7,31 @@ export type ServiceBenefit = { icon: string; title: string; description: string 
 export type ServiceOption = {
   id?: string
   label: string
-  type: 'single_choice' | 'multiple_choice' | 'scalar'
+  type:
+    | 'single_choice'
+    | 'multiple_choice'
+    | 'scalar'
+    | 'dropdown'
+    | 'radio'
+    | 'checkbox_group'
+    | 'range'
+    | 'number_stepper'
+    | 'quantity'
+    | 'toggle'
+    | 'text'
+    | 'textarea'
   required: boolean
   options?: Array<{ label: string; priceUSD: number; priceEUR: number }>
   min?: number
   max?: number
+  step?: number
   pricePerUnitUSD?: number
   pricePerUnitEUR?: number
+  priceUSD?: number
+  priceEUR?: number
+  placeholder?: string
+  enabledLabel?: string
+  disabledLabel?: string
 }
 
 export type ServiceRow = {
@@ -28,6 +46,7 @@ export type ServiceRow = {
   service_category_id: string | null
   service_category_name: string | null
   service_category_slug: string | null
+  service_category_sort_order: number | null
   status: ServiceStatus
   is_hot_offer: boolean
   hot_offer_at: string | null
@@ -48,6 +67,7 @@ type RawServiceRow = Omit<
   | 'game_slug'
   | 'service_category_name'
   | 'service_category_slug'
+  | 'service_category_sort_order'
   | 'base_price_usd'
   | 'base_price_eur'
   | 'what_you_get'
@@ -59,13 +79,13 @@ type RawServiceRow = Omit<
   options_schema: unknown
   games: { name: string; slug: string } | { name: string; slug: string }[] | null
   service_categories:
-    | { name: string; slug: string }
-    | { name: string; slug: string }[]
+    | { name: string; slug: string; sort_order?: number | null }
+    | { name: string; slug: string; sort_order?: number | null }[]
     | null
 }
 
 const SERVICE_SELECT =
-  'id, game_id, games(name, slug), title, slug, image, description, service_category_id, service_categories(name, slug), status, is_hot_offer, hot_offer_at, region, badges, requirements, what_you_get, base_price_usd, base_price_eur, options_schema, created_at, updated_at'
+  'id, game_id, games(name, slug), title, slug, image, description, service_category_id, service_categories(name, slug, sort_order), status, is_hot_offer, hot_offer_at, region, badges, requirements, what_you_get, base_price_usd, base_price_eur, options_schema, created_at, updated_at'
 
 function relationOne<T>(value: T | T[] | null | undefined) {
   return Array.isArray(value) ? value[0] : value
@@ -85,6 +105,7 @@ export function serviceRowToCatalogService(row: ServiceRow): GameService {
     category: row.service_category_name ?? 'Service',
     serviceCategory: row.service_category_name ?? 'Uncategorized',
     serviceCategorySlug: row.service_category_slug,
+    serviceCategorySortOrder: row.service_category_sort_order,
     image: row.image,
     description: row.description,
     startingPrice: row.base_price_usd,
@@ -109,6 +130,7 @@ function rawServiceToRow(row: RawServiceRow): ServiceRow {
     service_category_id: row.service_category_id,
     service_category_name: category?.name ?? null,
     service_category_slug: category?.slug ?? null,
+    service_category_sort_order: category?.sort_order ?? null,
     status: row.status,
     is_hot_offer: row.is_hot_offer,
     hot_offer_at: row.hot_offer_at,
@@ -145,6 +167,28 @@ export async function listAdminServices() {
   return (data ?? []).map(rawServiceToRow)
 }
 
+export async function listActiveServices() {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('services')
+    .select(SERVICE_SELECT)
+    .eq('status', 'active')
+    .order('title', { ascending: true })
+    .returns<RawServiceRow[]>()
+
+  if (error) throw error
+
+  return (data ?? [])
+    .map(rawServiceToRow)
+    .sort(
+      (a, b) =>
+        a.game_name.localeCompare(b.game_name) ||
+        (a.service_category_sort_order ?? 999) - (b.service_category_sort_order ?? 999) ||
+        (a.service_category_name ?? '').localeCompare(b.service_category_name ?? '') ||
+        a.title.localeCompare(b.title),
+    )
+}
+
 export async function listActiveServicesForGame(gameSlug: string) {
   const supabase = createAdminClient()
   const { data, error } = await supabase
@@ -157,7 +201,15 @@ export async function listActiveServicesForGame(gameSlug: string) {
 
   if (error) throw error
 
-  return (data ?? []).map(rawServiceToRow).filter((service) => service.game_slug === gameSlug)
+  return (data ?? [])
+    .map(rawServiceToRow)
+    .filter((service) => service.game_slug === gameSlug)
+    .sort(
+      (a, b) =>
+        (a.service_category_sort_order ?? 999) - (b.service_category_sort_order ?? 999) ||
+        (a.service_category_name ?? '').localeCompare(b.service_category_name ?? '') ||
+        a.title.localeCompare(b.title),
+    )
 }
 
 export async function getAdminService(id: string) {
@@ -171,6 +223,11 @@ export async function getAdminService(id: string) {
   if (error) throw error
 
   return data ? rawServiceToRow(data) : null
+}
+
+export async function getAdminServiceByGameAndSlug(gameSlug: string, serviceSlug: string) {
+  const services = await listAdminServices()
+  return services.find((service) => service.game_slug === gameSlug && service.slug === serviceSlug) ?? null
 }
 
 export async function getActiveServiceByGameAndSlug(gameSlug: string, serviceSlug: string) {

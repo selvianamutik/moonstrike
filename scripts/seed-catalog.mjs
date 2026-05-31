@@ -113,6 +113,207 @@ const serviceTemplates = [
   tags,
 }))
 
+const rankChoices = [
+  { label: 'Bronze', priceUSD: 0, priceEUR: 0 },
+  { label: 'Silver', priceUSD: 8, priceEUR: 8 },
+  { label: 'Gold', priceUSD: 16, priceEUR: 16 },
+  { label: 'Platinum', priceUSD: 28, priceEUR: 28 },
+  { label: 'Diamond', priceUSD: 44, priceEUR: 44 },
+]
+
+function buildOptionsSchema(template) {
+  const quantityOption = {
+    label: 'Quantity',
+    type: 'quantity',
+    required: true,
+    min: 1,
+    max: 20,
+  }
+
+  if (template.category === 'Rank Boost') {
+    return [
+      quantityOption,
+      {
+        label: 'Current Rank',
+        type: 'dropdown',
+        required: true,
+        options: rankChoices,
+      },
+      {
+        label: 'Target Rank',
+        type: 'radio',
+        required: true,
+        options: rankChoices.map((choice) => ({
+          ...choice,
+          priceUSD: choice.priceUSD + 12,
+          priceEUR: choice.priceEUR + 12,
+        })),
+      },
+      {
+        label: 'Duo Queue',
+        type: 'toggle',
+        required: false,
+        enabledLabel: 'Duo queue with booster',
+        disabledLabel: 'Solo boost',
+        priceUSD: 18,
+        priceEUR: 18,
+      },
+      {
+        label: 'Preferred Notes',
+        type: 'textarea',
+        required: false,
+        placeholder: 'Tell us your preferred agents, champions, heroes, or schedule.',
+      },
+    ]
+  }
+
+  if (template.category === 'Coaching') {
+    return [
+      quantityOption,
+      {
+        label: 'Session Length',
+        type: 'number_stepper',
+        required: true,
+        min: 1,
+        max: 6,
+        pricePerUnitUSD: template.slug === 'account-review' ? 12 : 20,
+        pricePerUnitEUR: template.slug === 'account-review' ? 12 : 20,
+      },
+      {
+        label: 'Focus Areas',
+        type: 'checkbox_group',
+        required: false,
+        options: [
+          { label: 'Mechanics', priceUSD: 0, priceEUR: 0 },
+          { label: 'Strategy', priceUSD: 5, priceEUR: 5 },
+          { label: 'VOD Review', priceUSD: 10, priceEUR: 10 },
+          { label: 'Build Review', priceUSD: 8, priceEUR: 8 },
+        ],
+      },
+      {
+        label: 'Discord Handle',
+        type: 'text',
+        required: false,
+        placeholder: 'username#0000',
+      },
+    ]
+  }
+
+  if (['Dungeon', 'Raid'].includes(template.category)) {
+    return [
+      quantityOption,
+      {
+        label: template.category === 'Raid' ? 'Clear Count' : 'Run Count',
+        type: 'number_stepper',
+        required: true,
+        min: 1,
+        max: 10,
+        pricePerUnitUSD: template.category === 'Raid' ? 24 : 14,
+        pricePerUnitEUR: template.category === 'Raid' ? 24 : 14,
+      },
+      {
+        label: 'Difficulty',
+        type: 'radio',
+        required: true,
+        options: [
+          { label: 'Normal', priceUSD: 0, priceEUR: 0 },
+          { label: 'Heroic', priceUSD: 18, priceEUR: 18 },
+          { label: 'Mythic', priceUSD: 42, priceEUR: 42 },
+        ],
+      },
+      {
+        label: 'Loot Priority',
+        type: 'checkbox_group',
+        required: false,
+        options: [
+          { label: 'Armor', priceUSD: 6, priceEUR: 6 },
+          { label: 'Weapons', priceUSD: 10, priceEUR: 10 },
+          { label: 'Cosmetics', priceUSD: 8, priceEUR: 8 },
+        ],
+      },
+    ]
+  }
+
+  if (['Powerleveling', 'Leveling'].includes(template.category)) {
+    return [
+      quantityOption,
+      {
+        label: 'Target Levels',
+        type: 'range',
+        required: true,
+        min: 5,
+        max: 80,
+        pricePerUnitUSD: 2,
+        pricePerUnitEUR: 2,
+      },
+      {
+        label: 'Delivery Speed',
+        type: 'dropdown',
+        required: true,
+        options: [
+          { label: 'Standard', priceUSD: 0, priceEUR: 0 },
+          { label: 'Express', priceUSD: 15, priceEUR: 15 },
+          { label: 'Priority', priceUSD: 28, priceEUR: 28 },
+        ],
+      },
+    ]
+  }
+
+  if (template.category === 'Item Farm') {
+    return [
+      quantityOption,
+      {
+        label: 'Farm Duration',
+        type: 'number_stepper',
+        required: true,
+        min: 1,
+        max: 12,
+        pricePerUnitUSD: 9,
+        pricePerUnitEUR: 9,
+      },
+      {
+        label: 'Target Rewards',
+        type: 'checkbox_group',
+        required: true,
+        options: [
+          { label: 'Materials', priceUSD: 0, priceEUR: 0 },
+          { label: 'Rare Drops', priceUSD: 18, priceEUR: 18 },
+          { label: 'Cosmetics', priceUSD: 12, priceEUR: 12 },
+        ],
+      },
+      {
+        label: 'Stop When Target Drops',
+        type: 'toggle',
+        required: false,
+        enabledLabel: 'Stop at target drop',
+        disabledLabel: 'Use full farm duration',
+        priceUSD: 0,
+        priceEUR: 0,
+      },
+    ]
+  }
+
+  return [
+    quantityOption,
+    {
+      label: 'Completion Tier',
+      type: 'dropdown',
+      required: true,
+      options: [
+        { label: 'Basic', priceUSD: 0, priceEUR: 0 },
+        { label: 'Full Clear', priceUSD: 20, priceEUR: 20 },
+        { label: 'Completionist', priceUSD: 38, priceEUR: 38 },
+      ],
+    },
+    {
+      label: 'Special Instructions',
+      type: 'textarea',
+      required: false,
+      placeholder: 'Add account notes, availability, or specific goals.',
+    },
+  ]
+}
+
 async function upsert(table, rows, onConflict) {
   const { error } = await supabase
     .from(table)
@@ -234,7 +435,7 @@ async function main() {
         ],
         base_price_usd: template.price,
         base_price_eur: template.price,
-        options_schema: [],
+        options_schema: buildOptionsSchema(template),
       }
     })
   )

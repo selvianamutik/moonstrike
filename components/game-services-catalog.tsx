@@ -11,15 +11,8 @@ type ServiceTab = {
   href: string;
   label: string;
   slug: string;
+  sortOrder: number;
 };
-
-function categorySlug(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
 
 function matchesQuery(service: GameService, query: string) {
   const normalizedQuery = query.trim().toLowerCase();
@@ -50,18 +43,27 @@ export function GameServicesCatalog({
   const [query, setQuery] = useState("");
   const tabSourceServices = navigationServices ?? services;
   const tabs = useMemo<ServiceTab[]>(() => {
-    const categoryTabs = Array.from(new Set(tabSourceServices.map((service) => service.serviceCategory)))
-      .sort((a, b) => a.localeCompare(b))
-      .map((category) => ({
-        href: `/${game.slug}/${categorySlug(category)}`,
-        label: category,
-        slug: categorySlug(category),
-      }));
+    const categoryTabs = new Map<string, ServiceTab>();
+
+    tabSourceServices.forEach((service) => {
+      const slug = service.serviceCategorySlug ?? service.serviceCategory.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+      if (!categoryTabs.has(slug)) {
+        categoryTabs.set(slug, {
+          href: `/${game.slug}/${slug}`,
+          label: service.serviceCategory,
+          slug,
+          sortOrder: service.serviceCategorySortOrder ?? 999,
+        });
+      }
+    });
 
     return [
-      { href: `/${game.slug}`, label: "All", slug: "all" },
-      { href: `/${game.slug}/hot-offers`, label: "Hot Offers", slug: "hot-offers" },
-      ...categoryTabs,
+      { href: `/${game.slug}`, label: "All", slug: "all", sortOrder: -2 },
+      { href: `/${game.slug}/hot-offers`, label: "Hot Offers", slug: "hot-offers", sortOrder: -1 },
+      ...Array.from(categoryTabs.values()).sort(
+        (a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label),
+      ),
     ];
   }, [game.slug, tabSourceServices]);
 

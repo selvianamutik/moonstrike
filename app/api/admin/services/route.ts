@@ -7,7 +7,19 @@ import { revalidatePath } from 'next/cache'
 
 const STATUSES = new Set(['active', 'draft', 'archived'])
 const REGIONS = new Set(['USA', 'EUROPE'])
-const OPTION_TYPES = new Set(['single_choice', 'multiple_choice', 'scalar'])
+const OPTION_TYPES = new Set([
+  'dropdown',
+  'radio',
+  'checkbox_group',
+  'range',
+  'number_stepper',
+  'quantity',
+  'toggle',
+  'text',
+  'textarea',
+])
+const CHOICE_OPTION_TYPES = new Set(['dropdown', 'radio', 'checkbox_group'])
+const UNIT_OPTION_TYPES = new Set(['range', 'number_stepper'])
 
 function parseNumber(value: unknown) {
   const parsed = Number(value)
@@ -20,11 +32,11 @@ function sanitizeOptionsSchema(value: unknown) {
   return value
     .map((option) => {
       const label = typeof option?.label === 'string' ? option.label.trim() : ''
-      const type = typeof option?.type === 'string' && OPTION_TYPES.has(option.type) ? option.type : 'single_choice'
+      const type = typeof option?.type === 'string' && OPTION_TYPES.has(option.type) ? option.type : 'dropdown'
 
       if (!label) return null
 
-      if (type === 'scalar') {
+      if (UNIT_OPTION_TYPES.has(type)) {
         const min = parseNumber(option?.min) || 1
         const rawMax = parseNumber(option?.max)
 
@@ -39,6 +51,40 @@ function sanitizeOptionsSchema(value: unknown) {
         }
       }
 
+      if (type === 'quantity') {
+        const min = Math.max(parseNumber(option?.min) || 1, 1)
+        const rawMax = parseNumber(option?.max)
+
+        return {
+          label,
+          type,
+          required: true,
+          min,
+          max: rawMax > 0 ? Math.max(rawMax, min) : 99,
+        }
+      }
+
+      if (type === 'toggle') {
+        return {
+          label,
+          type,
+          required: option?.required !== false,
+          enabledLabel: typeof option?.enabledLabel === 'string' && option.enabledLabel.trim() ? option.enabledLabel.trim() : 'Yes',
+          disabledLabel: typeof option?.disabledLabel === 'string' && option.disabledLabel.trim() ? option.disabledLabel.trim() : 'No',
+          priceUSD: parseNumber(option?.priceUSD),
+          priceEUR: parseNumber(option?.priceEUR),
+        }
+      }
+
+      if (type === 'text' || type === 'textarea') {
+        return {
+          label,
+          type,
+          required: option?.required !== false,
+          placeholder: typeof option?.placeholder === 'string' ? option.placeholder.trim() : '',
+        }
+      }
+
       const choices = Array.isArray(option?.options)
         ? option.options
             .map((choice: unknown) => ({
@@ -49,7 +95,7 @@ function sanitizeOptionsSchema(value: unknown) {
             .filter((choice: { label: string }) => choice.label)
         : []
 
-      if (choices.length === 0) return null
+      if (!CHOICE_OPTION_TYPES.has(type) || choices.length === 0) return null
 
       return {
         label,
@@ -87,7 +133,11 @@ function parsePayload(body: any) {
     status,
     is_hot_offer: body?.isHotOffer === true,
     region: regions.length > 0 ? regions : ['USA', 'EUROPE'],
-    badges: Array.isArray(body?.badges) ? body.badges.filter((value: unknown) => typeof value === 'string') : [],
+    badges: Array.isArray(body?.badges)
+      ? body.badges
+          .filter((value: unknown) => typeof value === 'string' && value.trim())
+          .map((value: string) => value.trim())
+      : [],
     requirements: Array.isArray(body?.requirements)
       ? body.requirements.filter((value: unknown) => typeof value === 'string' && value.trim()).map((value: string) => value.trim())
       : [],

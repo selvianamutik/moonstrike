@@ -21,6 +21,15 @@ function slugify(value: string) {
     .replace(/^-|-$/g, "");
 }
 
+function sortCategories(categories: ServiceCategoryRow[]) {
+  return [...categories].sort(
+    (a, b) =>
+      a.sort_order - b.sort_order ||
+      (a.game_name ?? "").localeCompare(b.game_name ?? "") ||
+      a.name.localeCompare(b.name),
+  );
+}
+
 export function ServicesPageClient({
   categories,
   games,
@@ -50,8 +59,12 @@ export function ServicesPageClient({
 
   const availableCategories = useMemo(
     () =>
-      categoryRows.filter((category) => gameFilter === "all" || category.game_id === gameFilter),
+      sortCategories(categoryRows.filter((category) => gameFilter === "all" || category.game_id === gameFilter)),
     [categoryRows, gameFilter]
+  );
+  const modalCategories = useMemo(
+    () => sortCategories(categoryRows.filter((category) => category.game_id === categoryGameId)),
+    [categoryGameId, categoryRows]
   );
 
   const filtered = useMemo(() => {
@@ -69,7 +82,13 @@ export function ServicesPageClient({
       const matchCat = categoryFilter === "all" || service.service_category_id === categoryFilter;
 
       return matchTab && matchSearch && matchGame && matchCat;
-    });
+    }).sort(
+      (a, b) =>
+        a.game_name.localeCompare(b.game_name) ||
+        (a.service_category_sort_order ?? 999) - (b.service_category_sort_order ?? 999) ||
+        (a.service_category_name ?? "").localeCompare(b.service_category_name ?? "") ||
+        a.title.localeCompare(b.title),
+    );
   }, [activeTab, categoryFilter, gameFilter, search, serviceRows]);
 
   function resetCategoryModal() {
@@ -126,7 +145,7 @@ export function ServicesPageClient({
           ? current.map((category) => category.id === result.category?.id ? result.category as ServiceCategoryRow : category)
           : [...current, result.category as ServiceCategoryRow];
 
-        return next.sort((a, b) => a.name.localeCompare(b.name));
+        return sortCategories(next);
       });
       setServiceRows((current) =>
         current.map((service) =>
@@ -135,6 +154,7 @@ export function ServicesPageClient({
                 ...service,
                 service_category_name: result.category.name,
                 service_category_slug: result.category.slug,
+                service_category_sort_order: result.category.sort_order,
               }
             : service
         )
@@ -173,7 +193,13 @@ export function ServicesPageClient({
       setServiceRows((current) =>
         current.map((service) =>
           service.service_category_id === category.id
-            ? { ...service, service_category_id: null, service_category_name: null, service_category_slug: null }
+            ? {
+                ...service,
+                service_category_id: null,
+                service_category_name: null,
+                service_category_slug: null,
+                service_category_sort_order: null,
+              }
             : service
         )
       );
@@ -312,8 +338,8 @@ export function ServicesPageClient({
             </td>
             <td className="px-6 py-4">
               <ActionIcons
-                editHref={`/admin/services/${service.id}/edit`}
-                previewHref={`/admin/services/${service.id}/preview`}
+                editHref={`/admin/services/${service.game_slug}/${service.slug}/edit`}
+                previewHref={`/admin/services/${service.game_slug}/${service.slug}/preview`}
                 onDelete={() => deleteService(service)}
               />
               {deletingServiceId === service.id && <span className="ml-2 text-xs text-[#94A3B8]">Deleting...</span>}
@@ -415,38 +441,44 @@ export function ServicesPageClient({
                 Existing Categories
               </h3>
               <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
-                {categoryRows.map((category) => (
-                  <div
-                    key={category.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-[#172554] bg-[#111827] px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-white">{category.name}</p>
-                      <p className="text-xs text-[#64748B]">
-                        {category.game_name ?? "Game"} / {category.slug}
-                      </p>
+                {modalCategories.length > 0 ? (
+                  modalCategories.map((category) => (
+                    <div
+                      key={category.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-[#172554] bg-[#111827] px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-white">{category.name}</p>
+                        <p className="text-xs text-[#64748B]">
+                          {category.game_name ?? "Game"} / {category.slug}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => editCategory(category)}
+                          className="rounded-lg p-2 text-[#94A3B8] transition-colors hover:bg-[#172554] hover:text-[#22D3EE]"
+                          aria-label={`Edit ${category.name}`}
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingCategoryId === category.id}
+                          onClick={() => deleteCategory(category)}
+                          className="rounded-lg p-2 text-[#94A3B8] transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label={`Delete ${category.name}`}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => editCategory(category)}
-                        className="rounded-lg p-2 text-[#94A3B8] transition-colors hover:bg-[#172554] hover:text-[#22D3EE]"
-                        aria-label={`Edit ${category.name}`}
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={deletingCategoryId === category.id}
-                        onClick={() => deleteCategory(category)}
-                        className="rounded-lg p-2 text-[#94A3B8] transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-40"
-                        aria-label={`Delete ${category.name}`}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="rounded-lg border border-dashed border-[#172554] px-3 py-4 text-sm text-[#94A3B8]">
+                    No categories for the selected game yet.
+                  </p>
+                )}
               </div>
             </div>
           </div>

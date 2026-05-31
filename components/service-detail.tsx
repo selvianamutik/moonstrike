@@ -12,16 +12,42 @@ type Region = "USA" | "EUROPE";
 type Currency = "USD" | "EUR";
 
 function optionLabel(option: ServiceOption) {
-  if (option.type === "single_choice") return "Single Choice";
-  if (option.type === "multiple_choice") return "Multiple Choice";
+  if (option.type === "dropdown") return "Dropdown";
+  if (option.type === "radio" || option.type === "single_choice") return "Single Choice";
+  if (option.type === "checkbox_group" || option.type === "multiple_choice") return "Multiple Choice";
+  if (option.type === "range") return "Range";
+  if (option.type === "number_stepper" || option.type === "scalar") return "Stepper";
+  if (option.type === "quantity") return "Quantity";
+  if (option.type === "toggle") return "Toggle";
+  if (option.type === "textarea") return "Long Text";
+  if (option.type === "text") return "Text";
   return "Quantity";
 }
 
-type SelectionValue = string | string[] | number;
+type SelectionValue = string | string[] | number | boolean;
+
+function isMultiChoice(option: ServiceOption) {
+  return option.type === "multiple_choice" || option.type === "checkbox_group";
+}
+
+function isChoice(option: ServiceOption) {
+  return option.type === "single_choice" || option.type === "multiple_choice" || option.type === "dropdown" || option.type === "radio" || option.type === "checkbox_group";
+}
+
+function isQuantity(option: ServiceOption) {
+  return option.type === "scalar" || option.type === "range" || option.type === "number_stepper";
+}
+
+function isQuantityOption(option: ServiceOption) {
+  return option.type === "quantity";
+}
 
 function getDefaultSelection(option: ServiceOption): SelectionValue {
-  if (option.type === "multiple_choice") return [];
-  if (option.type === "scalar") return option.min ?? 1;
+  if (isMultiChoice(option)) return [];
+  if (isQuantityOption(option)) return option.min ?? 1;
+  if (isQuantity(option)) return option.min ?? 1;
+  if (option.type === "toggle") return false;
+  if (option.type === "text" || option.type === "textarea") return "";
   return option.options?.[0]?.label ?? "";
 }
 
@@ -43,20 +69,36 @@ function getAvailableRegions(service: ServiceRow): Region[] {
 }
 
 function calculateOptionTotal(option: ServiceOption, value: SelectionValue, currency: Currency) {
-  if (option.type === "scalar") {
+  if (isQuantityOption(option)) return 0;
+
+  if (isQuantity(option)) {
     const unitPrice = currency === "EUR" ? option.pricePerUnitEUR ?? 0 : option.pricePerUnitUSD ?? 0;
     return (Number(value) || 0) * unitPrice;
   }
 
-  if (option.type === "multiple_choice") {
+  if (isMultiChoice(option)) {
     const selected = Array.isArray(value) ? value : [];
     return (option.options ?? [])
       .filter((item) => selected.includes(item.label))
       .reduce((total, item) => total + (currency === "EUR" ? item.priceEUR : item.priceUSD), 0);
   }
 
+  if (option.type === "toggle") {
+    return value === true ? (currency === "EUR" ? option.priceEUR ?? 0 : option.priceUSD ?? 0) : 0;
+  }
+
+  if (!isChoice(option)) return 0;
+
   const selected = option.options?.find((item) => item.label === value);
   return selected ? (currency === "EUR" ? selected.priceEUR : selected.priceUSD) : 0;
+}
+
+function optionPrice(option: ServiceOption, currency: Currency) {
+  return currency === "EUR" ? option.priceEUR ?? 0 : option.priceUSD ?? 0;
+}
+
+function choicePrice(item: { priceUSD: number; priceEUR: number }, currency: Currency) {
+  return currency === "EUR" ? item.priceEUR : item.priceUSD;
 }
 
 function ServiceOptions({
@@ -91,21 +133,158 @@ function ServiceOptions({
               {optionLabel(option)}
             </span>
           </div>
-          {option.type === "scalar" ? (
-            <input
-              type="number"
-              min={option.min ?? 1}
-              max={option.max}
-              value={Number(selections[option.label] ?? getDefaultSelection(option))}
-              onChange={(event) => onChange(option.label, Number(event.target.value))}
-              className="mt-4 h-12 w-full rounded-md border border-[var(--ms-border)] bg-transparent px-4 mono outline-none focus:border-[var(--ms-gradient-end)]"
-            />
+          {option.type === "quantity" ? (
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-[var(--ms-border)] p-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const current = Number(selections[option.label] ?? getDefaultSelection(option));
+                  onChange(option.label, Math.max(option.min ?? 1, current - 1));
+                }}
+                className="h-10 w-10 rounded-md border border-[var(--ms-border)] text-lg hover:border-[var(--ms-gradient-end)]"
+                aria-label={`Decrease ${option.label}`}
+              >
+                -
+              </button>
+              <span className="mono min-w-16 text-center text-sm text-[var(--ms-heading)]">
+                {Number(selections[option.label] ?? getDefaultSelection(option))}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const current = Number(selections[option.label] ?? getDefaultSelection(option));
+                  const rawNext = current + 1;
+                  onChange(option.label, option.max ? Math.min(option.max, rawNext) : rawNext);
+                }}
+                className="h-10 w-10 rounded-md border border-[var(--ms-border)] text-lg hover:border-[var(--ms-gradient-end)]"
+                aria-label={`Increase ${option.label}`}
+              >
+                +
+              </button>
+            </div>
+          ) : option.type === "range" ? (
+            <div className="mt-4">
+              <input
+                type="range"
+                min={option.min ?? 1}
+                max={option.max}
+                step={option.step ?? 1}
+                value={Number(selections[option.label] ?? getDefaultSelection(option))}
+                onChange={(event) => onChange(option.label, Number(event.target.value))}
+                className="h-12 w-full accent-[var(--ms-gradient-end)]"
+                aria-label={option.label}
+              />
+              <div className="mt-2 flex items-center justify-between text-xs text-[var(--ms-body)]">
+                <span>
+                  {Number(selections[option.label] ?? getDefaultSelection(option))}
+                </span>
+                <span className="mono text-[var(--ms-price)]">
+                  + {formatMoney(calculateOptionTotal(option, selections[option.label] ?? getDefaultSelection(option), currency), currency)}
+                </span>
+              </div>
+            </div>
+          ) : option.type === "number_stepper" || option.type === "scalar" ? (
+            <div className="mt-4">
+              <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--ms-border)] p-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = Number(selections[option.label] ?? getDefaultSelection(option));
+                    const next = Math.max(option.min ?? 1, current - 1);
+                    onChange(option.label, next);
+                  }}
+                  className="h-10 w-10 rounded-md border border-[var(--ms-border)] text-lg hover:border-[var(--ms-gradient-end)]"
+                  aria-label={`Decrease ${option.label}`}
+                >
+                  -
+                </button>
+                <span className="mono min-w-16 text-center text-sm text-[var(--ms-heading)]">
+                  {Number(selections[option.label] ?? getDefaultSelection(option))}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = Number(selections[option.label] ?? getDefaultSelection(option));
+                    const rawNext = current + 1;
+                    const next = option.max ? Math.min(option.max, rawNext) : rawNext;
+                    onChange(option.label, next);
+                  }}
+                  className="h-10 w-10 rounded-md border border-[var(--ms-border)] text-lg hover:border-[var(--ms-gradient-end)]"
+                  aria-label={`Increase ${option.label}`}
+                >
+                  +
+                </button>
+              </div>
+              <div className="mt-2 flex justify-end text-xs">
+                <span className="mono text-[var(--ms-price)]">
+                  + {formatMoney(calculateOptionTotal(option, selections[option.label] ?? getDefaultSelection(option), currency), currency)}
+                </span>
+              </div>
+            </div>
+          ) : option.type === "toggle" ? (
+            <button
+              type="button"
+              onClick={() => onChange(option.label, !(selections[option.label] ?? getDefaultSelection(option)))}
+              className={`mt-4 flex w-full items-center justify-between gap-4 rounded-md border px-4 py-3 text-left text-sm hover:border-[var(--ms-gradient-end)] ${
+                selections[option.label] === true
+                  ? "border-[var(--ms-gradient-end)] bg-[var(--ms-hover-bg)]"
+                  : "border-[var(--ms-border)]"
+              }`}
+            >
+              <span>{selections[option.label] === true ? option.enabledLabel ?? "Yes" : option.disabledLabel ?? "No"}</span>
+              <span
+                className={`relative h-6 w-11 rounded-full border transition-colors ${
+                  selections[option.label] === true
+                    ? "border-[var(--ms-gradient-end)] bg-[var(--ms-gradient-end)]"
+                    : "border-[var(--ms-border)] bg-transparent"
+                }`}
+                aria-hidden="true"
+              >
+                <span
+                  className={`absolute top-1 h-4 w-4 rounded-full bg-[var(--ms-heading)] transition-transform ${
+                    selections[option.label] === true ? "translate-x-5" : "translate-x-1"
+                  }`}
+                />
+              </span>
+              <span className="mono text-[var(--ms-price)]">
+                + {formatMoney(optionPrice(option, currency), currency)}
+              </span>
+            </button>
+          ) : option.type === "text" || option.type === "textarea" ? (
+            option.type === "textarea" ? (
+              <textarea
+                value={String(selections[option.label] ?? "")}
+                onChange={(event) => onChange(option.label, event.target.value)}
+                placeholder={option.placeholder}
+                className="mt-4 min-h-28 w-full rounded-md border border-[var(--ms-border)] bg-transparent px-4 py-3 text-sm outline-none focus:border-[var(--ms-gradient-end)]"
+              />
+            ) : (
+              <input
+                type="text"
+                value={String(selections[option.label] ?? "")}
+                onChange={(event) => onChange(option.label, event.target.value)}
+                placeholder={option.placeholder}
+                className="mt-4 h-12 w-full rounded-md border border-[var(--ms-border)] bg-transparent px-4 text-sm outline-none focus:border-[var(--ms-gradient-end)]"
+              />
+            )
+          ) : option.type === "dropdown" ? (
+            <select
+              value={String(selections[option.label] ?? getDefaultSelection(option))}
+              onChange={(event) => onChange(option.label, event.target.value)}
+              className="mt-4 h-12 w-full rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-page)] px-4 text-sm outline-none focus:border-[var(--ms-gradient-end)]"
+            >
+              {(option.options ?? []).map((item) => (
+                <option key={item.label} value={item.label}>
+                  {item.label} (+ {formatMoney(choicePrice(item, currency), currency)})
+                </option>
+              ))}
+            </select>
           ) : (
             <div className="mt-4 grid gap-2">
               {(option.options ?? []).map((item) => {
                 const currentSelection = selections[option.label];
                 const isSelected =
-                  option.type === "multiple_choice"
+                  isMultiChoice(option)
                     ? Array.isArray(currentSelection) && currentSelection.includes(item.label)
                     : currentSelection === item.label;
 
@@ -116,7 +295,7 @@ function ServiceOptions({
                     onClick={() => {
                       const current = selections[option.label] ?? getDefaultSelection(option);
 
-                      if (option.type === "multiple_choice") {
+                      if (isMultiChoice(option)) {
                         const selected = Array.isArray(current) ? current : [];
                         onChange(
                           option.label,
@@ -129,15 +308,31 @@ function ServiceOptions({
 
                       onChange(option.label, item.label);
                     }}
-                    className={`flex items-center justify-between rounded-md border px-4 py-3 text-left text-sm hover:border-[var(--ms-gradient-end)] ${
+                    className={`flex items-center justify-between gap-3 rounded-md border px-4 py-3 text-left text-sm hover:border-[var(--ms-gradient-end)] ${
                       isSelected
                         ? "border-[var(--ms-gradient-end)] bg-[var(--ms-hover-bg)]"
                         : "border-[var(--ms-border)]"
                     }`}
                   >
-                    <span>{item.label}</span>
+                    <span className="flex items-center gap-3">
+                      <span
+                        className={`grid h-4 w-4 shrink-0 place-items-center border ${
+                          isMultiChoice(option) ? "rounded-sm" : "rounded-full"
+                        } ${isSelected ? "border-[var(--ms-gradient-end)]" : "border-[var(--ms-border)]"}`}
+                        aria-hidden="true"
+                      >
+                        {isSelected ? (
+                          <span
+                            className={`h-2 w-2 bg-[var(--ms-gradient-end)] ${
+                              isMultiChoice(option) ? "rounded-[2px]" : "rounded-full"
+                            }`}
+                          />
+                        ) : null}
+                      </span>
+                      {item.label}
+                    </span>
                     <span className="mono text-[var(--ms-price)]">
-                      + {formatMoney(currency === "EUR" ? item.priceEUR : item.priceUSD, currency)}
+                      + {formatMoney(choicePrice(item, currency), currency)}
                     </span>
                   </button>
                 );
@@ -165,6 +360,8 @@ export function ServiceDetail({
   const [selections, setSelections] = useState<Record<string, SelectionValue>>(() =>
     Object.fromEntries(service.options_schema.map((option) => [option.label, getDefaultSelection(option)]))
   );
+  const quantityOption = service.options_schema.find(isQuantityOption);
+  const quantity = quantityOption ? Number(selections[quantityOption.label] ?? getDefaultSelection(quantityOption)) || 1 : 1;
   const optionsTotal = useMemo(
     () =>
       service.options_schema.reduce(
@@ -175,7 +372,8 @@ export function ServiceDetail({
     [currency, selections, service.options_schema]
   );
   const basePrice = currency === "EUR" ? service.base_price_eur : service.base_price_usd;
-  const total = basePrice + optionsTotal;
+  const unitTotal = basePrice + optionsTotal;
+  const total = unitTotal * quantity;
 
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
@@ -289,6 +487,14 @@ export function ServiceDetail({
               <div className="mt-3 flex justify-between text-sm">
                 <span className="text-[var(--ms-body)]">Options</span>
                 <span className="mono text-[var(--ms-price)]">+ {formatMoney(optionsTotal, currency)}</span>
+              </div>
+            ) : null}
+            {quantityOption && quantity > 1 ? (
+              <div className="mt-6 border-t border-[var(--ms-border)] pt-5">
+                <div className="flex justify-between text-sm">
+                  <span className="text-[var(--ms-body)]">Unit Price</span>
+                  <span className="mono text-[var(--ms-price)]">{formatMoney(unitTotal, currency)}</span>
+                </div>
               </div>
             ) : null}
             <div className="mt-6 flex justify-between border-t border-[var(--ms-border)] pt-5 text-base">

@@ -3,12 +3,34 @@
 import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
-import { AdminFormField, adminInputClass, adminSelectClass, adminTextareaClass } from "@/components/admin/AdminFormField";
 import { AdminButton } from "@/components/admin/AdminButton";
-import { SERVICE_BADGE_OPTIONS } from "@/lib/admin-constants";
+import { AdminFormField, adminInputClass, adminSelectClass, adminTextareaClass } from "@/components/admin/AdminFormField";
 import type { GameRow } from "@/lib/cms/games";
 import type { ServiceCategoryRow } from "@/lib/cms/service-categories";
 import type { ServiceBenefit, ServiceOption, ServiceRow } from "@/lib/cms/services";
+
+const optionTypes: Array<[ServiceOption["type"], string]> = [
+  ["dropdown", "Dropdown"],
+  ["radio", "Radio Buttons"],
+  ["checkbox_group", "Checkbox Group"],
+  ["range", "Range Slider"],
+  ["number_stepper", "Number Stepper"],
+  ["quantity", "Quantity"],
+  ["toggle", "Toggle"],
+  ["text", "Short Text"],
+  ["textarea", "Long Text"],
+];
+
+const sections = [
+  ["basic", "Basic Info"],
+  ["pricing", "Pricing"],
+  ["media", "Image"],
+  ["badges", "Badges"],
+  ["options", "Options"],
+  ["benefits", "What You Get"],
+  ["requirements", "Requirements"],
+  ["details", "Details"],
+] as const;
 
 function loadImage(file: Blob) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
@@ -52,7 +74,7 @@ async function resizeToWebp(file: File, maxWidth: number, quality: number) {
         resolve(new File([blob], "service-image.webp", { type: "image/webp" }));
       },
       "image/webp",
-      quality
+      quality,
     );
   });
 }
@@ -69,17 +91,61 @@ function emptyBenefit(): ServiceBenefit {
   return { icon: "tabler-star", title: "", description: "" };
 }
 
+function emptyChoice() {
+  return { label: "", priceUSD: 0, priceEUR: 0 };
+}
+
+function addEmptyRow<T>(current: T[], emptyValue: T) {
+  return [...current, emptyValue];
+}
+
 function emptyOption(): ServiceOption {
   return {
     label: "",
-    type: "single_choice",
+    type: "dropdown",
     required: true,
-    options: [{ label: "", priceUSD: 0, priceEUR: 0 }],
+    options: [emptyChoice()],
   };
 }
 
-function emptyChoice() {
-  return { label: "", priceUSD: 0, priceEUR: 0 };
+function isChoiceType(type: ServiceOption["type"]) {
+  return type === "dropdown" || type === "radio" || type === "checkbox_group";
+}
+
+function isUnitType(type: ServiceOption["type"]) {
+  return type === "range" || type === "number_stepper";
+}
+
+function isQuantityType(type: ServiceOption["type"]) {
+  return type === "quantity";
+}
+
+function normalizeLegacyOption(option: ServiceOption): ServiceOption {
+  if (option.type === "single_choice") return { ...option, type: "radio" };
+  if (option.type === "multiple_choice") return { ...option, type: "checkbox_group" };
+  if (option.type === "scalar") return { ...option, type: "number_stepper" };
+  return option;
+}
+
+function optionPreview(option: ServiceOption) {
+  if (isChoiceType(option.type)) {
+    const count = option.options?.filter((choice) => choice.label.trim()).length ?? 0;
+    return `${count} choice${count === 1 ? "" : "s"}`;
+  }
+
+  if (isUnitType(option.type)) {
+    return `${option.min ?? 1}-${option.max ?? 10}, USD ${option.pricePerUnitUSD ?? 0} / EUR ${option.pricePerUnitEUR ?? 0}`;
+  }
+
+  if (isQuantityType(option.type)) {
+    return `multiplies total, ${option.min ?? 1}-${option.max ?? 99}`;
+  }
+
+  if (option.type === "toggle") {
+    return `${option.disabledLabel ?? "No"} / ${option.enabledLabel ?? "Yes"}, USD ${option.priceUSD ?? 0} / EUR ${option.priceEUR ?? 0}`;
+  }
+
+  return option.placeholder ? `placeholder: ${option.placeholder}` : "text input";
 }
 
 export function ServiceForm({
@@ -106,68 +172,124 @@ export function ServiceForm({
   const [basePriceEUR, setBasePriceEUR] = useState(String(service?.base_price_eur ?? 0));
   const [image, setImage] = useState(service?.image ?? "");
   const [requirements, setRequirements] = useState<string[]>(
-    service?.requirements.length ? service.requirements : [""]
+    service?.requirements.length ? service.requirements : [""],
   );
   const [benefits, setBenefits] = useState<ServiceBenefit[]>(
-    service?.what_you_get.length ? service.what_you_get : [emptyBenefit()]
+    service?.what_you_get.length ? service.what_you_get : [emptyBenefit()],
   );
-  const [optionsSchema, setOptionsSchema] = useState<ServiceOption[]>(service?.options_schema ?? []);
+  const [optionsSchema, setOptionsSchema] = useState<ServiceOption[]>(
+    () => service?.options_schema.map(normalizeLegacyOption) ?? [],
+  );
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
   const availableCategories = useMemo(
-    () => categories.filter((category) => category.game_id === gameId),
-    [categories, gameId]
+    () =>
+      categories
+        .filter((category) => category.game_id === gameId)
+        .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
+    [categories, gameId],
   );
+
+  const hasQuantityOption = optionsSchema.some((option) => option.type === "quantity");
+
+  function scrollToSection(id: string) {
+    document.getElementById(`service-form-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   function toggleRegion(region: string) {
     setRegions((current) =>
-      current.includes(region)
-        ? current.filter((item) => item !== region)
-        : [...current, region]
+      current.includes(region) ? current.filter((item) => item !== region) : [...current, region],
     );
   }
 
-  function toggleBadge(badge: string) {
-    setBadges((current) =>
-      current.includes(badge)
-        ? current.filter((item) => item !== badge)
-        : [...current, badge]
-    );
+  function normalizeOption(option: ServiceOption, nextType: ServiceOption["type"]): ServiceOption {
+    if (isChoiceType(nextType)) {
+      return {
+        ...option,
+        type: nextType,
+        options: option.options?.length ? option.options : [emptyChoice()],
+        min: undefined,
+        max: undefined,
+        pricePerUnitUSD: undefined,
+        pricePerUnitEUR: undefined,
+        priceUSD: undefined,
+        priceEUR: undefined,
+        placeholder: undefined,
+      };
+    }
+
+    if (isUnitType(nextType)) {
+      return {
+        ...option,
+        type: nextType,
+        options: undefined,
+        min: option.min ?? 1,
+        max: option.max ?? 10,
+        pricePerUnitUSD: option.pricePerUnitUSD ?? 0,
+        pricePerUnitEUR: option.pricePerUnitEUR ?? 0,
+        priceUSD: undefined,
+        priceEUR: undefined,
+        placeholder: undefined,
+      };
+    }
+
+    if (nextType === "toggle") {
+      return {
+        ...option,
+        type: nextType,
+        options: undefined,
+        min: undefined,
+        max: undefined,
+        pricePerUnitUSD: undefined,
+        pricePerUnitEUR: undefined,
+        priceUSD: option.priceUSD ?? 0,
+        priceEUR: option.priceEUR ?? 0,
+        enabledLabel: option.enabledLabel ?? "Yes",
+        disabledLabel: option.disabledLabel ?? "No",
+        placeholder: undefined,
+      };
+    }
+
+    if (isQuantityType(nextType)) {
+      return {
+        ...option,
+        type: nextType,
+        options: undefined,
+        min: option.min ?? 1,
+        max: option.max ?? 99,
+        pricePerUnitUSD: undefined,
+        pricePerUnitEUR: undefined,
+        priceUSD: undefined,
+        priceEUR: undefined,
+        enabledLabel: undefined,
+        disabledLabel: undefined,
+        placeholder: undefined,
+      };
+    }
+
+    return {
+      ...option,
+      type: nextType,
+      options: undefined,
+      min: undefined,
+      max: undefined,
+      pricePerUnitUSD: undefined,
+      pricePerUnitEUR: undefined,
+      priceUSD: undefined,
+      priceEUR: undefined,
+      placeholder: option.placeholder ?? "",
+    };
   }
 
   function updateOption(index: number, patch: Partial<ServiceOption>) {
     setOptionsSchema((current) =>
       current.map((option, optionIndex) => {
         if (optionIndex !== index) return option;
-
         const next = { ...option, ...patch };
-
-        if (patch.type === "scalar") {
-          return {
-            ...next,
-            options: undefined,
-            min: next.min ?? 1,
-            max: next.max ?? 10,
-            pricePerUnitUSD: next.pricePerUnitUSD ?? 0,
-            pricePerUnitEUR: next.pricePerUnitEUR ?? 0,
-          };
-        }
-
-        if (patch.type === "single_choice" || patch.type === "multiple_choice") {
-          return {
-            ...next,
-            options: next.options?.length ? next.options : [emptyChoice()],
-            min: undefined,
-            max: undefined,
-            pricePerUnitUSD: undefined,
-            pricePerUnitEUR: undefined,
-          };
-        }
-
-        return next;
-      })
+        return patch.type ? normalizeOption(next, patch.type) : next;
+      }),
     );
   }
 
@@ -175,17 +297,50 @@ export function ServiceForm({
     setOptionsSchema((current) =>
       current.map((option, currentOptionIndex) => {
         if (currentOptionIndex !== optionIndex) return option;
-
         const choices = option.options?.length ? option.options : [emptyChoice()];
 
         return {
           ...option,
           options: choices.map((choice, currentChoiceIndex) =>
-            currentChoiceIndex === choiceIndex ? { ...choice, ...patch } : choice
+            currentChoiceIndex === choiceIndex ? { ...choice, ...patch } : choice,
           ),
         };
-      })
+      }),
     );
+  }
+
+  function validateOptions() {
+    const quantityCount = optionsSchema.filter((option) => option.type === "quantity").length;
+
+    if (quantityCount > 1) return "Only one Quantity option is allowed per service.";
+
+    for (const [index, option] of optionsSchema.entries()) {
+      const optionName = option.label.trim() || `Option ${index + 1}`;
+
+      if (!option.label.trim()) return `Option ${index + 1} needs a label.`;
+
+      if (isChoiceType(option.type)) {
+        const choices = option.options ?? [];
+        const labels = choices.map((choice) => choice.label.trim()).filter(Boolean);
+
+        if (labels.length === 0) return `${optionName} needs at least one choice.`;
+        if (labels.length !== choices.length) return `${optionName} has an empty choice label.`;
+        if (new Set(labels.map((label) => label.toLowerCase())).size !== labels.length) {
+          return `${optionName} has duplicate choice labels.`;
+        }
+      }
+
+      if (isUnitType(option.type) || isQuantityType(option.type)) {
+        const min = Number(option.min ?? 1);
+        const max = Number(option.max ?? min);
+
+        if (!Number.isFinite(min) || !Number.isFinite(max)) return `${optionName} needs valid minimum and maximum values.`;
+        if (min < 0 || max < min) return `${optionName} maximum must be greater than or equal to minimum.`;
+        if (isQuantityType(option.type) && min < 1) return `${optionName} minimum quantity must be at least 1.`;
+      }
+    }
+
+    return "";
   }
 
   async function uploadImage(file: File) {
@@ -198,14 +353,8 @@ export function ServiceForm({
       formData.set("slug", slug || slugify(title) || "service");
       formData.set("image", compressed);
 
-      const response = await fetch("/api/admin/services/image", {
-        method: "POST",
-        body: formData,
-      });
-      const result = (await response.json().catch(() => null)) as {
-        imageUrl?: string;
-        error?: string;
-      } | null;
+      const response = await fetch("/api/admin/services/image", { method: "POST", body: formData });
+      const result = (await response.json().catch(() => null)) as { imageUrl?: string; error?: string } | null;
 
       if (!response.ok || !result?.imageUrl) {
         setError(result?.error ?? "Unable to upload service image.");
@@ -223,6 +372,15 @@ export function ServiceForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+
+    const validationError = validateOptions();
+
+    if (validationError) {
+      setError(validationError);
+      document.getElementById("service-form-options")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
     setIsSaving(true);
 
     const payload = {
@@ -265,28 +423,54 @@ export function ServiceForm({
     }
   }
 
+  const sectionClass = "scroll-mt-28 bg-[var(--ms-secondary)] border border-[var(--ms-accent)] rounded-xl p-6";
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      <div className="flex items-center justify-end gap-3">
-        <AdminButton type="button" variant="secondary" onClick={() => router.push("/admin/services")}>
-          Discard
-        </AdminButton>
-        <AdminButton type="submit" disabled={isSaving || isUploading}>
-          {isUploading ? "Uploading..." : isSaving ? "Saving..." : isEditing ? "Save Service" : "Deploy Service"}
-        </AdminButton>
-      </div>
+    <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-[240px_1fr]">
+      <aside className="lg:sticky lg:top-28 lg:h-fit">
+        <div className="rounded-xl border border-[var(--ms-accent)] bg-[var(--ms-secondary)] p-4">
+          <p className="mono text-xs uppercase tracking-[0.18em] text-[var(--ms-text-secondary)]">Sections</p>
+          <nav className="mt-4 grid gap-1">
+            {sections.map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => scrollToSection(id)}
+                className="rounded-lg px-3 py-2 text-left text-sm text-[#94A3B8] transition-colors hover:bg-[#172554] hover:text-white"
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </aside>
 
-      {error && (
-        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-          {error}
-        </p>
-      )}
+      <div className="min-w-0">
+        <div className="sticky top-24 z-20 mb-6 flex flex-col gap-3 rounded-xl border border-[#172554] bg-[#0F172A]/95 p-4 shadow-xl backdrop-blur md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-medium text-white">{isEditing ? "Editing service" : "Create service"}</p>
+            <p className="text-xs text-[#94A3B8]">Actions stay available while you scroll.</p>
+          </div>
+          <div className="flex gap-3">
+            <AdminButton type="button" variant="secondary" onClick={() => router.push("/admin/services")}>
+              Discard
+            </AdminButton>
+            <AdminButton type="submit" disabled={isSaving || isUploading}>
+              {isUploading ? "Uploading..." : isSaving ? "Saving..." : isEditing ? "Save Service" : "Deploy Service"}
+            </AdminButton>
+          </div>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 flex flex-col gap-6">
-          <section className="bg-[var(--ms-secondary)] border border-[var(--ms-accent)] rounded-xl p-6">
-            <h2 className="text-lg font-bold text-white mb-4">Basic Info</h2>
-            <div className="grid gap-4">
+        {error && (
+          <p className="mb-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            {error}
+          </p>
+        )}
+
+        <div className="flex flex-col gap-6">
+          <section id="service-form-basic" className={sectionClass}>
+            <h2 className="mb-4 text-lg font-bold text-white">Basic Info</h2>
+            <div className="grid gap-4 md:grid-cols-2">
               <AdminFormField label="Service Name">
                 <input
                   className={adminInputClass}
@@ -327,9 +511,6 @@ export function ServiceForm({
                     </option>
                   ))}
                 </select>
-                {availableCategories.length === 0 && (
-                  <p className="mt-2 text-xs text-amber-300">No categories yet for this game. Add one from the Services list.</p>
-                )}
               </AdminFormField>
               <AdminFormField label="Status">
                 <select className={adminSelectClass} value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
@@ -338,12 +519,8 @@ export function ServiceForm({
                   <option value="archived">archived</option>
                 </select>
               </AdminFormField>
-              <label className="flex items-center gap-2 text-sm text-[var(--ms-text-secondary)]">
-                <input type="checkbox" checked={isHotOffer} onChange={(e) => setIsHotOffer(e.target.checked)} />
-                Hot Offer
-              </label>
               <AdminFormField label="Region">
-                <div className="flex flex-wrap gap-4">
+                <div className="flex h-11 flex-wrap items-center gap-4">
                   {["USA", "EUROPE"].map((region) => (
                     <label key={region} className="flex items-center gap-2 text-sm text-white">
                       <input type="checkbox" checked={regions.includes(region)} onChange={() => toggleRegion(region)} />
@@ -352,91 +529,88 @@ export function ServiceForm({
                   ))}
                 </div>
               </AdminFormField>
+              <label className="flex items-center gap-2 text-sm text-[var(--ms-text-secondary)] md:col-span-2">
+                <input type="checkbox" checked={isHotOffer} onChange={(e) => setIsHotOffer(e.target.checked)} />
+                Hot Offer
+              </label>
             </div>
           </section>
 
-          <section className="bg-[var(--ms-secondary)] border border-[var(--ms-accent)] rounded-xl p-6">
-            <h2 className="text-lg font-bold text-white mb-4">Service Badges</h2>
-            <div className="flex flex-wrap gap-2">
-              {SERVICE_BADGE_OPTIONS.map((badge) => (
-                <button
-                  key={badge}
-                  type="button"
-                  onClick={() => toggleBadge(badge)}
-                  className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${
-                    badges.includes(badge)
-                      ? "bg-[#8B5CF6] border-[#8B5CF6] text-white"
-                      : "border-[var(--ms-accent)] text-[var(--ms-text-secondary)] hover:border-[#8B5CF6]"
-                  }`}
-                >
-                  {badge}
-                </button>
-              ))}
+          <section id="service-form-pricing" className={sectionClass}>
+            <h2 className="mb-4 text-lg font-bold text-white">Pricing</h2>
+            <div className="grid gap-4 md:grid-cols-2">
+              <AdminFormField label="Base Price (USD)">
+                <input type="number" min="0" step="0.01" className={adminInputClass} value={basePriceUSD} onChange={(e) => setBasePriceUSD(e.target.value)} />
+              </AdminFormField>
+              <AdminFormField label="Base Price (EUR)">
+                <input type="number" min="0" step="0.01" className={adminInputClass} value={basePriceEUR} onChange={(e) => setBasePriceEUR(e.target.value)} />
+              </AdminFormField>
             </div>
           </section>
 
-          <section className="bg-[var(--ms-secondary)] border border-[var(--ms-accent)] rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-white">What You Get</h2>
-              {benefits.length < 4 && (
-                <button type="button" onClick={() => setBenefits((current) => [...current, emptyBenefit()])} className="flex items-center gap-1 text-sm text-[#22D3EE]">
-                  <Plus size={14} /> Add benefit
-                </button>
-              )}
-            </div>
-            <div className="space-y-3">
-              {benefits.map((benefit, index) => (
-                <div key={index} className="grid gap-2 p-3 border border-[var(--ms-accent)] rounded-lg bg-[var(--ms-primary)]">
-                  <input
-                    className={adminInputClass}
-                    value={benefit.icon}
-                    onChange={(e) => setBenefits((current) => current.map((item, i) => i === index ? { ...item, icon: e.target.value } : item))}
-                    placeholder="tabler-shield"
-                  />
-                  <input
-                    className={adminInputClass}
-                    value={benefit.title}
-                    onChange={(e) => setBenefits((current) => current.map((item, i) => i === index ? { ...item, title: e.target.value } : item))}
-                    placeholder="Title"
-                  />
-                  <textarea
-                    className={adminTextareaClass}
-                    value={benefit.description}
-                    onChange={(e) => setBenefits((current) => current.map((item, i) => i === index ? { ...item, description: e.target.value } : item))}
-                    placeholder="Description"
-                  />
-                </div>
-              ))}
-            </div>
+          <section id="service-form-media" className={sectionClass}>
+            <h2 className="mb-4 text-lg font-bold text-white">Image</h2>
+            <AdminFormField label="Service image">
+              <div className="space-y-3">
+                {image && <img src={image} alt="" className="h-40 w-full rounded-lg object-cover" />}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className={adminInputClass}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadImage(file);
+                  }}
+                />
+              </div>
+            </AdminFormField>
+            <p className="mt-3 text-xs text-[var(--ms-text-secondary)]">
+              Recommended: 1400 x 900 px landscape artwork. Uploads are compressed to WebP before storage.
+            </p>
           </section>
 
-          <section className="bg-[var(--ms-secondary)] border border-[var(--ms-accent)] rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-white">Requirements</h2>
-              <button type="button" onClick={() => setRequirements((current) => [...current, ""])} className="text-sm text-[#22D3EE]">
-                + Add row
+          <section id="service-form-badges" className={sectionClass}>
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <h2 className="text-lg font-bold text-white">Service Badges</h2>
+              <button
+                type="button"
+                onClick={() => setBadges((current) => addEmptyRow(current, ""))}
+                className="flex shrink-0 items-center gap-1 text-sm text-[#22D3EE]"
+              >
+                <Plus size={14} /> Add badge
               </button>
             </div>
-            {requirements.map((req, index) => (
-              <div key={index} className="flex gap-2 mb-2">
-                <input
-                  className={adminInputClass}
-                  value={req}
-                  onChange={(e) => setRequirements((current) => current.map((item, i) => i === index ? e.target.value : item))}
-                />
-                <button type="button" onClick={() => setRequirements((current) => current.filter((_, i) => i !== index))} className="text-red-400 p-2">
-                  <Trash2 size={16} />
-                </button>
+            {badges.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-[var(--ms-accent)] bg-[var(--ms-primary)] p-5 text-sm text-[var(--ms-text-secondary)]">
+                No badges yet. Add short labels like Express, Duo Queue, or Safe Delivery.
               </div>
-            ))}
+            ) : (
+              <div className="space-y-3">
+                {badges.map((badge, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      className={adminInputClass}
+                      value={badge}
+                      onChange={(e) =>
+                        setBadges((current) => current.map((item, itemIndex) => (itemIndex === index ? e.target.value : item)))
+                      }
+                      placeholder="Badge name"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setBadges((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                      className="flex h-11 items-center justify-center rounded-lg border border-red-500/30 px-3 text-red-400 hover:bg-red-500/10"
+                      aria-label="Remove badge"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
-          <section className="bg-[var(--ms-secondary)] border border-[var(--ms-accent)] rounded-xl p-6">
-            <h2 className="text-lg font-bold text-white mb-4">Service Details</h2>
-            <textarea className={adminTextareaClass + " min-h-[160px]"} value={description} onChange={(e) => setDescription(e.target.value)} />
-          </section>
-
-          <section className="bg-[var(--ms-secondary)] border border-[var(--ms-accent)] rounded-xl p-6">
+          <section id="service-form-options" className={sectionClass}>
             <div className="mb-4 flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-lg font-bold text-white">Options Builder</h2>
@@ -461,32 +635,29 @@ export function ServiceForm({
               <div className="space-y-4">
                 {optionsSchema.map((option, optionIndex) => (
                   <div key={optionIndex} className="rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] p-4">
-                    <div className="grid gap-3 lg:grid-cols-[1fr_190px_120px_auto] lg:items-end">
+                    <div className="grid gap-3 lg:grid-cols-[1fr_210px_120px_auto] lg:items-end">
                       <AdminFormField label="Option Label">
-                        <input
-                          className={adminInputClass}
-                          value={option.label}
-                          onChange={(e) => updateOption(optionIndex, { label: e.target.value })}
-                          placeholder="Current Rank"
-                        />
+                        <input className={adminInputClass} value={option.label} onChange={(e) => updateOption(optionIndex, { label: e.target.value })} placeholder="Current Rank" />
                       </AdminFormField>
-                      <AdminFormField label="Type">
+                        <AdminFormField label="Type">
                         <select
                           className={adminSelectClass}
-                          value={option.type}
+                          value={optionTypes.some(([value]) => value === option.type) ? option.type : "dropdown"}
                           onChange={(e) => updateOption(optionIndex, { type: e.target.value as ServiceOption["type"] })}
                         >
-                          <option value="single_choice">Single choice</option>
-                          <option value="multiple_choice">Multiple choice</option>
-                          <option value="scalar">Quantity</option>
+                          {optionTypes.map(([value, label]) => (
+                            <option
+                              key={value}
+                              value={value}
+                              disabled={value === "quantity" && hasQuantityOption && option.type !== "quantity"}
+                            >
+                              {label}
+                            </option>
+                          ))}
                         </select>
                       </AdminFormField>
                       <label className="flex h-11 items-center gap-2 text-sm text-white">
-                        <input
-                          type="checkbox"
-                          checked={option.required}
-                          onChange={(e) => updateOption(optionIndex, { required: e.target.checked })}
-                        />
+                        <input type="checkbox" checked={option.required} onChange={(e) => updateOption(optionIndex, { required: e.target.checked })} />
                         Required
                       </label>
                       <button
@@ -498,49 +669,11 @@ export function ServiceForm({
                         <Trash2 size={16} />
                       </button>
                     </div>
+                    <p className="mt-3 rounded-md border border-[#172554] bg-[#050816] px-3 py-2 text-xs text-[#94A3B8]">
+                      Preview: {optionPreview(option)}
+                    </p>
 
-                    {option.type === "scalar" ? (
-                      <div className="mt-4 grid gap-3 md:grid-cols-4">
-                        <AdminFormField label="Minimum">
-                          <input
-                            type="number"
-                            min="0"
-                            className={adminInputClass}
-                            value={option.min ?? 1}
-                            onChange={(e) => updateOption(optionIndex, { min: Number(e.target.value) })}
-                          />
-                        </AdminFormField>
-                        <AdminFormField label="Maximum">
-                          <input
-                            type="number"
-                            min="0"
-                            className={adminInputClass}
-                            value={option.max ?? 10}
-                            onChange={(e) => updateOption(optionIndex, { max: Number(e.target.value) })}
-                          />
-                        </AdminFormField>
-                        <AdminFormField label="USD / Unit">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            className={adminInputClass}
-                            value={option.pricePerUnitUSD ?? 0}
-                            onChange={(e) => updateOption(optionIndex, { pricePerUnitUSD: Number(e.target.value) })}
-                          />
-                        </AdminFormField>
-                        <AdminFormField label="EUR / Unit">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            className={adminInputClass}
-                            value={option.pricePerUnitEUR ?? 0}
-                            onChange={(e) => updateOption(optionIndex, { pricePerUnitEUR: Number(e.target.value) })}
-                          />
-                        </AdminFormField>
-                      </div>
-                    ) : (
+                    {isChoiceType(option.type) ? (
                       <div className="mt-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-medium text-[#94A3B8]">Choices</p>
@@ -549,10 +682,8 @@ export function ServiceForm({
                             onClick={() =>
                               setOptionsSchema((current) =>
                                 current.map((item, index) =>
-                                  index === optionIndex
-                                    ? { ...item, options: [...(item.options ?? []), emptyChoice()] }
-                                    : item
-                                )
+                                  index === optionIndex ? { ...item, options: [...(item.options ?? []), emptyChoice()] } : item,
+                                ),
                               )
                             }
                             className="text-sm text-[#22D3EE]"
@@ -562,30 +693,9 @@ export function ServiceForm({
                         </div>
                         {(option.options ?? []).map((choice, choiceIndex) => (
                           <div key={choiceIndex} className="grid gap-3 md:grid-cols-[1fr_140px_140px_auto] md:items-center">
-                            <input
-                              className={adminInputClass}
-                              value={choice.label}
-                              onChange={(e) => updateChoice(optionIndex, choiceIndex, { label: e.target.value })}
-                              placeholder="Choice label"
-                            />
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              className={adminInputClass}
-                              value={choice.priceUSD}
-                              onChange={(e) => updateChoice(optionIndex, choiceIndex, { priceUSD: Number(e.target.value) })}
-                              placeholder="USD"
-                            />
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              className={adminInputClass}
-                              value={choice.priceEUR}
-                              onChange={(e) => updateChoice(optionIndex, choiceIndex, { priceEUR: Number(e.target.value) })}
-                              placeholder="EUR"
-                            />
+                            <input className={adminInputClass} value={choice.label} onChange={(e) => updateChoice(optionIndex, choiceIndex, { label: e.target.value })} placeholder="Choice label" />
+                            <input type="number" min="0" step="0.01" className={adminInputClass} value={choice.priceUSD} onChange={(e) => updateChoice(optionIndex, choiceIndex, { priceUSD: Number(e.target.value) })} placeholder="USD" />
+                            <input type="number" min="0" step="0.01" className={adminInputClass} value={choice.priceEUR} onChange={(e) => updateChoice(optionIndex, choiceIndex, { priceEUR: Number(e.target.value) })} placeholder="EUR" />
                             <button
                               type="button"
                               onClick={() =>
@@ -593,8 +703,8 @@ export function ServiceForm({
                                   current.map((item, index) =>
                                     index === optionIndex
                                       ? { ...item, options: (item.options ?? []).filter((_, currentChoiceIndex) => currentChoiceIndex !== choiceIndex) }
-                                      : item
-                                  )
+                                      : item,
+                                  ),
                                 )
                               }
                               className="flex h-10 items-center justify-center rounded-lg border border-red-500/30 px-3 text-red-400 hover:bg-red-500/10"
@@ -605,44 +715,116 @@ export function ServiceForm({
                           </div>
                         ))}
                       </div>
-                    )}
+                    ) : null}
+
+                    {isUnitType(option.type) ? (
+                      <div className="mt-4 grid gap-3 md:grid-cols-4">
+                        <AdminFormField label="Minimum">
+                          <input type="number" min="0" className={adminInputClass} value={option.min ?? 1} onChange={(e) => updateOption(optionIndex, { min: Number(e.target.value) })} />
+                        </AdminFormField>
+                        <AdminFormField label="Maximum">
+                          <input type="number" min="0" className={adminInputClass} value={option.max ?? 10} onChange={(e) => updateOption(optionIndex, { max: Number(e.target.value) })} />
+                        </AdminFormField>
+                        <AdminFormField label={option.type === "range" ? "USD / Value" : "USD / Count"}>
+                          <input type="number" min="0" step="0.01" className={adminInputClass} value={option.pricePerUnitUSD ?? 0} onChange={(e) => updateOption(optionIndex, { pricePerUnitUSD: Number(e.target.value) })} />
+                        </AdminFormField>
+                        <AdminFormField label={option.type === "range" ? "EUR / Value" : "EUR / Count"}>
+                          <input type="number" min="0" step="0.01" className={adminInputClass} value={option.pricePerUnitEUR ?? 0} onChange={(e) => updateOption(optionIndex, { pricePerUnitEUR: Number(e.target.value) })} />
+                        </AdminFormField>
+                        {option.type === "number_stepper" ? (
+                          <p className="text-xs leading-5 text-[#94A3B8] md:col-span-4">
+                            Number stepper shows minus and plus controls on the service page. Each count adds the configured price to the total.
+                          </p>
+                        ) : (
+                          <p className="text-xs leading-5 text-[#94A3B8] md:col-span-4">
+                            Range slider shows a draggable slider. The selected value affects price.
+                          </p>
+                        )}
+                      </div>
+                    ) : null}
+
+                    {isQuantityType(option.type) ? (
+                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        <AdminFormField label="Minimum Quantity">
+                          <input type="number" min="1" className={adminInputClass} value={option.min ?? 1} onChange={(e) => updateOption(optionIndex, { min: Number(e.target.value) })} />
+                        </AdminFormField>
+                        <AdminFormField label="Maximum Quantity">
+                          <input type="number" min="1" className={adminInputClass} value={option.max ?? 99} onChange={(e) => updateOption(optionIndex, { max: Number(e.target.value) })} />
+                        </AdminFormField>
+                        <p className="text-xs leading-5 text-[#94A3B8] md:col-span-2">
+                          Quantity multiplies the configured service total. Add this only for services that can be bought more than once.
+                        </p>
+                      </div>
+                    ) : null}
+
+                    {option.type === "toggle" ? (
+                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        <AdminFormField label="Disabled Text">
+                          <input className={adminInputClass} value={option.disabledLabel ?? "No"} onChange={(e) => updateOption(optionIndex, { disabledLabel: e.target.value })} placeholder="No" />
+                        </AdminFormField>
+                        <AdminFormField label="Enabled Text">
+                          <input className={adminInputClass} value={option.enabledLabel ?? "Yes"} onChange={(e) => updateOption(optionIndex, { enabledLabel: e.target.value })} placeholder="Yes" />
+                        </AdminFormField>
+                        <AdminFormField label="USD if enabled">
+                          <input type="number" min="0" step="0.01" className={adminInputClass} value={option.priceUSD ?? 0} onChange={(e) => updateOption(optionIndex, { priceUSD: Number(e.target.value) })} />
+                        </AdminFormField>
+                        <AdminFormField label="EUR if enabled">
+                          <input type="number" min="0" step="0.01" className={adminInputClass} value={option.priceEUR ?? 0} onChange={(e) => updateOption(optionIndex, { priceEUR: Number(e.target.value) })} />
+                        </AdminFormField>
+                      </div>
+                    ) : null}
+
+                    {(option.type === "text" || option.type === "textarea") ? (
+                      <AdminFormField className="mt-4" label="Placeholder">
+                        <input className={adminInputClass} value={option.placeholder ?? ""} onChange={(e) => updateOption(optionIndex, { placeholder: e.target.value })} placeholder="Customer-facing placeholder text" />
+                      </AdminFormField>
+                    ) : null}
                   </div>
                 ))}
               </div>
             )}
           </section>
-        </div>
 
-        <div className="flex flex-col gap-6">
-          <section className="bg-[var(--ms-secondary)] border border-[var(--ms-accent)] rounded-xl p-6">
-            <h2 className="text-lg font-bold text-white mb-4">Pricing</h2>
-            <AdminFormField label="Base Price (USD)">
-              <input type="number" min="0" step="0.01" className={adminInputClass} value={basePriceUSD} onChange={(e) => setBasePriceUSD(e.target.value)} />
-            </AdminFormField>
-            <AdminFormField label="Base Price (EUR)">
-              <input type="number" min="0" step="0.01" className={adminInputClass} value={basePriceEUR} onChange={(e) => setBasePriceEUR(e.target.value)} />
-            </AdminFormField>
+          <section id="service-form-benefits" className={sectionClass}>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white">What You Get</h2>
+              {benefits.length < 4 && (
+                <button type="button" onClick={() => setBenefits((current) => [...current, emptyBenefit()])} className="flex items-center gap-1 text-sm text-[#22D3EE]">
+                  <Plus size={14} /> Add benefit
+                </button>
+              )}
+            </div>
+            <div className="space-y-3">
+              {benefits.map((benefit, index) => (
+                <div key={index} className="grid gap-2 rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] p-3">
+                  <input className={adminInputClass} value={benefit.icon} onChange={(e) => setBenefits((current) => current.map((item, i) => i === index ? { ...item, icon: e.target.value } : item))} placeholder="tabler-shield" />
+                  <input className={adminInputClass} value={benefit.title} onChange={(e) => setBenefits((current) => current.map((item, i) => i === index ? { ...item, title: e.target.value } : item))} placeholder="Title" />
+                  <textarea className={adminTextareaClass} value={benefit.description} onChange={(e) => setBenefits((current) => current.map((item, i) => i === index ? { ...item, description: e.target.value } : item))} placeholder="Description" />
+                </div>
+              ))}
+            </div>
           </section>
 
-          <section className="bg-[var(--ms-secondary)] border border-[var(--ms-accent)] rounded-xl p-6">
-            <h2 className="text-lg font-bold text-white mb-4">Thumbnail</h2>
-            <AdminFormField label="Service image">
-              <div className="space-y-3">
-                {image && <img src={image} alt="" className="h-32 w-full rounded-lg object-cover" />}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className={adminInputClass}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) uploadImage(file);
-                  }}
-                />
+          <section id="service-form-requirements" className={sectionClass}>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white">Requirements</h2>
+              <button type="button" onClick={() => setRequirements((current) => [...current, ""])} className="text-sm text-[#22D3EE]">
+                + Add row
+              </button>
+            </div>
+            {requirements.map((req, index) => (
+              <div key={index} className="mb-2 flex gap-2">
+                <input className={adminInputClass} value={req} onChange={(e) => setRequirements((current) => current.map((item, i) => i === index ? e.target.value : item))} />
+                <button type="button" onClick={() => setRequirements((current) => current.filter((_, i) => i !== index))} className="p-2 text-red-400">
+                  <Trash2 size={16} />
+                </button>
               </div>
-            </AdminFormField>
-            <p className="text-xs text-[var(--ms-text-secondary)]">
-              Recommended: 1400 x 900 px landscape artwork. Uploads are compressed to WebP before storage.
-            </p>
+            ))}
+          </section>
+
+          <section id="service-form-details" className={sectionClass}>
+            <h2 className="mb-4 text-lg font-bold text-white">Service Details</h2>
+            <textarea className={adminTextareaClass + " min-h-[160px]"} value={description} onChange={(e) => setDescription(e.target.value)} />
           </section>
         </div>
       </div>

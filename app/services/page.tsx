@@ -1,7 +1,7 @@
-import { ServicesCatalog, type ServiceCategoryFilter } from "@/components/services-catalog";
+import { ServicesCatalog } from "@/components/services-catalog";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { gameServices } from "@/lib/catalog";
+import { listActiveServices, serviceRowToCatalogService } from "@/lib/cms/services";
 
 type ServicesPageProps = {
   searchParams?: Promise<{
@@ -10,26 +10,17 @@ type ServicesPageProps = {
   }>;
 };
 
-const serviceCategories: ServiceCategoryFilter[] = ["hot", "dungeon", "powerleveling", "raid", "stories"];
-
-function getServiceCategory(value: string | undefined): ServiceCategoryFilter {
-  if (value && serviceCategories.includes(value as ServiceCategoryFilter)) {
-    return value as ServiceCategoryFilter;
-  }
-
-  return "hot";
-}
-
 export default async function ServicesPage({ searchParams }: ServicesPageProps) {
   const params = await searchParams;
-  const activeCategory = getServiceCategory(params?.category);
+  const activeCategory = params?.category ?? "all";
   const query = params?.q ?? "";
+  const services = (await listActiveServices()).map(serviceRowToCatalogService);
 
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
       <SiteHeader />
       <section className="ms-shell py-16">
-        <ServicesCatalog activeCategory={activeCategory} query={query} services={gameServices} />
+        <ServicesCatalog activeCategory={activeCategory} query={query} services={services} />
       </section>
       <SiteFooter />
     </main>

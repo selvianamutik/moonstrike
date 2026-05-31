@@ -7,6 +7,7 @@ export type GameService = {
   category: string;
   serviceCategory: string;
   serviceCategorySlug?: string | null;
+  serviceCategorySortOrder?: number | null;
   image?: string;
   description: string;
   startingPrice: number;

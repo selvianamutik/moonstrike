@@ -1,28 +1,19 @@
 import Link from "next/link";
 import { PlaceholderAsset } from "@/components/asset-image";
 import { ServiceCard } from "@/components/service-card";
-import { RegionSelector } from "@/components/ui";
 import type { GameService } from "@/lib/catalog";
-
-export type ServiceCategoryFilter = "hot" | "dungeon" | "powerleveling" | "raid" | "stories";
 
 type ServiceTab = {
   label: string;
-  value: ServiceCategoryFilter;
+  value: string;
+  sortOrder: number;
 };
 
-const serviceTabs: ServiceTab[] = [
-  { label: "Hot Offers", value: "hot" },
-  { label: "Dungeons", value: "dungeon" },
-  { label: "Powerleveling", value: "powerleveling" },
-  { label: "Raid", value: "raid" },
-  { label: "Stories", value: "stories" },
-];
-
-function matchesCategory(service: GameService, category: ServiceCategoryFilter) {
+function matchesCategory(service: GameService, category: string) {
+  if (category === "all") return true;
   if (category === "hot") return service.isHotOffer;
 
-  return service.serviceCategory.toLowerCase() === category;
+  return (service.serviceCategorySlug ?? service.serviceCategory.toLowerCase()) === category;
 }
 
 function matchesQuery(service: GameService, query: string) {
@@ -40,7 +31,7 @@ function matchesQuery(service: GameService, query: string) {
   ].some((value) => (value ?? "").toLowerCase().includes(normalizedQuery));
 }
 
-function servicesHref(category: ServiceCategoryFilter, query: string) {
+function servicesHref(category: string, query: string) {
   const params = new URLSearchParams({ category });
 
   if (query.trim()) {
@@ -50,15 +41,40 @@ function servicesHref(category: ServiceCategoryFilter, query: string) {
   return `/services?${params.toString()}`;
 }
 
+function getServiceTabs(services: GameService[]): ServiceTab[] {
+  const categoryTabs = new Map<string, ServiceTab>();
+
+  services.forEach((service) => {
+    const value = service.serviceCategorySlug ?? service.serviceCategory.toLowerCase();
+
+    if (!categoryTabs.has(value)) {
+      categoryTabs.set(value, {
+        label: service.serviceCategory,
+        value,
+        sortOrder: service.serviceCategorySortOrder ?? 999,
+      });
+    }
+  });
+
+  return [
+    { label: "All Services", value: "all", sortOrder: -2 },
+    { label: "Hot Offers", value: "hot", sortOrder: -1 },
+    ...Array.from(categoryTabs.values()).sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label),
+    ),
+  ];
+}
+
 export function ServicesCatalog({
   activeCategory,
   query,
   services,
 }: {
-  activeCategory: ServiceCategoryFilter;
+  activeCategory: string;
   query: string;
   services: GameService[];
 }) {
+  const serviceTabs = getServiceTabs(services);
   const filteredServices = services.filter(
     (service) => matchesCategory(service, activeCategory) && matchesQuery(service, query),
   );
@@ -106,7 +122,14 @@ export function ServicesCatalog({
           </p>
         </div>
         <div className="relative z-10 text-left md:text-center">
-          <RegionSelector active="USA" />
+          <div className="inline-flex rounded-full border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-1">
+            <span className="h-9 rounded-full bg-[var(--primary)] px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]">
+              USA
+            </span>
+            <span className="h-9 rounded-full px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] text-[var(--ms-body)]">
+              Europe
+            </span>
+          </div>
           <p className="mt-3 text-sm text-[var(--ms-gradient-end)]">USA / Europe pricing view</p>
         </div>
       </PlaceholderAsset>
