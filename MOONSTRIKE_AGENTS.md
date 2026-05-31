@@ -5,6 +5,33 @@
 
 ---
 
+## Current Progress Snapshot
+
+_Last refreshed: 2026-05-31_
+
+Moon Strike has moved past the static prototype phase. The current working surface is Supabase-backed auth, admin auth, game CMS, genre CMS, service category CMS, service CMS, service image upload, CMS-backed storefront service browsing, and CMS-backed Quick Select.
+
+**Implemented / mostly working:**
+- Customer auth: email/password, Google OAuth, verification, reset password, profile edit, connected accounts, and auth gates.
+- Admin auth: one seeded admin account, no OTP, signed HttpOnly admin session, `/admin/*` guard through `proxy.ts`, login rate limit, and audit logging coverage.
+- Admin games: create/edit/list/delete/archive, image upload, genre add/delete, active/draft/archived states.
+- Admin services: list/filter/search/delete, service categories per game, slug-based edit/preview routes, service images, custom badges, sticky editor layout, and validated option schema builder.
+- Storefront catalog: landing game section, `/games`, `/services`, `/[game-slug]`, category pages, service detail pages, and Quick Select use CMS data instead of mock service data.
+- Seeds: `npm run admin:seed`, `npm run admin:reseed`, and `npm run catalog:seed` for 20 games with 20 services per game plus option schemas.
+
+**Still pending / mock-backed:**
+- Real cart APIs and cart persistence.
+- Checkout/payment gateways and webhook handling.
+- Order lifecycle persistence, refunds, and Google Sheets sync.
+- Support chat persistence/realtime.
+- Dedicated `/hot-offers` route and final CMS polish for all landing blocks.
+
+**Current route direction:**
+- Public service detail: `/[game-slug]/[category-slug]/[service-slug]`.
+- Admin service edit: `/admin/services/[game-slug]/[service-slug]/edit`.
+- Admin service preview: `/admin/services/[game-slug]/[service-slug]/preview`.
+- Compatibility catch-all: `app/admin/services/[...servicePath]/page.tsx` handles old ID URLs when possible.
+
 ## Table of Contents
 
 1. Project Overview
@@ -104,16 +131,17 @@
 
 | Component | Description |
 |---|---|
-| `<Navbar>` | Logo · Currency selector (USD/EUR + flag) · Services (mega menu trigger) · Cart icon (→ `/cart`) · Dark/Light mode toggle · Profile icon |
-| `<Footer>` | Logo · Sitemap · Legal · Genres · Social Media · Disclaimer · copyright |
-| `<GameCard>` | Image thumbnail · Genre tags · Game name · Short description |
-| `<ServiceCard>` | Image · HOT badge (conditional) · Title · Description · Price · Buy Now button |
-| `<CategoryTabs>` | Scrollable horizontal pill tabs with left/right arrow nav |
-| `<StarRating>` | 5-star display with username and comment (TrustPilot style) |
-| `<RegionSelector>` | USA / EUROPE toggle pills |
-| `<Badge>` | HOT · NEW UPDATE · COMING SOON · FEATURED — corner/inline labels |
-| `<ThemeToggle>` | Switches dark and light mode; persisted in user preference |
-| `<SearchResults>` | Real-time overlay below the navbar search bar. Triggered on input (debounced 300ms) — no enter key needed. Shows closest matching service cards (image + name, max 6 results). Click result → navigate to service detail. Closes on click outside or Escape. Zero state: "No services found for [query]." |
+| `<Navbar>` / `<SiteHeader>` | Logo, Quick Select trigger, `/services` search form, currency toggle (USD/EUR, persisted in `localStorage`), Services link, About anchor, cart icon (`/cart`), theme toggle, and Login/Profile state from Supabase Auth. Current implementation lives in `components/site-header.tsx`. |
+| `<QuickSelectMenu>` | CMS-backed services menu. Fetches `/api/catalog/quick-select`, renders active games/services only, uses a body portal overlay, closes on outside click/Escape, and uses a one-step game carousel with fixed All + prev/next controls. |
+| `<Footer>` | Logo, sitemap, legal links, genres, social links, disclaimer, copyright. |
+| `<GameCard>` | Image thumbnail, genre tags, game name, short description. |
+| `<ServiceCard>` | Service image/thumbnail, custom badges, title, description, price, and service detail link. |
+| `<CategoryTabs>` | Scrollable horizontal pill tabs with left/right arrow nav. Landing genre tabs and Quick Select game tabs scroll one item at a time. |
+| `<StarRating>` | 5-star display with username and comment (TrustPilot style). |
+| `<CurrencySelector>` | USD / EUR display toggle. Controls visible prices only; never controls service availability. |
+| `<Badge>` | Custom badge text from CMS for services; do not hardcode a fixed service badge list. |
+| `<ThemeToggle>` | Switches dark and light mode; persisted in user preference. |
+| `<SearchResults>` | Planned real-time overlay below the navbar search bar. Current global header search submits to `/services` with a query. `/services`, `/games`, and Quick Select already have CMS-backed search/filter behavior. |
 
 ---
 
@@ -138,9 +166,9 @@
 
 ---
 
-### 3.2 Game Services Page (`/[game-slug]`, `/[game-slug]/[service-category-slug]`)
+### 3.2 Game Services Page (`/[game-slug]`, `/[game-slug]/[category-slug]`)
 
-**Route:** `/[game-slug]` (base) · `/[game-slug]/[service-category-slug]` (filtered by category)
+**Route:** `/[game-slug]` (base) · `/[game-slug]/[category-slug]` (filtered by category)
 
 **Purpose:** Browse all boosting services for a specific game, filterable by service category.
 
@@ -150,7 +178,7 @@
 | Page Header | Game name as title · Search input right-aligned (filters services within this game only) |
 | Featured Game Banner | CMS-editable. Wide card with game art, game title left, USA/EUROPE toggle right. Schedulable. |
 | Service Category Tabs | Scrollable pill tabs. See tab behaviour below. |
-| Service Cards Grid | 2-row × 4-column initial load. Infinite scroll. Each card: HOT badge · image · title · description · price · Buy Now |
+| Service Cards Grid | 2-row x 4-column initial load. Infinite scroll. Each card: HOT badge · image · title · description · price · Buy Now |
 | TrustPilot Reviews | Same carousel component as landing page |
 | Footer | Global |
 
@@ -160,7 +188,7 @@
 
 `HOT OFFERS` is always the second tab and always hardcoded. Selecting it navigates to `/[game-slug]/hot-offers`. It filters by `isHotOffer = true`. Never query `serviceCategory = "HOT OFFERS"` — that row will never exist in the DB.
 
-All remaining tabs are auto-populated from `ServiceCategory` records where `gameId = this game`, ordered by `sortOrder ASC`. Selecting one navigates to `/[game-slug]/[service-category.slug]`.
+All remaining tabs are auto-populated from `ServiceCategory` records where `gameId = this game`, ordered by `sortOrder ASC`. Selecting one navigates to `/[game-slug]/[category.slug]`.
 
 Tab → URL → filter mapping:
 
@@ -172,10 +200,10 @@ Tab → URL → filter mapping:
 
 **Routing rules:**
 
-On page load, read `[service-category-slug]` from the URL:
+On page load, read `[category-slug]` from the URL:
 - No segment → render ALL tab as active, no category filter
 - `hot-offers` → render HOT OFFERS tab as active, filter `isHotOffer = true`
-- Any other value → look up `ServiceCategory` where `slug = [service-category-slug]` AND `gameId = this game`. If found → render that tab as active, filter by `serviceCategoryId`. If not found → call `notFound()`.
+- Any other value → look up `ServiceCategory` where `slug = [category-slug]` AND `gameId = this game`. If found → render that tab as active, filter by `serviceCategoryId`. If not found → call `notFound()`.
 
 If no Game record matches `[game-slug]` → call `notFound()`.
 
@@ -217,33 +245,41 @@ If no Game record matches `[game-slug]` → call `notFound()`.
 
 ---
 
-### 3.5 Service Detail Page (`/[game-slug]/[service-slug]`)
+### 3.5 Service Detail Page (`/[game-slug]/[category-slug]/[service-slug]`)
 
 **Purpose:** Full service view with configurator. Primary conversion page.
 
-**Layout:** Two-column — detail (left) + sticky configurator sidebar (right).
+**Canonical route:** `/[game-slug]/[category-slug]/[service-slug]` for categorized services. Legacy `/services/[game]/[slug]` redirects to the modern storefront route when enough context exists.
+
+**Layout:** Two-column - detail (left) + sticky configurator sidebar (right).
 
 **Left Column:**
-1. Breadcrumb (game name, uppercase colored)
+1. Breadcrumb (game name and category)
 2. Title and description
-3. Quick badges: rendered from `service.badges[]`
-4. Service image (wide, rounded)
-5. "What You Get" — 2x2 benefit cards (icon + title + description) from `service.whatYouGet[]`
+3. Quick badges rendered from custom `service.badges[]`
+4. Service image from the service CMS upload
+5. "What You Get" benefit cards from `service.whatYouGet[]`
 6. Requirements checklist from `service.requirements[]`
-7. "Why Choose Us" section (shared component)
+7. Shared trust / why choose us content where applicable
 
-**Right Column — "Configure Your Run" Sticky Sidebar:**
-1. Option fields rendered from `optionsSchema` (see §6)
-2. Currency selector (synced to global currency state)
-3. Total price (live-calculated, cyan)
-4. Two action buttons side by side: `Add to Cart` (outlined) + `Buy Now` (gradient)
-- Both add the configured service to cart
-- `Add to Cart` → adds silently, shows cart item count badge update
-- `Buy Now` → adds to cart then opens the cart page so customer reviews before proceeding to checkout
+**Right Configurator:**
+- Currency-aware price display using independent USD/EUR values.
+- Base price plus live option pricing.
+- Current supported option widgets: dropdown, radio, checkbox group, range slider, number stepper, quantity, toggle, text, and textarea.
+- Quantity is CMS-controlled. It appears only if the service has a `quantity` option and multiplies the configured unit total.
+- Add to Cart / Buy Now UI is present, but cart persistence and checkout remain pending.
 
-> All service content is admin-managed via CMS: title, description, badges, image, What You Get items, requirements list, and option schema. Nothing on this page is hardcoded.
+**Price calculation:**
+```
+unitTotal = basePrice
+          + selected choice prices
+          + range/number stepper price impact
+          + enabled toggle price
 
-If no Service record matches `[service-slug]` for the given game → call `notFound()` to render the 404 page.
+total = unitTotal * quantityOptionValue (or 1)
+```
+
+USD and EUR are calculated independently. Do not convert one currency into the other at runtime.
 
 ---
 
@@ -412,16 +448,21 @@ TOC: Acceptance of Terms · User Conduct · Service Delivery · Limitation of Li
 
 ### 3.15 Quick Select Mega Menu (Global Component)
 
-Triggered by "Services" nav item click. Floating overlay panel.
+**Purpose:** Fast route into active games and services from the global header.
 
-**Layout:**
-1. Game tabs (horizontal, scrollable): `All · [Game Name] · [Game Name] · ...` — auto-populated from `Game` table WHERE `status = "active"`
-2. Service grid below the tabs:
-- **"All" tab:** services grouped by game name (game name as a section header), then by `serviceCategory` as column headers, individual service links below each column
-- **Single game tab:** service categories as column headers, individual service links below each column — no game header needed
-3. Each service link → navigates to `/[game-slug]/[service-slug]`
+**Current implementation:** `components/quick-select-menu.tsx`.
 
-**Data source:** Auto-queried from `Service` table — no CMS entry needed. Filtered by selected game tab. Only `status = "active"` services shown.
+**Behavior:**
+- Opened from the header menu button.
+- Rendered through a portal into `document.body` so it is not clipped by the navbar.
+- Full-page overlay, scrollable content, close button, outside-click close, and Escape close.
+- Fetches `/api/catalog/quick-select` on open.
+- Shows active CMS games in a one-step carousel: fixed `All` button, fixed previous/next buttons, animated game window in the middle.
+- Selecting a game filters visible services without navigating away.
+- Services are grouped by service category. In `All`, links include the game name for clarity.
+- Service links use canonical storefront detail routes: `/[game-slug]/[category-slug]/[service-slug]`.
+
+**Data source:** Active `games`, active `services`, and their `service_categories`. Do not import mock `gameServices` data here.
 
 ---
 
@@ -440,7 +481,8 @@ Triggered by "Services" nav item click. Floating overlay panel.
 
 **Implementation:** Next.js `app/not-found.tsx` — automatically caught by the framework for any unresolved route. Also call `notFound()` explicitly in:
 - `/[game-slug]` — if no Game record matches the slug
-- `/[game-slug]/[slug]` — if slug matches neither a ServiceCategory nor a Service for the given game
+- `/[game-slug]/[category-slug]` - if no ServiceCategory matches the slug for the given game
+- `/[game-slug]/[category-slug]/[service-slug]` - if no Service matches the slug for the given game/category pair
 - `/profile/orders/[id]` — if the order doesn't belong to the logged-in user
 - `/order-confirmed` — if no orders found for `checkoutSessionId` belonging to the logged-in user
 
@@ -453,7 +495,7 @@ Triggered by "Services" nav item click. Floating overlay panel.
 ```
 Landing Page
  ├── Click game card     → /[game-slug]  → click category tab → /[game-slug]/[category-slug]
- ├── Click game card     → /[game-slug]  → click service → /[game-slug]/[service-slug]
+ ├── Click game card     → /[game-slug]  → click service → /[game-slug]/[category-slug]/[service-slug]
  ├── Click offer card    → Service Detail → Configure → Buy Now → Cart → Checkout
  ├── VIEW ALL DEALS      → /hot-offers
  ├── Navbar > Services   → Quick Select mega menu → sub-service → Service Detail
@@ -464,10 +506,10 @@ Games Page (/games)
 
 /[game-slug]
  ├── Click category tab  → /[game-slug]/[category-slug]
- └── Click service card  → /[game-slug]/[service-slug]
+ └── Click service card  → /[game-slug]/[category-slug]/[service-slug]
 
 Hot Offers (/hot-offers)
- └── Click service card  → /[game-slug]/[service-slug]
+ └── Click service card  → /[game-slug]/[category-slug]/[service-slug]
 
 Checkout
  └── On success          → /order-confirmed?session=[checkoutSessionId]
@@ -486,7 +528,7 @@ Checkout
 - Use the same `<Footer>` on every page
 - Make all cards hoverable (subtle lift + border glow)
 - All prices in USD by default; currency toggle persists in global state
-- Region (USA/EUROPE) is a single global state — same as currency. Changing in one place updates all `<RegionSelector>` instances site-wide. Persists across navigation.
+- Currency (USD/EUR) is a single global state. Changing it in the header or service detail updates visible prices site-wide. Persists across navigation.
 
 ### DO NOT
 - Do not use white or light backgrounds anywhere in dark mode
@@ -504,7 +546,7 @@ Checkout
 | Components | `PascalCase` | `ServiceCard.tsx` |
 | Functions / hooks | `camelCase` | `useCartTotal` |
 | CSS variables | `--ms-*` prefix | `--ms-accent` |
-| API routes | `/api/v1/[resource]` | `/api/v1/orders` |
+| API routes | App Router route handlers under `/api/[scope]` | `/api/admin/services`, `/api/catalog/quick-select` |
 
 ---
 
@@ -513,7 +555,7 @@ Checkout
 > All models use Supabase PostgreSQL. Dynamic fields are stored as JSONB. All TypeScript fields use camelCase — Supabase maps these to snake_case DB columns automatically (e.g. `optionsSchema` ↔ `options_schema`).
 
 **Shared type used throughout:**
-`Region = "USA" | "EUROPE"` — `Service.region` and `PromoBanner.region` are `Region[]`. `Order.region` is a single `Region` value (whichever was active at checkout). `"BOTH"` is never used — represent both regions as `["USA", "EUROPE"]`.
+Currency = "USD" | "EUR" controls visible pricing only. Service availability is not region-based; active services are globally available unless modeled later as an option schema field.
 
 ---
 
@@ -568,10 +610,10 @@ The `/games` page sidebar and Landing Page game filter tabs auto-populate from d
 | status | string | `"active" \| "draft" \| "archived"` |
 | isHotOffer | boolean | `true` → appears in HOT OFFERS tab |
 | hotOfferAt | Date \| null | Set to `NOW()` when `isHotOffer` toggled on; cleared to `null` when toggled off. Used to sort Hot Offers page (`hotOfferAt DESC`). |
-| region | Region[] | `["USA"]`, `["EUROPE"]`, or `["USA", "EUROPE"]` |
+| region | Region[] | Legacy DB compatibility only. Keep default `["USA", "EUROPE"]`; do not expose as service availability in CMS. |
 | badges | string[] | Admin-managed. Options: `"Starts in < 15 mins"`, `"100% Completion"`, `"Safe & Secure"`, `"24/7 Support"` |
 | requirements | string[] | Rendered as checklist on Service Detail |
-| whatYouGet | Benefit[] | 2×2 benefit cards on Service Detail — see Benefit model below |
+| whatYouGet | Benefit[] | 2x2 benefit cards on Service Detail — see Benefit model below |
 | basePriceUSD | number | Flat fee always charged — admin sets manually, no runtime conversion |
 | basePriceEUR | number | Set independently from USD |
 | optionsSchema | JSONB | Array of ServiceOption — see below. DB column: `options_schema` |
@@ -613,50 +655,74 @@ The `/games` page sidebar and Landing Page game filter tabs auto-populate from d
 
 ### Service Options (`optionsSchema`)
 
-Each service's `optionsSchema` is an array of `ServiceOption` objects stored as JSONB. Admins build this through the CMS form — they never write raw JSON.
+Each service's `optionsSchema` is an array of `ServiceOption` objects stored as JSONB. Admins build this through the Service CMS form - they never write raw JSON.
 
-**Adding a new option type** requires: define the schema shape + build the UI component + add to CMS dropdown = one deploy. Adding a new service using existing types = admin fills form, zero deploy.
+**Current option types:**
+
+| Type | Customer UI | Pricing behavior | CMS fields |
+|---|---|---|---|
+| `dropdown` | Native dropdown/select | selected option price | choices: label, USD, EUR |
+| `radio` | Single-choice rows with circular indicator | selected option price | choices: label, USD, EUR |
+| `checkbox_group` | Multi-choice rows with square indicator | sum of selected option prices | choices: label, USD, EUR |
+| `range` | Slider with current value + calculated price | selected numeric value * price per value | min, max, USD/value, EUR/value |
+| `number_stepper` | Minus/value/plus control with calculated price | selected count * price per count | min, max, USD/count, EUR/count |
+| `quantity` | Minus/value/plus control | multiplies the configured service total; adds no option price by itself | min quantity, max quantity |
+| `toggle` | On/off toggle row with custom labels | enabled price, disabled is 0 | disabled text, enabled text, USD if enabled, EUR if enabled |
+| `text` | Short text input | no price effect | placeholder |
+| `textarea` | Long text input | no price effect | placeholder |
+
+Legacy saved option types are read for backwards compatibility only:
+- `single_choice` maps to `radio`
+- `multiple_choice` maps to `checkbox_group`
+- `scalar` maps to `number_stepper`
 
 **ServiceOption**
 
 | Field | Type | Notes |
 |---|---|---|
-| label | string | e.g. `"Level up boost"`, `"Number of runs"` |
-| required | boolean | |
-| type | string | `"single_choice"` \| `"multiple_choice"` \| `"scalar"` |
-| options | OptionItem[] | For `single_choice` and `multiple_choice` only |
-| min | number | For `scalar` only |
-| max | number | For `scalar` only |
-| pricePerUnitUSD | number | For `scalar` only |
-| pricePerUnitEUR | number | For `scalar` only |
+| label | string | Required. Used as the display label and selection key. |
+| required | boolean | Whether the customer must provide/select this option. |
+| type | string | One of the current option types listed above. |
+| options | OptionItem[] | For `dropdown`, `radio`, and `checkbox_group`. |
+| min | number | For `range`, `number_stepper`, and `quantity`. |
+| max | number | For `range`, `number_stepper`, and `quantity`. |
+| pricePerUnitUSD | number | For `range` and `number_stepper`. |
+| pricePerUnitEUR | number | For `range` and `number_stepper`. |
+| priceUSD | number | For `toggle` enabled state. |
+| priceEUR | number | For `toggle` enabled state. |
+| enabledLabel | string | For `toggle`. Defaults to `Yes`. |
+| disabledLabel | string | For `toggle`. Defaults to `No`. |
+| placeholder | string | For `text` and `textarea`. |
 
 **OptionItem**
 
 | Field | Type | Notes |
 |---|---|---|
-| label | string | e.g. `"1–20"`, `"Loot bag"` |
+| label | string | Required, unique within an option. |
 | priceUSD | number | |
-| priceEUR | number | Set independently — never converted from USD |
+| priceEUR | number | Set independently - never converted from USD. |
 
-**Component mapping:**
-- `single_choice` → `<SingleChoice />` — pill/card grid, pick one
-- `multiple_choice` → `<MultiChoice />` — checklist, pick any
-- `scalar` → `<Scalar />` — slider or stepper
+**Validation rules:**
+- Option label is required.
+- Choice labels are required and must be unique per option.
+- `min` and `max` must be valid numbers; `max >= min`.
+- `quantity.min >= 1`.
+- Only one `quantity` option is allowed per service.
 
 **Price calculation** (pure function, run client-side on every option change):
 ```
-total = basePriceUSD/EUR (always charged, flat)
-     + single_choice   → the selected OptionItem's price
-     + multiple_choice → sum of all checked OptionItems' prices
-     + scalar          → quantity × pricePerUnit
+unitTotal = basePriceUSD/EUR
+          + dropdown/radio selected option price
+          + checkbox_group selected option prices sum
+          + range selected value * pricePerUnit
+          + number_stepper selected count * pricePerUnit
+          + toggle enabled price
+          + text/textarea 0
+
+total = unitTotal * quantityOptionValue (or 1 if no quantity option exists)
 ```
+
 USD and EUR totals are always calculated independently. Never convert between currencies at runtime.
-
-**Example** (Level Boost, `basePriceUSD: 45` — selecting "21–40" + "Loot bag" + 2 runs):
-```
-$45 base + $10 level + $5 loot bag + $10 (2 × $5 runs) = $70 USD
-```
-
 ---
 
 ### Cart
@@ -836,7 +902,7 @@ One record per block — shared across dark and light mode. Theme changes CSS on
 | name | string | |
 | image | string | Media Library URL |
 | gameId | string \| null | FK → Game. If set, banner only shows on that game's Services page. If null, acts as a regional default/fallback. |
-| region | Region[] | |
+| region | Region[] | Legacy compatibility only; keep default both regions. |
 | link | string? | Optional CTA link |
 | status | string | `"active" \| "scheduled" \| "draft"` |
 | scheduledAt | Date? | |
@@ -885,95 +951,92 @@ const { data: settings } = await supabase
 
 `STATUS: done | in-progress | not-started | blocked`
 
-### Current Implementation Audit (2026-05-28)
+### Current Implementation Audit (2026-05-31)
 
-- Reviewed scope: Next app routes/components, `lib/catalog.ts`, `lib/admin-mock.ts`, and `/design-refs/` prototype inventory.
-- Verification: `npm.cmd run lint` passes, and `npm.cmd run build` passes after installing dependencies and refreshing Next optional SWC packages.
-- Runtime route check: the built app was served on `http://localhost:3005`; implemented storefront/admin routes returned 200 for `/`, `/games`, `/services`, `/services/world-of-warcraft/wow-mythic-plus`, `/cart`, `/checkout`, `/profile`, `/profile/orders/MS-2401`, legal pages, and the main admin pages.
-- Missing routes versus PRD: `/hot-offers`, `/privacy-policy`, `/order-confirmed`, `/reset-password`, `/profile/edit`, and the documented `/[game-slug]` (game services) route are not implemented.
-- Data/integration state: current storefront/admin data is static mock data from `lib/catalog.ts` and `lib/admin-mock.ts`. There are no `app/api` routes, Supabase clients, payment gateway handlers, webhook handlers, storage uploads, Resend emails, or Google Sheets writes yet.
-- Design state: current UI follows the dark premium gamer direction and maps to the design-ref page set, but most game/service media are placeholder assets. Storefront CSS gradient tokens currently use `#4735A5 -> #A561CA`, which differs from the system token spec of `#8B5CF6 -> #22D3EE`.
-- Known issue: dynamic invalid service/order slugs render the custom not-found UI, but production route checks returned HTTP 200 for those dynamic misses. Top-level missing routes returned HTTP 404.
+- Verification: `npm.cmd run lint` passes after the current auth/admin/CMS/service updates.
+- Data/integration state: Supabase-backed auth, admin session, games CMS, genres CMS, service categories, service CMS, service images, CMS-backed `/services`, and CMS-backed Quick Select are implemented. Cart, checkout, payment gateways, chat persistence, Google Sheets, and order lifecycle persistence remain pending or mock-backed.
+- Routing state: canonical service routes are `/:game-slug/:category-slug/:service-slug`. Admin service edit/preview uses `/admin/services/[...servicePath]` and supports slug URLs like `/admin/services/:game-slug/:service-slug/edit`.
+- Generated/seed data: `npm run catalog:seed` seeds games, genres, service categories, services, and representative `options_schema` entries.
 
 ### Storefront
 
 | Feature | Status | Notes |
 |---|---|---|
-| Landing Page UI | done | `/` build-verified. Matches the main design direction, but uses placeholder media and static content instead of CMS blocks. |
-| Games Page UI | done | `/games` build-verified with query-param filters and load-more. Infinite scroll is not implemented. |
-| Game Services Page UI | in-progress | `/services` build-verified as a global catalog. The PRD route `/[game-slug]` (with `/[game-slug]/[category-slug]` and `/[game-slug]/[service-slug]` sub-routes) is missing. |
-| Hot Offers Page UI | not-started | `/hot-offers` — game tabs + hot offer service grid |
-| Service Detail UI | in-progress | `/services/[game]/[slug]` build-verified. Static configurator only; `optionsSchema`, live price changes, add-to-cart, and buy-now behavior are pending. |
-| Checkout Page UI | in-progress | `/checkout` build-verified against mock cart data. Payment tabs are visual only; Stripe/PayPal/Crypto actions are pending. |
-| Refund Policy UI | done | Design ref: Moon_Strike_Refund_Policy_Page.png |
-| Terms of Service UI | done | Design ref: Moon_Strike_Terms_of_Service_Page.png |
-| Privacy Policy UI | not-started | Same layout as ToS and Refund Policy. Content written during build. |
-| Quick Select Mega Menu | done | Overlay UI implemented from `Quick_Select_Mega_Menu_Component.png`; links/search are hardcoded/static. |
-| Global Navbar | in-progress | Shared header exists. Cart icon/count, functional currency selector, and live search overlay are missing. |
-| Global Footer | done | Shared footer exists; privacy/social links still use placeholder `#` where routes are missing. |
-| Global Chat Bubble | in-progress | Fixed bottom-right UI exists with static messages. Supabase Realtime, send action, unread state, and anon session merge are pending. |
-| Customer Login | in-progress | Supabase email/password, Google OAuth redirect, rate-limited forgot-password API, safe `next` redirects, clearer callback errors, unverified resend action, and `/profile` + `/checkout` auth gates are wired. Cart merge API and full purchase gating are pending. |
-| Customer Register | in-progress | Supabase sign-up, provider-aware existing-email precheck, app-level registration rate limit, Google OAuth, confirm password validation, and email verification/resend banner are wired. Username persistence beyond auth metadata is pending. |
-| Customer Profile | in-progress | Profile route is auth-gated and displays the Supabase user's email, auth metadata username/name, member-since date, and real logout. `/profile/edit` supports auth metadata username updates, password changes, Google identity linking, and adding email/password login to OAuth users. Avatar upload, username uniqueness, real order totals, and profile table persistence are pending. |
-| Order History | in-progress | Mock order rows and status badges exist. Filter tabs are visual only. |
-| Order Detail | in-progress | Mock order detail, timeline, selected options, and refund button exist. Refund action/ownership checks are pending. |
-| Cart | in-progress | `/cart` UI build-verified with mock lines/totals. Quantity/remove/currency/auth-gate/API behavior is pending. |
-| Search | in-progress | Services/games pages support submit-based query filtering; global real-time overlay is not wired. |
-| Currency toggle | in-progress | Header has a visual `US USD / EUR` button only. No global state, conversion, persistence, or cart/detail sync yet. |
-| Region toggle | in-progress | Selector UI exists on service catalog/detail. No persistence, filtering, or shared state yet. |
-| Light mode theme | done | CSS variable swap exists for `<html data-theme="light">`; visual QA across all pages still recommended. |
-| Theme toggle | done | Toggle persists to `localStorage` and updates `<html data-theme>`. Header only exposes it at `xl` width. |
+| Landing Page UI | in-progress | CMS content blocks feed major landing content. Game section is DB-backed and genre carousel scrolls one item at a time. Some sections still need final CMS polish/media QA. |
+| Games Page UI | done | `/games` uses CMS games/genres with real-time client search and dynamic genre filters. |
+| Services Catalog (`/services`) | in-progress | Now CMS-backed via `listActiveServices()`. Category tabs are generated from active services and ordered by service category `sortOrder`. Submit search is wired; pagination/infinite scroll is pending. |
+| Game Services Page UI | in-progress | `/[game-slug]`, `/[game-slug]/hot-offers`, and `/[game-slug]/[category-slug]` are DB-backed. Category tabs use service category `sortOrder`. Infinite scroll and promo banner CMS are pending. |
+| Hot Offers Page UI | not-started | Dedicated `/hot-offers` route is still pending; hot-offer filtering exists inside game routes and service catalog logic. |
+| Service Detail UI | in-progress | DB-backed service detail renders image, badges, benefits, requirements, global currency, and current option schema types with live pricing. Cart add/buy-now persistence is pending. |
+| Checkout Page UI | in-progress | `/checkout` UI exists against mock cart data. Payment actions are pending. |
+| Refund Policy UI | done | Implemented. |
+| Terms of Service UI | done | Implemented. |
+| Privacy Policy UI | not-started | Same layout as ToS and Refund Policy. |
+| Quick Select Mega Menu | done | CMS-backed via `/api/catalog/quick-select`; game carousel uses fixed All + prev/next + animated one-step scrolling; service links use canonical detail URLs. |
+| Global Navbar | in-progress | Shared header uses Supabase auth state, quick select, `/services` search, cart link, theme toggle, and persisted currency toggle. Cart count and live search overlay remain pending. |
+| Global Footer | done | Shared footer exists; some placeholder links may remain. |
+| Global Chat Bubble | in-progress | UI exists; Supabase realtime/persistence is pending. |
+| Customer Login | in-progress | Supabase email/password, Google OAuth, reset password, rate limits, safe `next`, callback errors, resend verification, and auth gates are wired. Cart merge is pending. |
+| Customer Register | in-progress | Supabase sign-up, provider-aware checks, app rate limit, Google OAuth, confirm password validation, verification/resend UX are wired. Profile persistence beyond auth metadata is pending. |
+| Customer Profile | in-progress | Auth-gated profile and edit flow exist, including metadata username updates, password changes, Google identity linking, connected accounts, and email/password addition for OAuth users. Avatar upload/real orders remain pending. |
+| Order History | in-progress | Mock order rows and status badges exist. |
+| Order Detail | in-progress | Mock order detail/timeline/refund UI exists. |
+| Cart | in-progress | UI still mock-backed. Real cart APIs, selected option snapshots, quantity persistence, remove/update, and auth merge are pending. |
+| Search | in-progress | `/services`, `/games`, and Quick Select search are wired. Global live overlay below navbar remains pending. |
+| Currency toggle | in-progress | Header currency state persists via `useCurrency`; full cart/detail synchronization is not complete. Service detail currently uses region-derived currency. |
+| Currency toggle | in-progress | Header and service detail use global USD/EUR currency display. Cart/detail synchronization still needs final checkout integration. |
+| Light mode theme | done | CSS variable swap exists. |
+| Theme toggle | done | Toggle persists to `localStorage` and updates `<html data-theme>`. |
 | TrustPilot integration | not-started | Static review cards exist; TrustBox/API integration is pending. |
-| Notifications | not-started | In-app bell + email for customers. See §13 |
-| Mobile / responsive layouts | in-progress | Tailwind breakpoints are present across pages. Dedicated browser screenshot QA is still pending. |
-| Not Found page (404) | in-progress | `app/not-found.tsx` exists. Top-level missing routes return 404; dynamic bad slugs render the UI but returned HTTP 200 in production checks. |
+| Notifications | not-started | In-app bell + email for customers. |
+| Mobile / responsive layouts | in-progress | Tailwind breakpoints exist; browser screenshot QA still recommended. |
+| Not Found page (404) | in-progress | `app/not-found.tsx` exists; dynamic route behavior should be rechecked after slug-route changes. |
 
 ### Admin Terminal
 
 | Feature | Status | Notes |
 |---|---|---|
-| Admin Login | in-progress | Real password login issues a signed HttpOnly admin session cookie. Seed/reseed script creates the single admin account. |
-| Admin Dashboard Overview | done | `/admin/dashboard` build-verified. KPI/chart/table data is static. |
-| Admin Users | in-progress | UI/search/actions exist with mock data. Ban/self-ban guards are client alerts only. |
-| Admin Games | in-progress | UI/filtering exists with mock data. Create/edit persistence is pending. |
-| Admin Services List | in-progress | UI/filtering exists with mock data. CRUD persistence is pending. |
-| Admin Service CMS | in-progress | Form UI exists for badges/options/benefits/requirements. JSONB save, validation, upload, and storefront binding are pending. |
-| Admin Service Preview | done | /admin/services/[id]/preview — draft storefront render |
-| Admin Order Management | in-progress | Filter tabs/date sort exist with mock orders. Status transitions are not persisted. |
-| Admin Order Detail | in-progress | Status update/refund/chat UI exists. Gateway refund APIs and audit logging are pending. |
-| Admin Transactions | in-progress | UI exists with mock transactions. Refund actions are alerts only. |
-| Admin Content Library | in-progress | Landing/banners/media tabs exist with mock data. Real CMS persistence and storefront rendering are pending. |
-| Landing Page CMS blocks | in-progress | Admin content rows/forms exist. Storefront still uses hardcoded sections. |
-| Promotional Banners CMS | in-progress | Admin banner rows exist. Scheduling/query fallback logic is pending. |
-| Media Library CMS | in-progress | Media tab/upload UI exists. Supabase Storage, CDN URLs, usage tracking, and delete guard are pending. |
-| Hot Offers auto-population | in-progress | Static mock filtering exists for `isHotOffer`. DB query and `hotOfferAt` sorting are pending. |
-| Admin Messages / Chat | in-progress | Inbox UI exists with mock support/order threads. Realtime, persistence, attachments, and anon merge are pending. |
-| Admin Audit Logs | in-progress | Logs UI exists with mock audit entries. Backend middleware/log writes are pending. |
-| Admin Settings | in-progress | Settings form exists with local "saved" state. Persistence and enforcement are pending. |
-| Admin Auth Guard | in-progress | Middleware verifies the signed admin cookie for all /admin/* routes except /admin/login. |
-| Admin Sidebar | done | Shared across all admin pages |
-| Admin Top Bar | done | Shared across all admin pages |
-| System Pulse indicator | in-progress | Static "System Pulse: Stable" footer exists. Live status source is pending. |
-| CSV export | in-progress | Export buttons exist. Actual CSV generation/download is pending. |
+| Admin Login | done | Single seeded admin account; password login issues signed HttpOnly admin session cookie. No OTP by design. Login attempts are rate-limited/audited. |
+| Admin Dashboard Overview | done | UI exists; KPI/chart data still mostly static. |
+| Admin Users | in-progress | UI/search/actions exist with mock data. |
+| Admin Games | in-progress | CMS-backed list/create/edit/archive/delete flows exist with upload support; further validation/polish may remain. |
+| Admin Services List | done | CMS-backed list/filter/search/delete with active/draft/archived tabs, game/category filters, image thumbnails, slug-based edit/preview links, and service category management modal. |
+| Admin Service CMS | done | CMS-backed create/edit with upload image, custom badges, base USD/EUR price, service category, benefits, requirements, sticky section nav/actions, and validated option builder. |
+| Admin Service Preview | done | `/admin/services/:game-slug/:service-slug/preview` via catch-all route renders draft storefront preview. Old ID URLs redirect when possible. |
+| Admin Order Management | in-progress | UI exists with mock orders. Backend transitions are pending. |
+| Admin Order Detail | in-progress | Status update/refund/chat UI exists. Gateway refund APIs and persistence are pending. |
+| Admin Transactions | in-progress | UI exists with mock transactions. |
+| Admin Content Library | in-progress | CMS-backed content rows/forms and image upload are partially wired. Landing content uses several CMS blocks; full coverage/QA pending. |
+| Landing Page CMS blocks | in-progress | Hero and several landing blocks are CMS-managed; remaining sections need cleanup. |
+| Promotional Banners CMS | in-progress | Banner/content management exists; full scheduling/fallback behavior pending. |
+| Media Library CMS | in-progress | Supabase Storage upload exists for content/game/service images. Dedicated library/usage tracking/delete guards are pending. |
+| Hot Offers auto-population | in-progress | Services support `is_hot_offer`; dedicated `/hot-offers` page pending. |
+| Admin Messages / Chat | in-progress | Inbox UI exists with mock support/order threads. |
+| Admin Audit Logs | in-progress | Audit log persistence exists for several admin actions including auth and CMS mutations; coverage is not complete. |
+| Admin Settings | in-progress | Settings form exists with local saved state. |
+| Admin Auth Guard | done | `proxy.ts` verifies signed admin cookie for `/admin/*` except `/admin/login`. |
+| Admin Sidebar | done | Shared across admin pages. |
+| Admin Top Bar | done | Shared across admin pages. |
+| System Pulse indicator | in-progress | Static footer indicator exists. |
+| CSV export | in-progress | Export buttons exist; generation/download pending. |
 
 ### System
 
 | Feature | Status | Notes |
 |---|---|---|
-| Auto-complete cron (7-day window) | not-started | Supabase scheduled function — moves `delivered` orders to `completed` after 7 days if no refund request |
-| Order state machine | in-progress | Mock admin/client status labels and next-action helpers exist. Backend enforcement and audit logging are pending. |
-| Stripe integration | not-started | Checkout + auto-routed refund API |
-| NowPayments integration | not-started | Checkout + auto-routed refund + wallet address collection |
-| NowPayments webhook verification | not-started | HMAC-SHA512 middleware with timing-safe comparison. `NOWPAYMENTS_IPN_SECRET` setup pending. See §13 |
-| Refund router | not-started | Reads paymentProvider, routes to Stripe or NowPayments automatically |
-| Rate limiting | not-started | See §12 — depends on framework |
-| Audit log (every admin action) | not-started | Backend middleware |
-| Google Sheets integration | not-started | Orders + Transactions tabs. See §13 |
-| Real-time chat | not-started | Supabase Realtime WebSocket |
-| Admin second factor | removed | Extra login factors are intentionally out of scope. One seeded admin account uses password + signed cookie session. |
-| Anonymous cart API routes | not-started | All anonymous cart operations go through server-side routes with service role key |
-| Backend API routes | not-started | No `app/api` routes exist yet. Needed for cart, payments, webhooks, chat, CMS, admin mutations, and notification flows. |
-
+| Auto-complete cron (7-day window) | not-started | Supabase scheduled function pending. |
+| Order state machine | in-progress | Mock labels/helpers exist. Backend enforcement pending. |
+| Stripe integration | not-started | Checkout + refund API pending. |
+| NowPayments integration | not-started | Checkout + crypto refund pending. |
+| NowPayments webhook verification | not-started | HMAC-SHA512 middleware pending. |
+| Refund router | not-started | Pending. |
+| Rate limiting | in-progress | Auth/admin login/password-reset/register limits exist. Broader API limits pending. |
+| Audit log (admin actions) | in-progress | Implemented for selected admin auth/CMS actions; expand coverage. |
+| Google Sheets integration | not-started | Orders + Transactions tabs pending. |
+| Real-time chat | not-started | Supabase Realtime pending. |
+| Admin second factor | removed | Extra login factors intentionally out of scope. |
+| Anonymous cart API routes | not-started | Pending. |
+| Backend API routes | in-progress | Auth/admin/CMS/catalog APIs exist. Cart, payments, webhooks, chat, and notifications pending. |
 ---
 
 ## 8. Stack & Decisions
@@ -1016,7 +1079,7 @@ const { data: settings } = await supabase
 | Service fees | Taxes and fees included in base price. No extra fee at checkout. |
 | Order cancellation | No cancelled state — customers request refunds instead. Admin approves or denies. |
 | Hot Offers | 4 random `isHotOffer = true` services via `ORDER BY RANDOM() LIMIT 4` — re-randomized per page load. No admin curation. |
-| Region | Single global state (USA / EUROPE). Updates all `<RegionSelector>` instances site-wide. Persists across navigation. `Region[]` everywhere except `Order.region` (single value at checkout). |
+| Currency | Single global state (USD / EUR). Updates header and service detail prices. Persists across navigation. Does not affect service availability. |
 | Light mode | CSS variable swap only — `<html data-theme="light">`. Same components, no separate content. |
 | Rate limiting | Supabase API gateway. See §12. |
 | Multi-order checkout | One payment → one Order per CartItem. All share a `checkoutSessionId`. Redirect: `/order-confirmed?session=[checkoutSessionId]`. |
@@ -1031,21 +1094,19 @@ src/
    common/             Navbar, Footer, Badge, StarRating, ThemeToggle
    cards/              GameCard, ServiceCard
    layout/             PageWrapper, Section
-   configurator/       SingleChoice, MultiChoice, Scalar
+   configurator/       Dropdown, Radio, CheckboxGroup, RangeSlider, NumberStepper, Quantity, Toggle, TextInput
    checkout/           PaymentForm, OrderSummary
  app/
    page.tsx                    Landing
    games/
    [game-slug]/
-     page.tsx                  Game Services Page (ALL tab — no category filter)
-     [slug]/
-       page.tsx                Either: service-category filtered view OR service detail
-                               Resolved at request time:
-                               1. Check if slug matches a ServiceCategory.slug for this game → render category-filtered services page
-                               2. Else check if slug matches a Service.slug for this game → render Service Detail
-                               3. Else → notFound()
+     page.tsx                  Game Services Page (ALL tab - no category filter)
+     [category-slug]/
+       page.tsx                Service-category filtered view
+       [service-slug]/
+         page.tsx              Service Detail
 
-> The `[slug]` catch-all handles both category tabs and service detail in one dynamic segment. Resolution order: category first, then service, then 404.
+> Service detail URLs include the category slug: `/[game-slug]/[category-slug]/[service-slug]`. The legacy short form `/[game-slug]/[service-slug]` may redirect to the canonical category-aware route when resolvable.
 
    hot-offers/
    cart/
@@ -1063,8 +1124,8 @@ src/
    terms-of-service/
    not-found.tsx               Global 404 page
    admin/                      All admin routes (see §10.14)
- hooks/                useCart, useCurrency, useRegion  ← both are global state, same pattern
- store/                Global state (currency, region, cart)
+ hooks/                useCart, useCurrency
+ store/                Global state (currency, cart)
  lib/                  API clients, utils, webhook verification
  types/                TypeScript interfaces (mirrors §6 models)
  styles/               Global CSS vars, theme tokens
@@ -1166,7 +1227,7 @@ Only `ADMIN` role in admin terminal. Storefront customers authenticate via Supab
 
 **Stat cards:** TOTAL USERS · ACTIVE ORDERS · PENDING REFUNDS · BANNED/FLAGGED
 
-> Game card image recommended upload size: **600×400px** (3:2 ratio). Cloudflare Images serves optimized versions at render time.
+> Game card image recommended upload size: **600x400px** (3:2 ratio). Cloudflare Images serves optimized versions at render time.
 
 ---
 
@@ -1196,7 +1257,7 @@ Clicking opens a modal: **Add Genre**
 
 Actions: **Save Genre** (purple) · **Cancel**.
 
-On save: `POST /api/v1/admin/genres` → inserts into `genres`. Toast: "Genre created." The genre immediately appears in the Genre dropdown when creating or editing a game, and in the sidebar filter on `/games`.
+On save: `POST /api/admin/genres` → inserts into `genres`. Toast: "Genre created." The genre immediately appears in the Genre dropdown when creating or editing a game, and in the sidebar filter on `/games`.
 
 **Duplicate name guard:** If a genre with the same name (case-insensitive) already exists, show inline error: "This genre already exists."
 
@@ -1208,76 +1269,70 @@ On save: `POST /api/v1/admin/genres` → inserts into `genres`. Toast: "Genre cr
 
 ### 10.6 Admin Services List (`/admin/services`)
 
-**Table:** SERVICE NAME · GAME · SERVICE CATEGORY · BASE PRICE (cyan) · STATUS · ACTIONS
+**Table:** SERVICE NAME, GAME, SERVICE CATEGORY, BASE PRICE, STATUS, IMAGE, ACTIONS.
 
-**Two-axis filters:** Status tabs (All / Active / Draft) · Filter Game dropdown · Filter Category dropdown.
+**Filters:** Status tabs (All / Active / Draft / Archived), game filter, category filter, and search.
 
-Service Category dropdown is now populated from `ServiceCategory` records filtered by the selected game (or all categories across all games if no game filter is active). No hardcoded values.
+Service Category dropdowns are populated from `ServiceCategory` records filtered by the selected game when a game is selected. No hardcoded category list should be used.
 
-**Add: "New Service Category" button**
-
-Position: top-right of the Services list page, next to "New Service".
-
-Clicking opens a modal: **Add Service Category**
+**Category management:** The Services list includes a service category manager.
 
 | Field | Notes |
 |---|---|
-| Game | Dropdown — required. Which game this category belongs to. |
-| Category Name | Text input — required. e.g. `"Dungeon"`, `"Rank Boost"`. |
-| Slug | Auto-generated from name; admin can override. Validated: unique per game, no reserved slugs (`hot-offers`). |
-| Sort Order | Number input. Controls tab position. Defaults to last (max existing `sortOrder + 1`). |
+| Game | Required. Category ownership is scoped to one game. |
+| Category Name | Required. Example: `Dungeon`, `Rank Boost`. |
+| Slug | Auto-generated from name; admin can override. Must be unique per game. Reserved slug: `hot-offers`. |
+| Sort Order | Controls category tab ordering within that game only. Same `sort_order` across different games is allowed. If two categories in the same game share an order, fall back to name/created order for stable display. |
 
-Actions: **Save Category** (purple) · **Cancel**.
+**Edit / Delete category:** Categories can be edited or deleted from admin. Deleting a category clears `service_category_id` on affected services via `ON DELETE SET NULL`; those services stay in admin and should be recategorized before publishing.
 
-On save: `POST /api/v1/admin/service-categories` → inserts into `service_categories`. Toast: "Category created." Tab list on the matching game's storefront page updates immediately.
-
-**Edit / Delete category:** Each `ServiceCategory` row in the filter dropdown has inline Edit (pencil) and Delete (trash) icons.
-
-- **Edit:** Opens the same modal pre-filled. `PATCH /api/v1/admin/service-categories/[id]`. Changing the `name` auto-updates the slug unless admin has manually edited it.
-- **Delete:** Confirmation dialog: "Delete [name]? Services assigned to this category will have their category cleared." On confirm: `DELETE /api/v1/admin/service-categories/[id]`. Sets `service_category_id = null` on all affected services (via `ON DELETE SET NULL`). Those services appear uncategorised in the admin table and are filtered out of storefront tabs (but remain accessible on their detail pages).
-
-**Slug conflict guard:** If a slug already exists for that game, show inline error: "A category with this slug already exists for [Game Name]."
+**Service actions:** Edit and preview use slug-based links. Delete removes the service record and should also clean up service-owned images when that cleanup is implemented.
 
 ---
 
-### 10.7 Admin Service CMS (`/admin/services/new`, `/admin/services/[id]/edit`)
+### 10.7 Admin Service CMS (`/admin/services/new`, `/admin/services/[game-slug]/[service-slug]/edit`)
 
-**Left column:**
+**Routing:** Canonical edit URL is `/admin/services/[game-slug]/[service-slug]/edit`. The catch-all route `app/admin/services/[...servicePath]/page.tsx` also supports old ID edit/preview URLs and redirects to the canonical slug URL when possible.
 
-1. **Basic Info:** Service Name · Game (dropdown) · Service Category (dropdown — populated from `ServiceCategory` records where `gameId = selected game`; updates when the Game dropdown changes; shows category name + slug in the option label e.g. `Dungeon (dungeon)`; required before publishing. If no categories exist for the selected game, shows a warning: "No categories yet for [Game Name]. [Add one →]" — the link opens the Add Service Category modal inline.) · Hot Offer checkbox — when checked, sets `isHotOffer = true` and `hotOfferAt = current timestamp`; when unchecked, sets `isHotOffer = false` and `hotOfferAt = null` · Region (multi-select: USA / EUROPE / Both)
+**Layout:**
+- Left: sticky section navigation card. Section links scroll to the matching form section.
+- Right: input form sections.
+- Bottom/top action area: sticky Save and Discard controls so edits can be saved from anywhere on the page.
 
-2. **Service Badges:** Tag input with pre-defined options. Admin selects any combination:
-`Starts in < 15 mins` · `100% Completion` · `Safe & Secure` · `24/7 Support`
-Rendered as pill badges below the service title on Service Detail. Leave empty to show no badges.
+**Sections:**
+1. **Basic Info:** Service name, game, service category filtered by selected game, slug, status, hot offer, short description, and full description.
+2. **Media:** Service thumbnail/image upload with recommended dimensions. Service cards and game service pages use this uploaded service image.
+3. **Pricing:** `basePriceUSD` and `basePriceEUR`. Currency values are entered independently.
+4. **Badges:** Fully custom free-text badge rows. Admin can add/remove badge names. No fixed badge list.
+5. **Options:** Dynamic option schema builder saved to `options_schema` JSONB.
+6. **What You Get:** Repeatable benefit cards with icon, title, and description.
+7. **Requirements:** Repeatable checklist rows.
 
-3. **Custom Service Options (JSONB):** Dynamic field builder. Each field: label input · type dropdown (Single Choice / Multiple Choice / Scalar) · required toggle · type-specific price inputs. Saved as `optionsSchema` JSONB in Supabase (DB column: `options_schema`).
-- Single / Multiple Choice: option rows with label + `$USD` + `€EUR` per option
-- Scalar: min · max · `$pricePerUnitUSD` · `€pricePerUnitEUR`
+**Current option builder types:** dropdown, radio, checkbox group, range slider, number stepper, quantity, toggle, text, and textarea.
 
-4. **What You Get (Benefit Cards):** Repeatable field builder — up to 4 entries. Each entry: icon picker (Tabler icon name, text input with preview) · benefit title · benefit description. Rendered as the 2×2 grid on Service Detail. Minimum 1 entry required to publish.
+**Option builder validation:**
+- Option label is required.
+- Choice options require at least one choice.
+- Choice labels must be unique within an option.
+- Range, stepper, and quantity require valid min/max with `max >= min`.
+- Quantity min must be at least 1.
+- Only one quantity option is allowed per service.
 
-5. **Service Details:** Rich text editor (B / I / List / Link) for description.
-
-6. **Requirements:** Repeatable text field — one requirement per row. Rendered as checklist on Service Detail.
-
-**Right column:** BASE PRICE (`basePriceUSD` + `basePriceEUR` — always charged flat, options stack on top) · Thumbnail upload (drag + drop, recommended 1200×1080px) · Pro Tip card.
+Legacy saved option types are mapped for compatibility only: `single_choice -> radio`, `multiple_choice -> checkbox_group`, `scalar -> number_stepper`.
 
 ---
 
-### 10.7b Admin Service Preview (`/admin/services/[id]/preview`)
+### 10.7b Admin Service Preview (`/admin/services/[game-slug]/[service-slug]/preview`)
 
-Full-page storefront render using draft data. Read-only — no checkout.
+Full-page storefront render using draft data. Read-only - no checkout.
 
-- Amber banner: `PREVIEW MODE — This service is not yet published`
-- Buttons: Back to Editor · Deploy Now
-- Renders identical components as the public Service Detail page (§3.5)
-- What admins see = what customers see
+- Amber banner: `PREVIEW MODE - This service is not yet published`
+- Back to Editor link in the admin page header
+- Renders the same `ServiceDetail` component as the public Service Detail page (section 3.5)
+- Add to Cart and Buy Now are disabled in preview mode
+- Old ID preview URLs redirect to the canonical slug preview URL when possible
 
-**Deploy Now behavior:**
-1. Runs the same field validation as Save in the CMS editor: minimum 1 `whatYouGet` entry, all required fields filled, `basePriceUSD` and `basePriceEUR` > 0.
-2. If validation fails: show inline errors on the preview page. Stay on preview — do not publish.
-3. If validation passes: sets `service.status → "active"`, redirect to `/admin/services` with a success toast: "Service published."
-4. If the service is already `active` (re-previewing a live service): button label changes to `Update Live`. Same behavior — no confirmation dialog needed.
+> Publishing is handled by saving the service status from the editor. A dedicated Deploy Now action can be added later if needed.
 
 ---
 
@@ -1396,7 +1451,7 @@ Full-page storefront render using draft data. Read-only — no checkout.
 /[game-slug]                    Game Services Page (ALL tab)
 /[game-slug]/hot-offers         Game Services Page (HOT OFFERS tab)
 /[game-slug]/[category-slug]    Game Services Page (filtered by service category)
-/[game-slug]/[service-slug]     Service Detail
+/[game-slug]/[category-slug]/[service-slug]     Service Detail
 /cart                           Cart Page
 /checkout                       Checkout
 /order-confirmed                Order Confirmed (?session=[checkoutSessionId])
@@ -1422,8 +1477,9 @@ Full-page storefront render using draft data. Read-only — no checkout.
 /admin/games/[id]/edit          Edit Game
 /admin/services                 Service Catalog
 /admin/services/new             Create Service
-/admin/services/[id]/edit       Edit Service
-/admin/services/[id]/preview    Service Preview (draft storefront render)
+/admin/services/[game-slug]/[service-slug]/edit       Edit Service (canonical)
+/admin/services/[game-slug]/[service-slug]/preview    Service Preview (canonical)
+/admin/services/[...servicePath] Compatibility catch-all for old ID edit/preview URLs
 /admin/orders                   Order Management
 /admin/orders/[id]              Order Detail
 /admin/transactions             Financial Ledger
@@ -1811,7 +1867,7 @@ Admin auth does not use Supabase Auth — see §8 and §10.2.
 
 ---
 
-*Last updated: see git history — update §7 Feature Progress Tracker when any feature status changes.*
+*Last updated: 2026-05-31 - auth, admin CMS, games, services, Quick Select, and seed progress reflected.*
 *Design references: all screenshots stored in `/design-refs/`.*
 
 ---
@@ -2087,23 +2143,41 @@ ALTER TABLE services
 ALTER TABLE service_categories ENABLE ROW LEVEL SECURITY;
 ```
 
-#### New API Routes
+#### Current API Routes
 
-**Genre routes:**
+**Implemented auth/admin/catalog routes:**
 ```
-POST   /api/v1/admin/genres         Create genre
-GET    /api/v1/genres               Public — fetch all genres (used by /games sidebar and landing page filter tabs)
+POST   /api/auth/register-check              Provider-aware registration precheck
+POST   /api/auth/password-reset              Rate-limited password reset request
+POST   /api/admin/login                      Admin login
+POST   /api/admin/logout                     Admin logout
+GET    /api/admin/me                         Current admin session
+POST   /api/admin/genres                     Create genre
+DELETE /api/admin/genres/[id]                Delete genre
+GET    /api/admin/games                      Admin games list
+POST   /api/admin/games                      Create game
+PATCH  /api/admin/games/[id]                 Edit game
+DELETE /api/admin/games/[id]                 Delete game
+POST   /api/admin/games/image                Upload/compress game image
+GET    /api/admin/services                   Admin services list
+POST   /api/admin/services                   Create service
+PATCH  /api/admin/services/[id]              Edit service
+DELETE /api/admin/services/[id]              Delete service
+POST   /api/admin/services/image             Upload/compress service image
+POST   /api/admin/service-categories         Create category
+PATCH  /api/admin/service-categories/[id]    Edit category
+DELETE /api/admin/service-categories/[id]    Delete category
+GET    /api/catalog/quick-select             Active games/services for Quick Select
 ```
 
-**Service Category routes:**
-```
-POST   /api/v1/admin/service-categories          Create category
-PATCH  /api/v1/admin/service-categories/[id]     Edit category
-DELETE /api/v1/admin/service-categories/[id]     Delete category
-GET    /api/v1/service-categories?gameId=[id]    Public — fetch categories for a game (used by storefront tab render)
-```
+All admin write routes require the signed admin session cookie, use server-side credentials for DB writes, and should write an audit log entry on success.
 
-All write routes: admin JWT required, service role key for DB writes, audit log entry on success.
+**Seed scripts:**
+```
+npm run admin:seed       Seed the single admin account
+npm run admin:reseed     Replace/reseed the single admin account
+npm run catalog:seed     Seed 20 games, genres, categories, and 20 services per game with option schemas
+```
 
 ---
 
@@ -2119,7 +2193,7 @@ Follow these during development — not as a post-launch fix.
 | Supabase Realtime | Subscribe to chat WebSocket only when chat bubble is open. Unsubscribe on close. Never keep open connections across all pages. |
 | TrustBox widget | Load async via script tag. Does not block page render — no action needed. |
 | Options schema render | Service Detail configurator reads `optionsSchema` JSONB. Parse once on load, do not re-parse on every price recalculation. |
-| Price calculation | Run entirely client-side on each option change — no API call needed. One pure function (see §6). |
+| Price calculation | Run entirely client-side on each option change — no API call needed. One pure function (see section 6). |
 | Admin dashboard charts | Fetch aggregated data server-side. Never query raw orders/transactions table on the client for chart data. |
 | Cart item count badge | Store count in global state (useCart hook). Do not re-fetch cart on every page to get the count. |
 
@@ -2184,4 +2258,7 @@ GOOGLE_SHEET_ID=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms
 NEXT_PUBLIC_CLOUDFLARE_IMAGES_ACCOUNT_HASH=abc123xyz
 ```
 
-> For Stripe webhooks in local dev: use the Stripe CLI (`stripe listen --forward-to localhost:3000/api/v1/webhooks/stripe`) to forward webhook events to your local server. The CLI provides a temporary `STRIPE_WEBHOOK_SECRET` for local use only.
+> For Stripe webhooks in local dev: use the Stripe CLI (`stripe listen --forward-to localhost:3000/api/webhooks/stripe`) to forward webhook events to your local server. The CLI provides a temporary `STRIPE_WEBHOOK_SECRET` for local use only.
+
+
+

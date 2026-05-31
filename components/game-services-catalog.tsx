@@ -1,25 +1,17 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { PlaceholderAsset } from "@/components/asset-image";
+import { ScrollingTabList, type ScrollingTabItem } from "@/components/scrolling-tab-list";
 import { ServiceCard } from "@/components/service-card";
-import { RegionSelector } from "@/components/ui";
 import type { GameCatalogItem, GameService } from "@/lib/catalog";
 
 type ServiceTab = {
   href: string;
   label: string;
   slug: string;
+  sortOrder: number;
 };
-
-function categorySlug(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
 
 function matchesQuery(service: GameService, query: string) {
   const normalizedQuery = query.trim().toLowerCase();
@@ -50,23 +42,42 @@ export function GameServicesCatalog({
   const [query, setQuery] = useState("");
   const tabSourceServices = navigationServices ?? services;
   const tabs = useMemo<ServiceTab[]>(() => {
-    const categoryTabs = Array.from(new Set(tabSourceServices.map((service) => service.serviceCategory)))
-      .sort((a, b) => a.localeCompare(b))
-      .map((category) => ({
-        href: `/${game.slug}/${categorySlug(category)}`,
-        label: category,
-        slug: categorySlug(category),
-      }));
+    const categoryTabs = new Map<string, ServiceTab>();
+
+    tabSourceServices.forEach((service) => {
+      const slug = service.serviceCategorySlug ?? service.serviceCategory.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+      if (!categoryTabs.has(slug)) {
+        categoryTabs.set(slug, {
+          href: `/${game.slug}/${slug}`,
+          label: service.serviceCategory,
+          slug,
+          sortOrder: service.serviceCategorySortOrder ?? 999,
+        });
+      }
+    });
 
     return [
-      { href: `/${game.slug}`, label: "All", slug: "all" },
-      { href: `/${game.slug}/hot-offers`, label: "Hot Offers", slug: "hot-offers" },
-      ...categoryTabs,
+      { href: `/${game.slug}`, label: "All", slug: "all", sortOrder: -2 },
+      { href: `/${game.slug}/hot-offers`, label: "Hot Offers", slug: "hot-offers", sortOrder: -1 },
+      ...Array.from(categoryTabs.values()).sort(
+        (a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label),
+      ),
     ];
   }, [game.slug, tabSourceServices]);
 
   const activeLabel = tabs.find((tab) => tab.slug === activeSlug)?.label ?? "All";
   const filteredServices = services.filter((service) => matchesQuery(service, query));
+  const fixedTabs: ScrollingTabItem[] = tabs.slice(0, 2).map((tab) => ({
+    href: tab.href,
+    key: tab.slug,
+    label: tab.label,
+  }));
+  const scrollingTabs: ScrollingTabItem[] = tabs.slice(2).map((tab) => ({
+    href: tab.href,
+    key: tab.slug,
+    label: tab.label,
+  }));
 
   return (
     <>
@@ -107,25 +118,25 @@ export function GameServicesCatalog({
           </p>
         </div>
         <div className="relative z-10 text-left md:text-center">
-          <RegionSelector active="USA" />
-          <p className="mt-3 text-sm text-[var(--ms-gradient-end)]">USA / Europe pricing view</p>
+          <div className="inline-flex rounded-full border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-1">
+            <span className="h-9 rounded-full bg-[var(--primary)] px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]">
+              USD
+            </span>
+            <span className="h-9 rounded-full px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] text-[var(--ms-body)]">
+              EUR
+            </span>
+          </div>
+          <p className="mt-3 text-sm text-[var(--ms-gradient-end)]">USD / EUR pricing view</p>
         </div>
       </PlaceholderAsset>
 
-      <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-        {tabs.map((tab) => (
-          <Link
-            key={tab.slug}
-            href={tab.href}
-            className={`inline-flex h-10 items-center justify-center rounded-full px-5 mono text-xs uppercase tracking-[0.22em] ${
-              tab.slug === activeSlug
-                ? "ms-button"
-                : "border border-[var(--ms-border)] bg-[var(--ms-bg-card)] text-[var(--ms-heading)] hover:border-[var(--ms-gradient-end)] hover:bg-[var(--ms-hover-bg)]"
-            }`}
-          >
-            {tab.label}
-          </Link>
-        ))}
+      <div className="mt-8">
+        <ScrollingTabList
+          activeKey={activeSlug}
+          ariaLabel={`${game.name} service categories`}
+          fixedTabs={fixedTabs}
+          scrollingTabs={scrollingTabs}
+        />
       </div>
 
       <div className="mt-6 flex flex-col justify-between gap-3 text-sm text-[var(--ms-body)] md:flex-row md:items-center">

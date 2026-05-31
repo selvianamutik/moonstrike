@@ -70,7 +70,7 @@ export default async function Home() {
         </div>
         <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
           {gameServices.slice(0, 4).map((service) => (
-            <ServiceCard key={service.slug} service={service} />
+            <ServiceCard key={`${service.gameSlug}-${service.slug}`} service={service} />
           ))}
         </div>
       </section>
