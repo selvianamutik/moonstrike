@@ -11,6 +11,7 @@ export type GameService = {
   image?: string;
   description: string;
   startingPrice: number;
+  startingPriceEUR?: number;
   isHotOffer: boolean;
   tags: string[];
 };

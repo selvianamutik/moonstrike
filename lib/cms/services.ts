@@ -50,7 +50,6 @@ export type ServiceRow = {
   status: ServiceStatus
   is_hot_offer: boolean
   hot_offer_at: string | null
-  region: string[]
   badges: string[]
   requirements: string[]
   what_you_get: ServiceBenefit[]
@@ -85,7 +84,7 @@ type RawServiceRow = Omit<
 }
 
 const SERVICE_SELECT =
-  'id, game_id, games(name, slug), title, slug, image, description, service_category_id, service_categories(name, slug, sort_order), status, is_hot_offer, hot_offer_at, region, badges, requirements, what_you_get, base_price_usd, base_price_eur, options_schema, created_at, updated_at'
+  'id, game_id, games(name, slug), title, slug, image, description, service_category_id, service_categories(name, slug, sort_order), status, is_hot_offer, hot_offer_at, badges, requirements, what_you_get, base_price_usd, base_price_eur, options_schema, created_at, updated_at'
 
 function relationOne<T>(value: T | T[] | null | undefined) {
   return Array.isArray(value) ? value[0] : value
@@ -109,6 +108,7 @@ export function serviceRowToCatalogService(row: ServiceRow): GameService {
     image: row.image,
     description: row.description,
     startingPrice: row.base_price_usd,
+    startingPriceEUR: row.base_price_eur,
     isHotOffer: row.is_hot_offer,
     tags: row.badges,
   }
@@ -134,7 +134,6 @@ function rawServiceToRow(row: RawServiceRow): ServiceRow {
     status: row.status,
     is_hot_offer: row.is_hot_offer,
     hot_offer_at: row.hot_offer_at,
-    region: row.region,
     badges: row.badges,
     requirements: row.requirements,
     what_you_get: asArray<ServiceBenefit>(row.what_you_get),

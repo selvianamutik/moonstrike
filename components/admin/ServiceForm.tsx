@@ -165,7 +165,6 @@ export function ServiceForm({
   const [categoryId, setCategoryId] = useState(service?.service_category_id ?? "");
   const [status, setStatus] = useState(service?.status ?? "draft");
   const [isHotOffer, setIsHotOffer] = useState(service?.is_hot_offer ?? false);
-  const [regions, setRegions] = useState<string[]>(service?.region ?? ["USA", "EUROPE"]);
   const [badges, setBadges] = useState<string[]>(service?.badges ?? []);
   const [description, setDescription] = useState(service?.description ?? "");
   const [basePriceUSD, setBasePriceUSD] = useState(String(service?.base_price_usd ?? 0));
@@ -196,12 +195,6 @@ export function ServiceForm({
 
   function scrollToSection(id: string) {
     document.getElementById(`service-form-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  function toggleRegion(region: string) {
-    setRegions((current) =>
-      current.includes(region) ? current.filter((item) => item !== region) : [...current, region],
-    );
   }
 
   function normalizeOption(option: ServiceOption, nextType: ServiceOption["type"]): ServiceOption {
@@ -390,7 +383,6 @@ export function ServiceForm({
       serviceCategoryId: categoryId || null,
       status,
       isHotOffer,
-      region: regions,
       badges,
       description,
       image,
@@ -521,23 +513,6 @@ export function ServiceForm({
                   <option value="active">active</option>
                   <option value="archived">archived</option>
                 </select>
-              </AdminFormField>
-              <AdminFormField label="Status">
-                <select className={adminSelectClass} value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
-                  <option value="draft">draft</option>
-                  <option value="active">active</option>
-                  <option value="archived">archived</option>
-                </select>
-              </AdminFormField>
-              <AdminFormField label="Region">
-                <div className="flex h-11 flex-wrap items-center gap-4">
-                  {["USA", "EUROPE"].map((region) => (
-                    <label key={region} className="flex items-center gap-2 text-sm text-white">
-                      <input type="checkbox" checked={regions.includes(region)} onChange={() => toggleRegion(region)} />
-                      {region}
-                    </label>
-                  ))}
-                </div>
               </AdminFormField>
               <label className="flex items-center gap-2 text-sm text-[var(--ms-text-secondary)] md:col-span-2">
                 <input type="checkbox" checked={isHotOffer} onChange={(e) => setIsHotOffer(e.target.checked)} />

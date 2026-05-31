@@ -138,7 +138,7 @@ Moon Strike has moved past the static prototype phase. The current working surfa
 | `<ServiceCard>` | Service image/thumbnail, custom badges, title, description, price, and service detail link. |
 | `<CategoryTabs>` | Scrollable horizontal pill tabs with left/right arrow nav. Landing genre tabs and Quick Select game tabs scroll one item at a time. |
 | `<StarRating>` | 5-star display with username and comment (TrustPilot style). |
-| `<RegionSelector>` | USA / EUROPE toggle pills where a page needs region-scoped pricing or availability. |
+| `<CurrencySelector>` | USD / EUR display toggle. Controls visible prices only; never controls service availability. |
 | `<Badge>` | Custom badge text from CMS for services; do not hardcode a fixed service badge list. |
 | `<ThemeToggle>` | Switches dark and light mode; persisted in user preference. |
 | `<SearchResults>` | Planned real-time overlay below the navbar search bar. Current global header search submits to `/services` with a query. `/services`, `/games`, and Quick Select already have CMS-backed search/filter behavior. |
@@ -263,7 +263,7 @@ If no Game record matches `[game-slug]` → call `notFound()`.
 7. Shared trust / why choose us content where applicable
 
 **Right Configurator:**
-- Region/currency-aware price display using independent USD/EUR values.
+- Currency-aware price display using independent USD/EUR values.
 - Base price plus live option pricing.
 - Current supported option widgets: dropdown, radio, checkbox group, range slider, number stepper, quantity, toggle, text, and textarea.
 - Quantity is CMS-controlled. It appears only if the service has a `quantity` option and multiplies the configured unit total.
@@ -528,7 +528,7 @@ Checkout
 - Use the same `<Footer>` on every page
 - Make all cards hoverable (subtle lift + border glow)
 - All prices in USD by default; currency toggle persists in global state
-- Region (USA/EUROPE) is a single global state — same as currency. Changing in one place updates all `<RegionSelector>` instances site-wide. Persists across navigation.
+- Currency (USD/EUR) is a single global state. Changing it in the header or service detail updates visible prices site-wide. Persists across navigation.
 
 ### DO NOT
 - Do not use white or light backgrounds anywhere in dark mode
@@ -555,7 +555,7 @@ Checkout
 > All models use Supabase PostgreSQL. Dynamic fields are stored as JSONB. All TypeScript fields use camelCase — Supabase maps these to snake_case DB columns automatically (e.g. `optionsSchema` ↔ `options_schema`).
 
 **Shared type used throughout:**
-`Region = "USA" | "EUROPE"` — `Service.region` and `PromoBanner.region` are `Region[]`. `Order.region` is a single `Region` value (whichever was active at checkout). `"BOTH"` is never used — represent both regions as `["USA", "EUROPE"]`.
+Currency = "USD" | "EUR" controls visible pricing only. Service availability is not region-based; active services are globally available unless modeled later as an option schema field.
 
 ---
 
@@ -610,7 +610,7 @@ The `/games` page sidebar and Landing Page game filter tabs auto-populate from d
 | status | string | `"active" \| "draft" \| "archived"` |
 | isHotOffer | boolean | `true` → appears in HOT OFFERS tab |
 | hotOfferAt | Date \| null | Set to `NOW()` when `isHotOffer` toggled on; cleared to `null` when toggled off. Used to sort Hot Offers page (`hotOfferAt DESC`). |
-| region | Region[] | `["USA"]`, `["EUROPE"]`, or `["USA", "EUROPE"]` |
+| region | Region[] | Legacy DB compatibility only. Keep default `["USA", "EUROPE"]`; do not expose as service availability in CMS. |
 | badges | string[] | Admin-managed. Options: `"Starts in < 15 mins"`, `"100% Completion"`, `"Safe & Secure"`, `"24/7 Support"` |
 | requirements | string[] | Rendered as checklist on Service Detail |
 | whatYouGet | Benefit[] | 2x2 benefit cards on Service Detail — see Benefit model below |
@@ -902,7 +902,7 @@ One record per block — shared across dark and light mode. Theme changes CSS on
 | name | string | |
 | image | string | Media Library URL |
 | gameId | string \| null | FK → Game. If set, banner only shows on that game's Services page. If null, acts as a regional default/fallback. |
-| region | Region[] | |
+| region | Region[] | Legacy compatibility only; keep default both regions. |
 | link | string? | Optional CTA link |
 | status | string | `"active" \| "scheduled" \| "draft"` |
 | scheduledAt | Date? | |
@@ -967,7 +967,7 @@ const { data: settings } = await supabase
 | Services Catalog (`/services`) | in-progress | Now CMS-backed via `listActiveServices()`. Category tabs are generated from active services and ordered by service category `sortOrder`. Submit search is wired; pagination/infinite scroll is pending. |
 | Game Services Page UI | in-progress | `/[game-slug]`, `/[game-slug]/hot-offers`, and `/[game-slug]/[category-slug]` are DB-backed. Category tabs use service category `sortOrder`. Infinite scroll and promo banner CMS are pending. |
 | Hot Offers Page UI | not-started | Dedicated `/hot-offers` route is still pending; hot-offer filtering exists inside game routes and service catalog logic. |
-| Service Detail UI | in-progress | DB-backed service detail renders image, badges, benefits, requirements, regions, and current option schema types with live pricing. Cart add/buy-now persistence is pending. |
+| Service Detail UI | in-progress | DB-backed service detail renders image, badges, benefits, requirements, global currency, and current option schema types with live pricing. Cart add/buy-now persistence is pending. |
 | Checkout Page UI | in-progress | `/checkout` UI exists against mock cart data. Payment actions are pending. |
 | Refund Policy UI | done | Implemented. |
 | Terms of Service UI | done | Implemented. |
@@ -984,7 +984,7 @@ const { data: settings } = await supabase
 | Cart | in-progress | UI still mock-backed. Real cart APIs, selected option snapshots, quantity persistence, remove/update, and auth merge are pending. |
 | Search | in-progress | `/services`, `/games`, and Quick Select search are wired. Global live overlay below navbar remains pending. |
 | Currency toggle | in-progress | Header currency state persists via `useCurrency`; full cart/detail synchronization is not complete. Service detail currently uses region-derived currency. |
-| Region toggle | in-progress | Service detail region selector changes USD/EUR display for that service. Global region persistence is pending. |
+| Currency toggle | in-progress | Header and service detail use global USD/EUR currency display. Cart/detail synchronization still needs final checkout integration. |
 | Light mode theme | done | CSS variable swap exists. |
 | Theme toggle | done | Toggle persists to `localStorage` and updates `<html data-theme>`. |
 | TrustPilot integration | not-started | Static review cards exist; TrustBox/API integration is pending. |
@@ -1001,7 +1001,7 @@ const { data: settings } = await supabase
 | Admin Users | in-progress | UI/search/actions exist with mock data. |
 | Admin Games | in-progress | CMS-backed list/create/edit/archive/delete flows exist with upload support; further validation/polish may remain. |
 | Admin Services List | done | CMS-backed list/filter/search/delete with active/draft/archived tabs, game/category filters, image thumbnails, slug-based edit/preview links, and service category management modal. |
-| Admin Service CMS | done | CMS-backed create/edit with upload image, custom badges, base USD/EUR price, service category, regions, benefits, requirements, sticky section nav/actions, and validated option builder. |
+| Admin Service CMS | done | CMS-backed create/edit with upload image, custom badges, base USD/EUR price, service category, benefits, requirements, sticky section nav/actions, and validated option builder. |
 | Admin Service Preview | done | `/admin/services/:game-slug/:service-slug/preview` via catch-all route renders draft storefront preview. Old ID URLs redirect when possible. |
 | Admin Order Management | in-progress | UI exists with mock orders. Backend transitions are pending. |
 | Admin Order Detail | in-progress | Status update/refund/chat UI exists. Gateway refund APIs and persistence are pending. |
@@ -1079,7 +1079,7 @@ const { data: settings } = await supabase
 | Service fees | Taxes and fees included in base price. No extra fee at checkout. |
 | Order cancellation | No cancelled state — customers request refunds instead. Admin approves or denies. |
 | Hot Offers | 4 random `isHotOffer = true` services via `ORDER BY RANDOM() LIMIT 4` — re-randomized per page load. No admin curation. |
-| Region | Single global state (USA / EUROPE). Updates all `<RegionSelector>` instances site-wide. Persists across navigation. `Region[]` everywhere except `Order.region` (single value at checkout). |
+| Currency | Single global state (USD / EUR). Updates header and service detail prices. Persists across navigation. Does not affect service availability. |
 | Light mode | CSS variable swap only — `<html data-theme="light">`. Same components, no separate content. |
 | Rate limiting | Supabase API gateway. See §12. |
 | Multi-order checkout | One payment → one Order per CartItem. All share a `checkoutSessionId`. Redirect: `/order-confirmed?session=[checkoutSessionId]`. |
@@ -1124,8 +1124,8 @@ src/
    terms-of-service/
    not-found.tsx               Global 404 page
    admin/                      All admin routes (see §10.14)
- hooks/                useCart, useCurrency, useRegion  ← both are global state, same pattern
- store/                Global state (currency, region, cart)
+ hooks/                useCart, useCurrency
+ store/                Global state (currency, cart)
  lib/                  API clients, utils, webhook verification
  types/                TypeScript interfaces (mirrors §6 models)
  styles/               Global CSS vars, theme tokens
@@ -1300,7 +1300,7 @@ Service Category dropdowns are populated from `ServiceCategory` records filtered
 - Bottom/top action area: sticky Save and Discard controls so edits can be saved from anywhere on the page.
 
 **Sections:**
-1. **Basic Info:** Service name, game, service category filtered by selected game, slug, status, hot offer, region availability, short description, and full description.
+1. **Basic Info:** Service name, game, service category filtered by selected game, slug, status, hot offer, short description, and full description.
 2. **Media:** Service thumbnail/image upload with recommended dimensions. Service cards and game service pages use this uploaded service image.
 3. **Pricing:** `basePriceUSD` and `basePriceEUR`. Currency values are entered independently.
 4. **Badges:** Fully custom free-text badge rows. Admin can add/remove badge names. No fixed badge list.

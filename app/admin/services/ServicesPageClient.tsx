@@ -13,6 +13,15 @@ import type { GameRow } from "@/lib/cms/games";
 import type { ServiceCategoryRow } from "@/lib/cms/service-categories";
 import type { ServiceRow } from "@/lib/cms/services";
 
+type CategoryFilterOption = {
+  key: string;
+  label: string;
+  value: string;
+  sortOrder: number;
+};
+
+const SERVICES_PER_PAGE = 20;
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -30,6 +39,40 @@ function sortCategories(categories: ServiceCategoryRow[]) {
   );
 }
 
+function getCategoryFilterOptions(categories: ServiceCategoryRow[], gameFilter: string): CategoryFilterOption[] {
+  if (gameFilter !== "all") {
+    return sortCategories(categories.filter((category) => category.game_id === gameFilter)).map((category) => ({
+      key: category.id,
+      label: category.name,
+      value: category.id,
+      sortOrder: category.sort_order,
+    }));
+  }
+
+  const options = new Map<string, CategoryFilterOption>();
+
+  sortCategories(categories).forEach((category) => {
+    const slug = category.slug || slugify(category.name);
+    const existing = options.get(slug);
+
+    if (!existing) {
+      options.set(slug, {
+        key: slug,
+        label: category.name,
+        value: `slug:${slug}`,
+        sortOrder: category.sort_order,
+      });
+      return;
+    }
+
+    if (category.sort_order < existing.sortOrder) {
+      options.set(slug, { ...existing, label: category.name, sortOrder: category.sort_order });
+    }
+  });
+
+  return Array.from(options.values()).sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label));
+}
+
 export function ServicesPageClient({
   categories,
   games,
@@ -45,6 +88,7 @@ export function ServicesPageClient({
   const [search, setSearch] = useState("");
   const [gameFilter, setGameFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [page, setPage] = useState(1);
   const [error, setError] = useState("");
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [categoryGameId, setCategoryGameId] = useState(games[0]?.id ?? "");
@@ -58,8 +102,7 @@ export function ServicesPageClient({
   const [deletingServiceId, setDeletingServiceId] = useState("");
 
   const availableCategories = useMemo(
-    () =>
-      sortCategories(categoryRows.filter((category) => gameFilter === "all" || category.game_id === gameFilter)),
+    () => getCategoryFilterOptions(categoryRows, gameFilter),
     [categoryRows, gameFilter]
   );
   const modalCategories = useMemo(
@@ -79,7 +122,11 @@ export function ServicesPageClient({
         service.title.toLowerCase().includes(search.toLowerCase()) ||
         service.slug.toLowerCase().includes(search.toLowerCase());
       const matchGame = gameFilter === "all" || service.game_id === gameFilter;
-      const matchCat = categoryFilter === "all" || service.service_category_id === categoryFilter;
+      const matchCat =
+        categoryFilter === "all" ||
+        (categoryFilter.startsWith("slug:")
+          ? service.service_category_slug === categoryFilter.replace("slug:", "")
+          : service.service_category_id === categoryFilter);
 
       return matchTab && matchSearch && matchGame && matchCat;
     }).sort(
@@ -90,6 +137,15 @@ export function ServicesPageClient({
         a.title.localeCompare(b.title),
     );
   }, [activeTab, categoryFilter, gameFilter, search, serviceRows]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / SERVICES_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedServices = filtered.slice((currentPage - 1) * SERVICES_PER_PAGE, currentPage * SERVICES_PER_PAGE);
+  const showingFrom = filtered.length > 0 ? (currentPage - 1) * SERVICES_PER_PAGE + 1 : 0;
+  const showingTo = filtered.length > 0 ? showingFrom + pagedServices.length - 1 : 0;
+
+  function resetPage() {
+    setPage(1);
+  }
 
   function resetCategoryModal() {
     setCategoryName("");
@@ -159,7 +215,7 @@ export function ServicesPageClient({
             : service
         )
       );
-      setCategoryFilter(result.category.id);
+      setCategoryFilter(gameFilter === "all" ? `slug:${result.category.slug}` : result.category.id);
       resetCategoryModal();
       setIsCategoryModalOpen(false);
     } catch {
@@ -203,7 +259,7 @@ export function ServicesPageClient({
             : service
         )
       );
-      if (categoryFilter === category.id) setCategoryFilter("all");
+      if (categoryFilter === category.id || categoryFilter === `slug:${category.slug}`) setCategoryFilter("all");
     } catch {
       setError("Unable to reach the service category endpoint.");
     } finally {
@@ -265,10 +321,16 @@ export function ServicesPageClient({
           { id: "archived", label: "Archived" },
         ]}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={(nextTab) => {
+          setActiveTab(nextTab);
+          resetPage();
+        }}
         searchPlaceholder="Search services..."
         searchValue={search}
-        onSearchChange={setSearch}
+        onSearchChange={(value) => {
+          setSearch(value);
+          resetPage();
+        }}
         extra={
           <>
             <select
@@ -276,6 +338,7 @@ export function ServicesPageClient({
               onChange={(e) => {
                 setGameFilter(e.target.value);
                 setCategoryFilter("all");
+                resetPage();
               }}
               className="bg-[var(--ms-secondary)] border border-[var(--ms-accent)] text-white text-sm rounded-lg px-4 py-2.5"
             >
@@ -288,19 +351,22 @@ export function ServicesPageClient({
             </select>
             <select
               value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                resetPage();
+              }}
               className="bg-[var(--ms-secondary)] border border-[var(--ms-accent)] text-white text-sm rounded-lg px-4 py-2.5"
             >
               <option value="all">All Categories</option>
               {availableCategories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
+                <option key={category.key} value={category.value}>
+                  {category.label}
                 </option>
               ))}
             </select>
           </>
         }
-        counter={`Showing ${filtered.length > 0 ? 1 : 0}-${filtered.length} of ${serviceRows.length}`}
+        counter={`Showing ${showingFrom}-${showingTo} of ${filtered.length}`}
       />
 
       {error && (
@@ -311,9 +377,39 @@ export function ServicesPageClient({
 
       <AdminDataTable
         columns={["SERVICE", "GAME", "SERVICE CATEGORY", "BASE PRICE", "STATUS", "ACTIONS"]}
-        footer={<AdminPagination showingFrom={filtered.length > 0 ? 1 : 0} showingTo={filtered.length} total={serviceRows.length} totalPages={1} />}
+        footer={
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <AdminPagination
+              showingFrom={showingFrom}
+              showingTo={showingTo}
+              total={filtered.length}
+              totalPages={totalPages}
+            />
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                disabled={currentPage <= 1}
+                onClick={() => setPage((value) => Math.max(1, value - 1))}
+                className="rounded-lg border border-[#172554] px-3 py-2 text-xs font-semibold text-[#94A3B8] transition-colors hover:border-[#22D3EE] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <span className="text-xs text-[#64748B]">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                className="rounded-lg border border-[#172554] px-3 py-2 text-xs font-semibold text-[#94A3B8] transition-colors hover:border-[#22D3EE] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        }
       >
-        {filtered.map((service) => (
+        {pagedServices.map((service) => (
           <tr key={service.id} className="hover:bg-[#111827] transition-colors">
             <td className="px-6 py-4">
               <div className="flex items-center gap-3">

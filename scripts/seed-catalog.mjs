@@ -404,11 +404,10 @@ async function main() {
         service_category_id: category?.id,
         status: 'active',
         is_hot_offer: template.hot,
-        region: ['USA', 'EUROPE'],
         badges: template.tags,
         requirements: [
           'Active game account with access to selected content.',
-          'Correct region selected before checkout.',
+          'Correct service options selected before checkout.',
           'Account-specific details shared through support chat after purchase.',
         ],
         what_you_get: [

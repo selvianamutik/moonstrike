@@ -6,7 +6,6 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 
 const STATUSES = new Set(['active', 'draft', 'archived'])
-const REGIONS = new Set(['USA', 'EUROPE'])
 const OPTION_TYPES = new Set([
   'dropdown',
   'radio',
@@ -119,10 +118,6 @@ function parsePayload(body: any) {
     typeof body?.status === 'string' && STATUSES.has(body.status)
       ? body.status
       : 'draft'
-  const regions = Array.isArray(body?.region)
-    ? body.region.filter((region: string) => REGIONS.has(region))
-    : ['USA', 'EUROPE']
-
   return {
     title,
     slug,
@@ -132,7 +127,6 @@ function parsePayload(body: any) {
     service_category_id: categoryId,
     status,
     is_hot_offer: body?.isHotOffer === true,
-    region: regions.length > 0 ? regions : ['USA', 'EUROPE'],
     badges: Array.isArray(body?.badges)
       ? body.badges
           .filter((value: unknown) => typeof value === 'string' && value.trim())

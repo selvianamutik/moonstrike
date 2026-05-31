@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PlaceholderAsset } from "@/components/asset-image";
+import { ScrollingTabList, type ScrollingTabItem } from "@/components/scrolling-tab-list";
 import { ServiceCard } from "@/components/service-card";
 import type { GameService } from "@/lib/catalog";
 
@@ -79,6 +80,16 @@ export function ServicesCatalog({
     (service) => matchesCategory(service, activeCategory) && matchesQuery(service, query),
   );
   const activeLabel = serviceTabs.find((tab) => tab.value === activeCategory)?.label ?? "Services";
+  const fixedTabs: ScrollingTabItem[] = serviceTabs.slice(0, 2).map((tab) => ({
+    href: servicesHref(tab.value, query),
+    key: tab.value,
+    label: tab.label,
+  }));
+  const scrollingTabs: ScrollingTabItem[] = serviceTabs.slice(2).map((tab) => ({
+    href: servicesHref(tab.value, query),
+    key: tab.value,
+    label: tab.label,
+  }));
 
   return (
     <>
@@ -118,36 +129,29 @@ export function ServicesCatalog({
             Seasonal Boost Catalog
           </h2>
           <p className="mt-4 max-w-lg text-sm leading-6 text-[var(--ms-body)]">
-            Browse hot offers, dungeon runs, powerleveling, raids, and story clears for your selected region.
+            Browse hot offers, dungeon runs, powerleveling, raids, and story clears in your preferred currency.
           </p>
         </div>
         <div className="relative z-10 text-left md:text-center">
           <div className="inline-flex rounded-full border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-1">
             <span className="h-9 rounded-full bg-[var(--primary)] px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]">
-              USA
+              USD
             </span>
             <span className="h-9 rounded-full px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] text-[var(--ms-body)]">
-              Europe
+              EUR
             </span>
           </div>
-          <p className="mt-3 text-sm text-[var(--ms-gradient-end)]">USA / Europe pricing view</p>
+          <p className="mt-3 text-sm text-[var(--ms-gradient-end)]">USD / EUR pricing view</p>
         </div>
       </PlaceholderAsset>
 
-      <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-        {serviceTabs.map((tab) => (
-          <Link
-            key={tab.value}
-            href={servicesHref(tab.value, query)}
-            className={`inline-flex h-10 items-center justify-center rounded-full px-5 mono text-xs uppercase tracking-[0.22em] ${
-              tab.value === activeCategory
-                ? "ms-button"
-                : "border border-[var(--ms-border)] bg-[var(--ms-bg-card)] text-[var(--ms-heading)] hover:border-[var(--ms-gradient-end)] hover:bg-[var(--ms-hover-bg)]"
-            }`}
-          >
-            {tab.label}
-          </Link>
-        ))}
+      <div className="mt-8">
+        <ScrollingTabList
+          activeKey={activeCategory}
+          ariaLabel="service categories"
+          fixedTabs={fixedTabs}
+          scrollingTabs={scrollingTabs}
+        />
       </div>
 
       <div className="mt-6 flex flex-col justify-between gap-3 text-sm text-[var(--ms-body)] md:flex-row md:items-center">
@@ -165,7 +169,7 @@ export function ServicesCatalog({
       {filteredServices.length > 0 ? (
         <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
           {filteredServices.map((service) => (
-            <ServiceCard key={service.slug} service={service} />
+            <ServiceCard key={`${service.gameSlug}-${service.slug}`} service={service} />
           ))}
         </div>
       ) : (

@@ -5,11 +5,9 @@ import { useMemo, useState } from "react";
 import { PlaceholderAsset } from "@/components/asset-image";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { Badge, RegionSelector } from "@/components/ui";
+import { Badge } from "@/components/ui";
+import { useCurrency, type Currency } from "@/hooks/useCurrency";
 import type { ServiceOption, ServiceRow } from "@/lib/cms/services";
-
-type Region = "USA" | "EUROPE";
-type Currency = "USD" | "EUR";
 
 function optionLabel(option: ServiceOption) {
   if (option.type === "dropdown") return "Dropdown";
@@ -51,21 +49,12 @@ function getDefaultSelection(option: ServiceOption): SelectionValue {
   return option.options?.[0]?.label ?? "";
 }
 
-function currencyForRegion(region: Region): Currency {
-  return region === "EUROPE" ? "EUR" : "USD";
-}
-
 function formatMoney(value: number, currency: Currency) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
     minimumFractionDigits: 2,
   }).format(value);
-}
-
-function getAvailableRegions(service: ServiceRow): Region[] {
-  const regions = service.region.filter((region): region is Region => region === "USA" || region === "EUROPE");
-  return regions.length > 0 ? regions : ["USA", "EUROPE"];
 }
 
 function calculateOptionTotal(option: ServiceOption, value: SelectionValue, currency: Currency) {
@@ -354,9 +343,7 @@ export function ServiceDetail({
   service: ServiceRow;
   showSiteChrome?: boolean;
 }) {
-  const availableRegions = getAvailableRegions(service);
-  const [region, setRegion] = useState<Region>(availableRegions[0]);
-  const currency = currencyForRegion(region);
+  const { currency, setCurrency } = useCurrency();
   const [selections, setSelections] = useState<Record<string, SelectionValue>>(() =>
     Object.fromEntries(service.options_schema.map((option) => [option.label, getDefaultSelection(option)]))
   );
@@ -464,8 +451,21 @@ export function ServiceDetail({
 
         <aside className="ms-card h-fit rounded-xl p-6 shadow-[0_20px_80px_rgba(0,0,0,0.35)] lg:sticky lg:top-32">
           <h2 className="text-lg font-medium">Configure Your Run</h2>
-          <div className="mt-6">
-            <RegionSelector active={region} availableRegions={availableRegions} onChange={setRegion} />
+          <div className="mt-6 inline-flex rounded-full border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-1">
+            {(["USD", "EUR"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setCurrency(option)}
+                className={`h-9 rounded-full px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] transition-colors ${
+                  currency === option
+                    ? "bg-[var(--primary)] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]"
+                    : "text-[var(--ms-body)] hover:text-[var(--ms-heading)]"
+                }`}
+              >
+                {option}
+              </button>
+            ))}
           </div>
           <div className="mt-8">
             <ServiceOptions
@@ -477,7 +477,7 @@ export function ServiceDetail({
           </div>
           <div className="mt-8 border-t border-[var(--ms-border)] pt-8">
             <p className="mono text-right text-sm uppercase tracking-[0.18em] text-[var(--ms-body)]">
-              {region} / {currency}
+              {currency}
             </p>
             <div className="mt-8 flex justify-between text-sm">
               <span className="text-[var(--ms-body)]">Base Price</span>

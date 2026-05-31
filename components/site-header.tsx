@@ -46,7 +46,7 @@ export function SiteHeader() {
           className="ms-button hidden h-11 px-4 mono text-xs uppercase tracking-[0.16em] md:inline-flex"
           aria-label="Toggle currency"
         >
-          {currency === "USD" ? "$ USD" : "EUR"}
+          {currency === "USD" ? "$ USD" : "€ EUR"}
         </button>
 
         <div className="hidden xl:block">

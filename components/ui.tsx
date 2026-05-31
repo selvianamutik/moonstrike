@@ -185,7 +185,11 @@ export function SearchResults({ query, services }: { query: string; services: Se
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {services.map((service) => (
-        <Link key={service.slug} href={getServiceDetailHref(service)} className="ms-card ms-card-hover rounded-lg p-3">
+        <Link
+          key={`${service.gameSlug}-${service.slug}`}
+          href={getServiceDetailHref(service)}
+          className="ms-card ms-card-hover rounded-lg p-3"
+        >
           <PlaceholderAsset alt={`${service.name} search result`} className="h-28 rounded-md" imageClassName="p-4" />
           <h3 className="mt-3 font-bold text-[var(--ms-heading)]">{service.name}</h3>
         </Link>
