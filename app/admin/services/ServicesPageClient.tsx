@@ -21,6 +21,7 @@ type CategoryFilterOption = {
 };
 
 const SERVICES_PER_PAGE = 20;
+const HOT_OFFER_FILTER = "hot-offers";
 
 function slugify(value: string) {
   return value
@@ -124,6 +125,7 @@ export function ServicesPageClient({
       const matchGame = gameFilter === "all" || service.game_id === gameFilter;
       const matchCat =
         categoryFilter === "all" ||
+        (categoryFilter === HOT_OFFER_FILTER && service.is_hot_offer) ||
         (categoryFilter.startsWith("slug:")
           ? service.service_category_slug === categoryFilter.replace("slug:", "")
           : service.service_category_id === categoryFilter);
@@ -358,6 +360,7 @@ export function ServicesPageClient({
               className="bg-[var(--ms-secondary)] border border-[var(--ms-accent)] text-white text-sm rounded-lg px-4 py-2.5"
             >
               <option value="all">All Categories</option>
+              <option value={HOT_OFFER_FILTER}>Hot Offers</option>
               {availableCategories.map((category) => (
                 <option key={category.key} value={category.value}>
                   {category.label}

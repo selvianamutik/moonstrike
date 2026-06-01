@@ -39,15 +39,6 @@ function optionValue(value: string | string[] | number | boolean) {
   return String(value);
 }
 
-function calculateTotals(subtotal: number) {
-  return {
-    subtotal,
-    serviceFee: Math.round(subtotal * 0.04 * 100) / 100,
-    discount: 0,
-    taxes: 0,
-  };
-}
-
 export function CartPageClient() {
   const { currency } = useCurrency();
   const [items, setItems] = useState<CartApiItem[]>([]);
@@ -105,8 +96,17 @@ export function CartPageClient() {
     () => items.reduce((total, item) => total + (currency === "EUR" ? item.priceEUR : item.priceUSD), 0),
     [currency, items],
   );
-  const totals = calculateTotals(subtotal);
-  const total = totals.subtotal + totals.serviceFee + totals.taxes - totals.discount;
+  const summaryItems = useMemo(
+    () =>
+      items.map((item) => ({
+        id: item.id,
+        image: item.service?.image,
+        meta: item.service?.gameName,
+        name: item.service?.title ?? "Service",
+        price: formatMoney(currency === "EUR" ? item.priceEUR : item.priceUSD, currency),
+      })),
+    [currency, items],
+  );
 
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
@@ -194,15 +194,11 @@ export function CartPageClient() {
         <OrderSummary
           ctaHref={items.length > 0 ? "/checkout" : undefined}
           ctaLabel={items.length > 0 ? "Proceed to Checkout" : undefined}
-          rows={[
-            { label: "Subtotal", value: formatMoney(totals.subtotal, currency) },
-            { label: "Service Fee", value: formatMoney(totals.serviceFee, currency) },
-            { label: "Discount", value: `-${formatMoney(totals.discount, currency)}` },
-            { label: "Taxes", value: formatMoney(totals.taxes, currency) },
-          ]}
+          items={summaryItems}
+          rows={[]}
           serviceName={`${items.length} configured services`}
           serviceMeta={`Cart priced in ${currency}`}
-          total={formatMoney(total, currency)}
+          total={formatMoney(subtotal, currency)}
         />
       </section>
       <SiteFooter />
