@@ -7,9 +7,9 @@
 
 ## Current Progress Snapshot
 
-_Last refreshed: 2026-05-31_
+_Last refreshed: 2026-06-01_
 
-Moon Strike has moved past the static prototype phase. The current working surface is Supabase-backed auth, admin auth, game CMS, genre CMS, service category CMS, service CMS, service image upload, CMS-backed storefront service browsing, and CMS-backed Quick Select.
+Moon Strike has moved past the static prototype phase. The current working surface is Supabase-backed auth, admin auth, game CMS, genre CMS, service category CMS, service CMS, service image upload, CMS-backed storefront browsing, CMS-backed Quick Select, browser-session cart APIs, and real add-to-cart/remove-cart flows.
 
 **Implemented / mostly working:**
 - Customer auth: email/password, Google OAuth, verification, reset password, profile edit, connected accounts, and auth gates.
@@ -18,9 +18,9 @@ Moon Strike has moved past the static prototype phase. The current working surfa
 - Admin services: list/filter/search/delete, service categories per game, slug-based edit/preview routes, service images, custom badges, sticky editor layout, and validated option schema builder.
 - Storefront catalog: landing game section, `/games`, `/services`, `/[game-slug]`, category pages, service detail pages, and Quick Select use CMS data instead of mock service data.
 - Seeds: `npm run admin:seed`, `npm run admin:reseed`, and `npm run catalog:seed` for 20 games with 20 services per game plus option schemas.
+- Browser-session cart: anonymous/login/logout in the same browser all use the same `ms_cart_session` cart; service detail Add to Cart and Buy Now persist selected option snapshots.
 
 **Still pending / mock-backed:**
-- Real cart APIs and cart persistence.
 - Checkout/payment gateways and webhook handling.
 - Order lifecycle persistence, refunds, and Google Sheets sync.
 - Support chat persistence/realtime.
@@ -131,7 +131,7 @@ Moon Strike has moved past the static prototype phase. The current working surfa
 
 | Component | Description |
 |---|---|
-| `<Navbar>` / `<SiteHeader>` | Logo, Quick Select trigger, `/services` search form, currency toggle (USD/EUR, persisted in `localStorage`), Services link, About anchor, cart icon (`/cart`), theme toggle, and Login/Profile state from Supabase Auth. Current implementation lives in `components/site-header.tsx`. |
+| `<Navbar>` / `<SiteHeader>` | Logo, Quick Select trigger, `/services` search form, currency toggle (USD/EUR, persisted in `localStorage`), Games link, Notifications link, cart icon (`/cart`), theme toggle, and Login/Profile state from Supabase Auth. Current implementation lives in `components/site-header.tsx`. Cart count badge and live search overlay are still pending. |
 | `<QuickSelectMenu>` | CMS-backed services menu. Fetches `/api/catalog/quick-select`, renders active games/services only, uses a body portal overlay, closes on outside click/Escape, and uses a one-step game carousel with fixed All + prev/next controls. |
 | `<Footer>` | Logo, sitemap, legal links, genres, social links, disclaimer, copyright. |
 | `<GameCard>` | Image thumbnail, genre tags, game name, short description. |
@@ -376,7 +376,7 @@ If `orderId` doesn't belong to the logged-in user → call `notFound()` to rende
 **Rules:**
 - Anonymous users can add to cart — items stored against a `session_id` in a cookie (`ms_cart_session`, 30-day HttpOnly cookie)
 - All anonymous cart operations go through server-side API routes using the service role key — the Supabase client is never used directly for anonymous cart writes
-- On login, anonymous CartItems are merged into the user's account cart automatically
+- Cart is browser-session based: anonymous, logged-in, and logged-out states in the same browser all use the same `ms_cart_session` cart
 - Anonymous cart cookie (`ms_cart_session`) has a **30-day expiry** — independent of the support chat session (1-hour TTL). These are two separate cookies with separate lifetimes
 - Same service can appear multiple times as separate rows (each is a distinct CartItem)
 - Prices are locked at add-to-cart time — no live recalculation from service changes
@@ -739,7 +739,7 @@ Each CartItem becomes exactly one Order on checkout. Adding the same service twi
 | createdAt | Date | |
 | updatedAt | Date | |
 
-> Anonymous cart operations always go through server-side API routes using the service role key. The Supabase client is never used directly for anonymous cart reads or writes. On login, CartItems are moved to the user's cart and the anonymous cart is deleted automatically.
+> Anonymous cart operations always go through server-side API routes using the service role key. The Supabase client is never used directly for anonymous cart reads or writes. Cart is browser-session based: the same `ms_cart_session` cart remains visible across anonymous, logged-in, and logged-out states in the same browser.
 
 **CartItem**
 
@@ -954,7 +954,7 @@ const { data: settings } = await supabase
 ### Current Implementation Audit (2026-05-31)
 
 - Verification: `npm.cmd run lint` passes after the current auth/admin/CMS/service updates.
-- Data/integration state: Supabase-backed auth, admin session, games CMS, genres CMS, service categories, service CMS, service images, CMS-backed `/services`, and CMS-backed Quick Select are implemented. Cart, checkout, payment gateways, chat persistence, Google Sheets, and order lifecycle persistence remain pending or mock-backed.
+- Data/integration state: Supabase-backed auth, admin session, games CMS, genres CMS, service categories, service CMS, service images, CMS-backed `/services`, CMS-backed Quick Select, and browser-session cart APIs are implemented. Checkout, payment gateways, chat persistence, Google Sheets, and order lifecycle persistence remain pending or mock-backed.
 - Routing state: canonical service routes are `/:game-slug/:category-slug/:service-slug`. Admin service edit/preview uses `/admin/services/[...servicePath]` and supports slug URLs like `/admin/services/:game-slug/:service-slug/edit`.
 - Generated/seed data: `npm run catalog:seed` seeds games, genres, service categories, services, and representative `options_schema` entries.
 
@@ -967,28 +967,27 @@ const { data: settings } = await supabase
 | Services Catalog (`/services`) | in-progress | Now CMS-backed via `listActiveServices()`. Category tabs are generated from active services and ordered by service category `sortOrder`. Submit search is wired; pagination/infinite scroll is pending. |
 | Game Services Page UI | in-progress | `/[game-slug]`, `/[game-slug]/hot-offers`, and `/[game-slug]/[category-slug]` are DB-backed. Category tabs use service category `sortOrder`. Infinite scroll and promo banner CMS are pending. |
 | Hot Offers Page UI | not-started | Dedicated `/hot-offers` route is still pending; hot-offer filtering exists inside game routes and service catalog logic. |
-| Service Detail UI | in-progress | DB-backed service detail renders image, badges, benefits, requirements, global currency, and current option schema types with live pricing. Cart add/buy-now persistence is pending. |
+| Service Detail UI | in-progress | DB-backed service detail renders image, badges, benefits, requirements, global currency, current option schema types, live pricing, and real Add to Cart / Buy Now persistence. Checkout remains pending. |
 | Checkout Page UI | in-progress | `/checkout` UI exists against mock cart data. Payment actions are pending. |
 | Refund Policy UI | done | Implemented. |
 | Terms of Service UI | done | Implemented. |
 | Privacy Policy UI | not-started | Same layout as ToS and Refund Policy. |
 | Quick Select Mega Menu | done | CMS-backed via `/api/catalog/quick-select`; game carousel uses fixed All + prev/next + animated one-step scrolling; service links use canonical detail URLs. |
-| Global Navbar | in-progress | Shared header uses Supabase auth state, quick select, `/services` search, cart link, theme toggle, and persisted currency toggle. Cart count and live search overlay remain pending. |
+| Global Navbar | in-progress | Shared header uses Supabase auth state, quick select, `/services` search, Games link, Notifications link, cart link, theme toggle, and persisted currency toggle. Cart count and live search overlay remain pending. |
 | Global Footer | done | Shared footer exists; some placeholder links may remain. |
 | Global Chat Bubble | in-progress | UI exists; Supabase realtime/persistence is pending. |
-| Customer Login | in-progress | Supabase email/password, Google OAuth, reset password, rate limits, safe `next`, callback errors, resend verification, and auth gates are wired. Cart merge is pending. |
+| Customer Login | in-progress | Supabase email/password, Google OAuth, reset password, rate limits, safe `next`, callback errors, resend verification, and auth gates are wired. Cart is browser-session based, so the same browser cart remains visible before/after login/logout. |
 | Customer Register | in-progress | Supabase sign-up, provider-aware checks, app rate limit, Google OAuth, confirm password validation, verification/resend UX are wired. Profile persistence beyond auth metadata is pending. |
 | Customer Profile | in-progress | Auth-gated profile and edit flow exist, including metadata username updates, password changes, Google identity linking, connected accounts, and email/password addition for OAuth users. Avatar upload/real orders remain pending. |
 | Order History | in-progress | Mock order rows and status badges exist. |
 | Order Detail | in-progress | Mock order detail/timeline/refund UI exists. |
-| Cart | in-progress | UI still mock-backed. Real cart APIs, selected option snapshots, quantity persistence, remove/update, and auth merge are pending. |
+| Cart | in-progress | Real browser-session cart APIs, selected option snapshots, Add to Cart, Buy Now, remove item, and currency display are wired. Checkout integration, cart count badge, and edit configured options remain pending. |
 | Search | in-progress | `/services`, `/games`, and Quick Select search are wired. Global live overlay below navbar remains pending. |
-| Currency toggle | in-progress | Header currency state persists via `useCurrency`; full cart/detail synchronization is not complete. Service detail currently uses region-derived currency. |
-| Currency toggle | in-progress | Header and service detail use global USD/EUR currency display. Cart/detail synchronization still needs final checkout integration. |
+| Currency toggle | in-progress | Header, service cards, service detail, and cart use global USD/EUR currency display. Checkout integration remains pending. |
 | Light mode theme | done | CSS variable swap exists. |
 | Theme toggle | done | Toggle persists to `localStorage` and updates `<html data-theme>`. |
 | TrustPilot integration | not-started | Static review cards exist; TrustBox/API integration is pending. |
-| Notifications | not-started | In-app bell + email for customers. |
+| Notifications | in-progress | Navbar links to `/notifications`; placeholder notification center exists. Real notification persistence and email/in-app events are pending. |
 | Mobile / responsive layouts | in-progress | Tailwind breakpoints exist; browser screenshot QA still recommended. |
 | Not Found page (404) | in-progress | `app/not-found.tsx` exists; dynamic route behavior should be rechecked after slug-route changes. |
 
@@ -1035,7 +1034,7 @@ const { data: settings } = await supabase
 | Google Sheets integration | not-started | Orders + Transactions tabs pending. |
 | Real-time chat | not-started | Supabase Realtime pending. |
 | Admin second factor | removed | Extra login factors intentionally out of scope. |
-| Anonymous cart API routes | not-started | Pending. |
+| Anonymous cart API routes | in-progress | Browser-session cart uses `ms_cart_session` and server-side service role routes for add/list/remove. Checkout integration pending. |
 | Backend API routes | in-progress | Auth/admin/CMS/catalog APIs exist. Cart, payments, webhooks, chat, and notifications pending. |
 ---
 
@@ -1073,7 +1072,7 @@ const { data: settings } = await supabase
 | Booster role | No separate booster role — Admin = booster. One role only. |
 | Order state machine | No escrow — refunds go directly to the payment gateway. See §11. |
 | Search | Real-time overlay, debounced 300ms. Service titles only — image + name, max 6 results. Closes on click outside or Escape. |
-| Cart | Same service can be added multiple times as separate CartItems. Anonymous cart uses `ms_cart_session` cookie (30-day TTL). All anonymous cart operations go server-side via service role key. |
+| Cart | Same service can be added multiple times as separate CartItems. Cart uses the browser `ms_cart_session` cookie (30-day TTL) consistently across anonymous/login/logout states. All cart operations go server-side via service role key. |
 | Reviews | TrustPilot TrustBox Carousel embed — client-side, no DB storage, no server API calls. |
 | Crypto refund | Wallet address collected at refund request time (required by NowPayments). |
 | Service fees | Taxes and fees included in base price. No extra fee at checkout. |
@@ -1867,7 +1866,7 @@ Admin auth does not use Supabase Auth — see §8 and §10.2.
 
 ---
 
-*Last updated: 2026-05-31 - auth, admin CMS, games, services, Quick Select, and seed progress reflected.*
+*Last updated: 2026-06-01 - navbar Games/Notifications, browser-session cart APIs, add/remove cart, and currency-synced cart progress reflected.*
 *Design references: all screenshots stored in `/design-refs/`.*
 
 ---
@@ -1885,11 +1884,11 @@ Test every flow end-to-end as a real user before going live. Use Stripe test car
 | Register → verify email → login | Confirmation email arrives via Resend, link works, redirects to profile |
 | Register with Google OAuth | Account created, redirected correctly |
 | Forgot password | Reset email arrives, link opens reset form, redirect to login on success |
-| Add to cart (anonymous) → login → cart merge | Items survive login, prices and options intact |
+| Add to cart (anonymous) -> login/logout same browser | Items stay visible because cart is keyed by `ms_cart_session`, not auth state |
 | Add same service twice | Two separate CartItems appear in cart |
 | Configure service → Add to Cart → Buy Now → Cart | Cart opens, item shown with correct options and price |
 | Cart currency toggle | Prices update across cart, navbar, and service detail simultaneously |
-| Cart region toggle | Services filter correctly, persists across navigation |
+| Cart currency toggle after login/logout | Same browser cart keeps items and prices update with global USD/EUR toggle |
 | Proceed to Checkout (anonymous) | Redirected to login, returned to cart after login |
 | Full purchase — Stripe card | Payment clears, orders created, Order Confirmed page shows all purchased services, cart emptied, admin notified |
 | Full purchase — NowPayments crypto | Webhook fires, signature verified, orders created, wallet address flow works on refund |
