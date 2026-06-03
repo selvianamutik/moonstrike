@@ -9,7 +9,7 @@
 
 _Last refreshed: 2026-06-01_
 
-Moon Strike has moved past the static prototype phase. The current working surface is Supabase-backed auth, admin auth, game CMS, genre CMS, service category CMS, service CMS, service image upload, CMS-backed storefront browsing, CMS-backed Quick Select, browser-session cart APIs, and real add-to-cart/remove-cart flows.
+Moon Strike has moved past the static prototype phase. The current working surface is Supabase-backed auth, admin auth, game CMS, genre CMS, service category CMS, service CMS, service image upload, CMS-backed storefront browsing, CMS-backed Quick Select, browser-session cart APIs, real add-to-cart/remove-cart flows, real-cart checkout, Stripe sandbox Checkout Sessions, frozen checkout snapshots, idempotent Stripe webhook fulfillment, payment transactions, order confirmation, real customer order history/detail readout, and real admin order management.
 
 **Implemented / mostly working:**
 - Customer auth: email/password, Google OAuth, verification, reset password, profile edit, connected accounts, and auth gates.
@@ -21,7 +21,7 @@ Moon Strike has moved past the static prototype phase. The current working surfa
 - Browser-session cart: anonymous/login/logout in the same browser all use the same `ms_cart_session` cart; service detail Add to Cart and Buy Now persist selected option snapshots.
 
 **Still pending / mock-backed:**
-- Checkout/payment gateways and webhook handling.
+- NowPayments payment submission and webhook handling.
 - Order lifecycle persistence, refunds, and Google Sheets sync.
 - Support chat persistence/realtime.
 - Dedicated `/hot-offers` route and final CMS polish for all landing blocks.
@@ -267,7 +267,7 @@ If no Game record matches `[game-slug]` → call `notFound()`.
 - Base price plus live option pricing.
 - Current supported option widgets: dropdown, radio, checkbox group, range slider, number stepper, quantity, toggle, text, and textarea.
 - Quantity is CMS-controlled. It appears only if the service has a `quantity` option and multiplies the configured unit total.
-- Add to Cart / Buy Now UI is present, but cart persistence and checkout remain pending.
+- Add to Cart persists configured snapshots. Buy Now adds the configured service and moves the customer into the cart/checkout flow.
 
 **Price calculation:**
 ```
@@ -394,7 +394,7 @@ If `orderId` doesn't belong to the logged-in user → call `notFound()` to rende
 
 **Right:** Order summary — lists ALL CartItems (one row per service: thumbnail · name · options summary · line total) · Grand total (sum of all items, large, cyan, taxes included) · Complete Purchase button (gradient) · SSL note · legal note.
 
-> Prototype shows one item — actual implementation shows all cart items. One payment covers the full cart. Backend creates one `Order` record per `CartItem` on payment success. All orders from the same payment share a `checkoutSessionId` (the Stripe Payment Intent ID or NowPayments payment ID).
+> Prototype shows one item — actual implementation shows all cart items. One payment covers the full cart. Backend creates one `Order` record per `CartItem` on payment success. All orders from the same payment share a `checkoutSessionId` (Stripe Checkout Session ID for card payments, NowPayments payment ID for crypto).
 
 **On payment success:** Redirect to `/order-confirmed?session=[checkoutSessionId]`.
 
@@ -735,7 +735,7 @@ Each CartItem becomes exactly one Order on checkout. Adding the same service twi
 |---|---|---|
 | id | string | |
 | userId | string \| null | `null` for anonymous carts |
-| sessionId | string \| null | Set for anonymous carts (`ms_cart_session` cookie, 30-day TTL). Cleared after login merge. |
+| sessionId | string \| null | Browser-session cart key (`ms_cart_session` cookie, 30-day TTL). Stays consistent across anonymous/login/logout in the same browser. |
 | createdAt | Date | |
 | updatedAt | Date | |
 
@@ -766,7 +766,7 @@ Orders only exist post-payment. No pre-payment state. No escrow — refunds go d
 | cartItemId | string | FK → CartItem |
 | serviceId | string | FK → Service |
 | userId | string | FK → auth.users |
-| checkoutSessionId | string | Groups all Orders from the same payment. Equals the Stripe Payment Intent ID or NowPayments payment ID. Used by `/order-confirmed?session=[id]` to fetch all sibling orders. |
+| checkoutSessionId | string | Groups all Orders from the same payment. For Stripe this is the Checkout Session ID (`cs_...`); the Payment Intent is stored separately in `stripePaymentIntentId`. For NowPayments this is the payment ID. Used by `/order-confirmed?session=[id]` to fetch all sibling orders. |
 | selectedOptionsSnapshot | JSONB | Copied from `CartItem.selectedOptionsSnapshot` at checkout. Use this for all display, history, and Google Sheets writes — `selectedOptions` does not exist on Order. |
 | total | number | Taxes and fees included in base price |
 | currency | string | `"USD"` \| `"EUR"` |
@@ -799,6 +799,28 @@ Orders only exist post-payment. No pre-payment state. No escrow — refunds go d
 
 ---
 
+### Transaction
+
+One row per successful payment attempt. Transactions are the payment ledger; Orders are the fulfillment records created from that paid checkout. A single Transaction can map to multiple Orders through `checkoutSessionId`.
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | |
+| checkoutSessionId | string | Unique. For Stripe this is the Checkout Session ID (`cs_...`). |
+| userId | string | FK ? auth.users |
+| provider | string | `"stripe"` \| `"nowpayments"` |
+| providerPaymentId | string | Stripe PaymentIntent ID or NowPayments payment ID |
+| providerSessionId | string \| null | Stripe Checkout Session ID when provider = `stripe` |
+| amount | number | Amount actually paid according to the provider |
+| currency | string | `"USD"` \| `"EUR"` |
+| method | string | e.g. `Stripe Checkout` |
+| status | string | `success` \| `pending` \| `disputed` \| `refunded` \| `failed` |
+| refundStatus | string | `none` \| `requested` \| `approved` \| `rejected` \| `refunded` |
+| rawProviderPayload | JSONB | Minimal provider payload snapshot for audit/debugging. Never store secrets. |
+| createdAt | Date | |
+| updatedAt | Date | |
+
+---
 ### AdminUser
 
 One role only: `ADMIN`. Admin = booster. No partial-access roles. Auth is manual (scrypt password hash + signed JWT cookie) — not Supabase Auth. See §8 and §10.2.
@@ -954,7 +976,7 @@ const { data: settings } = await supabase
 ### Current Implementation Audit (2026-05-31)
 
 - Verification: `npm.cmd run lint` passes after the current auth/admin/CMS/service updates.
-- Data/integration state: Supabase-backed auth, admin session, games CMS, genres CMS, service categories, service CMS, service images, CMS-backed `/services`, CMS-backed Quick Select, and browser-session cart APIs are implemented. Checkout, payment gateways, chat persistence, Google Sheets, and order lifecycle persistence remain pending or mock-backed.
+- Data/integration state: Supabase-backed auth, admin session, games CMS, genres CMS, service categories, service CMS, service images, CMS-backed `/services`, CMS-backed Quick Select, browser-session cart APIs, and real-cart checkout UI are implemented. NowPayments, chat persistence, Google Sheets, refund gateway handling, and full order lifecycle automation remain pending or mock-backed.
 - Routing state: canonical service routes are `/:game-slug/:category-slug/:service-slug`. Admin service edit/preview uses `/admin/services/[...servicePath]` and supports slug URLs like `/admin/services/:game-slug/:service-slug/edit`.
 - Generated/seed data: `npm run catalog:seed` seeds games, genres, service categories, services, and representative `options_schema` entries.
 
@@ -967,8 +989,8 @@ const { data: settings } = await supabase
 | Services Catalog (`/services`) | in-progress | Now CMS-backed via `listActiveServices()`. Category tabs are generated from active services and ordered by service category `sortOrder`. Submit search is wired; pagination/infinite scroll is pending. |
 | Game Services Page UI | in-progress | `/[game-slug]`, `/[game-slug]/hot-offers`, and `/[game-slug]/[category-slug]` are DB-backed. Category tabs use service category `sortOrder`. Infinite scroll and promo banner CMS are pending. |
 | Hot Offers Page UI | not-started | Dedicated `/hot-offers` route is still pending; hot-offer filtering exists inside game routes and service catalog logic. |
-| Service Detail UI | in-progress | DB-backed service detail renders image, badges, benefits, requirements, global currency, current option schema types, live pricing, and real Add to Cart / Buy Now persistence. Checkout remains pending. |
-| Checkout Page UI | in-progress | `/checkout` UI exists against mock cart data. Payment actions are pending. |
+| Service Detail UI | in-progress | DB-backed service detail renders image, badges, benefits, requirements, global currency, current option schema types, live pricing, and real Add to Cart / Buy Now persistence into the cart/checkout flow. |
+| Checkout Page UI | in-progress | `/checkout` is verified-user gated, loads the real browser-session cart, shows all cart items in the order summary, honors global USD/EUR display, handles empty/error states, and redirects to Stripe sandbox Checkout through `POST /api/checkout`. The cart is frozen into a `checkout_sessions` snapshot before redirect. |
 | Refund Policy UI | done | Implemented. |
 | Terms of Service UI | done | Implemented. |
 | Privacy Policy UI | not-started | Same layout as ToS and Refund Policy. |
@@ -978,12 +1000,12 @@ const { data: settings } = await supabase
 | Global Chat Bubble | in-progress | UI exists; Supabase realtime/persistence is pending. |
 | Customer Login | in-progress | Supabase email/password, Google OAuth, reset password, rate limits, safe `next`, callback errors, resend verification, and auth gates are wired. Cart is browser-session based, so the same browser cart remains visible before/after login/logout. |
 | Customer Register | in-progress | Supabase sign-up, provider-aware checks, app rate limit, Google OAuth, confirm password validation, verification/resend UX are wired. Profile persistence beyond auth metadata is pending. |
-| Customer Profile | in-progress | Auth-gated profile and edit flow exist, including metadata username updates, password changes, Google identity linking, connected accounts, and email/password addition for OAuth users. Avatar upload/real orders remain pending. |
-| Order History | in-progress | Mock order rows and status badges exist. |
-| Order Detail | in-progress | Mock order detail/timeline/refund UI exists. |
-| Cart | in-progress | Real browser-session cart APIs, selected option snapshots, Add to Cart, Buy Now, remove item, and currency display are wired. Checkout integration, cart count badge, and edit configured options remain pending. |
+| Customer Profile | in-progress | Auth-gated profile and edit flow exist, including metadata username updates, password changes, Google identity linking, connected accounts, email/password addition for OAuth users, real order history from `orders`, and real transaction history from `transactions`. Avatar upload remains pending. |
+| Order History | in-progress | `/profile` reads real customer `orders` rows, shows status badges, selected option summaries, and totals. Transaction History reads real `transactions` rows. Filtering is visual-only for now. |
+| Order Detail | in-progress | `/profile/orders/[id]` reads real customer-owned orders, verifies ownership, shows service details, selected option snapshots, timeline, price summary, and support/refund actions. Actions are still UI-only. |
+| Cart | in-progress | Real browser-session cart APIs, selected option snapshots, Add to Cart, Buy Now, remove item, Stripe checkout handoff, cart clearing after paid checkout, and currency display are wired. Cart count badge and edit configured options remain pending. |
 | Search | in-progress | `/services`, `/games`, and Quick Select search are wired. Global live overlay below navbar remains pending. |
-| Currency toggle | in-progress | Header, service cards, service detail, and cart use global USD/EUR currency display. Checkout integration remains pending. |
+| Currency toggle | in-progress | Header, service cards, service detail, cart, and checkout use global USD/EUR currency display. |
 | Light mode theme | done | CSS variable swap exists. |
 | Theme toggle | done | Toggle persists to `localStorage` and updates `<html data-theme>`. |
 | TrustPilot integration | not-started | Static review cards exist; TrustBox/API integration is pending. |
@@ -1002,9 +1024,9 @@ const { data: settings } = await supabase
 | Admin Services List | done | CMS-backed list/filter/search/delete with active/draft/archived tabs, game/category filters, image thumbnails, slug-based edit/preview links, and service category management modal. |
 | Admin Service CMS | done | CMS-backed create/edit with upload image, custom badges, base USD/EUR price, service category, benefits, requirements, sticky section nav/actions, and validated option builder. |
 | Admin Service Preview | done | `/admin/services/:game-slug/:service-slug/preview` via catch-all route renders draft storefront preview. Old ID URLs redirect when possible. |
-| Admin Order Management | in-progress | UI exists with mock orders. Backend transitions are pending. |
-| Admin Order Detail | in-progress | Status update/refund/chat UI exists. Gateway refund APIs and persistence are pending. |
-| Admin Transactions | in-progress | UI exists with mock transactions. |
+| Admin Order Management | in-progress | `/admin/orders` reads real `orders` rows, enriches customer/service data, supports search/filter tabs, and links to real order detail. Pagination is still single-page. |
+| Admin Order Detail | in-progress | `/admin/orders/[id]` reads real order data and persists status transitions through `PATCH /api/admin/orders/[id]` with audit logging. Chat/refund gateway actions remain pending. |
+| Admin Transactions | in-progress | `/admin/transactions` reads real `transactions` rows, enriches customer/service data, shows payment stats, and supports search/status filters. Refund action is still pending. |
 | Admin Content Library | in-progress | CMS-backed content rows/forms and image upload are partially wired. Landing content uses several CMS blocks; full coverage/QA pending. |
 | Landing Page CMS blocks | in-progress | Hero and several landing blocks are CMS-managed; remaining sections need cleanup. |
 | Promotional Banners CMS | in-progress | Banner/content management exists; full scheduling/fallback behavior pending. |
@@ -1025,7 +1047,7 @@ const { data: settings } = await supabase
 |---|---|---|
 | Auto-complete cron (7-day window) | not-started | Supabase scheduled function pending. |
 | Order state machine | in-progress | Mock labels/helpers exist. Backend enforcement pending. |
-| Stripe integration | not-started | Checkout + refund API pending. |
+| Stripe integration | in-progress | Stripe sandbox Checkout Session creation, frozen checkout snapshots, idempotent `checkout.session.completed` webhook fulfillment, transaction ledger writes, and signature verification are wired. Refund API pending. |
 | NowPayments integration | not-started | Checkout + crypto refund pending. |
 | NowPayments webhook verification | not-started | HMAC-SHA512 middleware pending. |
 | Refund router | not-started | Pending. |
@@ -1034,8 +1056,8 @@ const { data: settings } = await supabase
 | Google Sheets integration | not-started | Orders + Transactions tabs pending. |
 | Real-time chat | not-started | Supabase Realtime pending. |
 | Admin second factor | removed | Extra login factors intentionally out of scope. |
-| Anonymous cart API routes | in-progress | Browser-session cart uses `ms_cart_session` and server-side service role routes for add/list/remove. Checkout integration pending. |
-| Backend API routes | in-progress | Auth/admin/CMS/catalog APIs exist. Cart, payments, webhooks, chat, and notifications pending. |
+| Anonymous cart API routes | in-progress | Browser-session cart uses `ms_cart_session` and server-side service role routes for add/list/remove plus checkout readout. |
+| Backend API routes | in-progress | Auth/admin/CMS/catalog/cart APIs, Stripe-backed `POST /api/checkout`, and `/api/v1/webhooks/stripe` exist. NowPayments, chat, and notifications pending. |
 ---
 
 ## 8. Stack & Decisions
@@ -1866,7 +1888,7 @@ Admin auth does not use Supabase Auth — see §8 and §10.2.
 
 ---
 
-*Last updated: 2026-06-01 - navbar Games/Notifications, browser-session cart APIs, add/remove cart, and currency-synced cart progress reflected.*
+*Last updated: 2026-06-03 - Stripe sandbox checkout with frozen snapshots/idempotent fulfillment, transaction ledger writes, order confirmation, real customer order history/detail, and real admin order/transaction management reflected.*
 *Design references: all screenshots stored in `/design-refs/`.*
 
 ---
