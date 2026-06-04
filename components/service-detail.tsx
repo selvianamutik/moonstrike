@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PlaceholderAsset } from "@/components/asset-image";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -343,7 +344,10 @@ export function ServiceDetail({
   service: ServiceRow;
   showSiteChrome?: boolean;
 }) {
+  const router = useRouter();
   const { currency, setCurrency } = useCurrency();
+  const [cartStatus, setCartStatus] = useState<"idle" | "adding" | "buying">("idle");
+  const [cartMessage, setCartMessage] = useState("");
   const [selections, setSelections] = useState<Record<string, SelectionValue>>(() =>
     Object.fromEntries(service.options_schema.map((option) => [option.label, getDefaultSelection(option)]))
   );
@@ -361,6 +365,39 @@ export function ServiceDetail({
   const basePrice = currency === "EUR" ? service.base_price_eur : service.base_price_usd;
   const unitTotal = basePrice + optionsTotal;
   const total = unitTotal * quantity;
+
+  async function addToCart(nextAction: "stay" | "cart") {
+    if (previewMode || cartStatus !== "idle") return;
+
+    setCartMessage("");
+    setCartStatus(nextAction === "cart" ? "buying" : "adding");
+
+    try {
+      const response = await fetch("/api/cart/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ serviceId: service.id, selectedOptions: selections }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setCartMessage(payload.error ?? "Unable to add this service to cart.");
+        return;
+      }
+
+      if (nextAction === "cart") {
+        router.push("/cart");
+        return;
+      }
+
+      setCartMessage("Added to cart.");
+      router.refresh();
+    } catch {
+      setCartMessage("Unable to reach the cart service.");
+    } finally {
+      setCartStatus("idle");
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
@@ -517,15 +554,26 @@ export function ServiceDetail({
                 </>
               ) : (
                 <>
-                  <Link href="/cart" className="h-12 rounded-md border border-[var(--ms-border)] text-center mono leading-[3rem] hover:bg-[var(--ms-hover-bg)]">
-                    Add to Cart
-                  </Link>
-                  <Link href="/cart" className="ms-button h-14 w-full mono">
-                    Buy Now
-                  </Link>
+                  <button
+                    type="button"
+                    disabled={cartStatus !== "idle"}
+                    onClick={() => addToCart("stay")}
+                    className="h-12 rounded-md border border-[var(--ms-border)] text-center mono leading-[3rem] hover:bg-[var(--ms-hover-bg)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {cartStatus === "adding" ? "Adding..." : "Add to Cart"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={cartStatus !== "idle"}
+                    onClick={() => addToCart("cart")}
+                    className="ms-button h-14 w-full mono disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {cartStatus === "buying" ? "Opening Cart..." : "Buy Now"}
+                  </button>
                 </>
               )}
             </div>
+            {cartMessage ? <p className="mt-4 text-center text-sm text-[var(--ms-gradient-end)]">{cartMessage}</p> : null}
           </div>
         </aside>
       </section>

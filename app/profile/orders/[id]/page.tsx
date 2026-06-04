@@ -1,64 +1,71 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { OrderSummary } from "@/components/order-summary";
 import { PlaceholderAsset } from "@/components/asset-image";
+import { ProfileSidebar } from "@/components/profile/ProfileSidebar";
+import { RefundRequestButton } from "@/components/profile/RefundRequestButton";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { calculateOrderTotals, getOrderById } from "@/lib/catalog";
+import { requireVerifiedUser } from "@/lib/auth/session";
+import { formatMemberSince, getUserDisplayName, getUserInitials } from "@/lib/auth/user-display";
+import {
+  formatOrderMoney,
+  formatOrderOptionValue,
+  getCustomerOrder,
+} from "@/lib/orders";
 
 type ProfileOrderDetailPageProps = {
   params: Promise<{ id: string }>;
 };
 
-const timelineSteps = ["Placed", "Confirmed", "Delivered", "Completed"];
+const timelineSteps = ["Placed", "Confirmed", "In Progress", "Delivered", "Completed"];
+
+function completedStepCount(status: string) {
+  if (status === "completed") return 5;
+  if (status === "delivered") return 4;
+  if (status === "in_progress") return 3;
+  if (status === "confirmed") return 2;
+  return 1;
+}
+
+export const dynamic = "force-dynamic";
 
 export default async function ProfileOrderDetailPage({ params }: ProfileOrderDetailPageProps) {
+  const user = await requireVerifiedUser("/profile/orders");
   const { id } = await params;
-  const order = getOrderById(id);
+  const order = await getCustomerOrder(user.id, id);
 
   if (!order) notFound();
 
-  const totals = calculateOrderTotals(order.subtotal);
-  const optionTotal = order.selectedOptions.reduce((total, option) => total + option.priceModifier, 0);
-  const completedSteps = order.status === "completed" ? 4 : order.status === "in_progress" ? 2 : 1;
-  const canRequestRefund = !["completed", "cancelled", "refunded"].includes(order.status);
+  const displayName = getUserDisplayName(user);
+  const initials = getUserInitials(displayName, user.email);
+  const memberSince = formatMemberSince(user.created_at);
+  const completedSteps = completedStepCount(order.status);
+  const canRequestRefund = !["completed", "refund_requested", "refunded"].includes(order.status);
 
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
       <SiteHeader />
-      <section className="ms-shell grid gap-10 py-16 lg:grid-cols-[1fr_390px]">
+      
+      <section className="ms-shell grid gap-10 py-16 lg:grid-cols-[300px_1fr]">
+        <ProfileSidebar displayName={displayName} email={user.email} initials={initials} memberSince={memberSince} />
+
         <div>
+          <div>
           <div className="flex flex-col justify-between gap-5 border-b border-[var(--ms-border)] pb-7 md:flex-row md:items-end">
             <div>
               <p className="mono text-xs uppercase tracking-[0.28em] text-[var(--ms-gradient-end)]">
                 Profile / Order Detail
               </p>
-              <h1 className="font-display mt-3 text-4xl font-black tracking-[-0.05em]">{order.id}</h1>
-              <p className="mt-3 text-[var(--ms-body)]">{order.service.name}</p>
+              <h1 className="font-display mt-3 text-4xl font-black tracking-[-0.05em]">Order Detail</h1>
+              <p className="mt-3 text-[var(--ms-body)]">{order.serviceSummary}</p>
             </div>
             <span className="w-fit rounded-full border border-[var(--ms-gradient-end)]/50 px-4 py-2 mono text-sm uppercase text-[var(--ms-success)]">
               {order.status.replace("_", " ")}
             </span>
           </div>
-
-          <section className="mt-8 rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-6">
-            <div className="grid gap-5 md:grid-cols-[140px_1fr]">
-              <PlaceholderAsset alt={`${order.service.name} order preview`} className="h-32 rounded-md" imageClassName="p-5" />
-              <div>
-                <h2 className="text-2xl font-black">{order.service.offerTitle ?? order.service.name}</h2>
-                <p className="mt-3 leading-7 text-[var(--ms-body)]">{order.service.description}</p>
-                <div className="mt-5 flex flex-wrap gap-3 mono text-xs uppercase tracking-[0.16em] text-[var(--ms-body)]">
-                  <span className="rounded-full border border-[var(--ms-border)] px-3 py-1">{order.region}</span>
-                  <span className="rounded-full border border-[var(--ms-border)] px-3 py-1">{order.paymentStatus}</span>
-                  <span className="rounded-full border border-[var(--ms-border)] px-3 py-1">{order.transactionId}</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
           <section className="mt-8 rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-6">
             <h2 className="text-xl font-black">Order Timeline</h2>
-            <div className="mt-7 grid gap-4 md:grid-cols-4">
+            <div className="mt-7 grid gap-4 md:grid-cols-5">
               {timelineSteps.map((label, index) => {
                 const isComplete = index < completedSteps;
                 return (
@@ -77,32 +84,73 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
             </div>
           </section>
 
-          <section className="mt-8 grid gap-6 md:grid-cols-2">
-            <article className="rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-6">
-              <h2 className="text-xl font-black">Selected Options</h2>
-              <div className="mt-5 space-y-3">
-                {order.selectedOptions.map((option) => (
-                  <div key={option.group} className="flex justify-between gap-4 border-b border-[var(--ms-border)] pb-3">
-                    <span className="text-[var(--ms-body)]">{option.group}</span>
-                    <span>
-                      {option.value}
-                      <span className="mono ml-2 text-[var(--ms-price)]">+${option.priceModifier.toFixed(2)}</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </article>
+          <section className="mt-8 rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-6">
+            <h2 className="text-xl font-black">Services in this order</h2>
+            <div className="mt-5 space-y-4">
+              {order.items.map((item, index) => {
+                const options = Object.entries(item.selectedOptionsSnapshot);
 
+                return (
+                  <details key={item.id} className="group rounded-lg border border-[var(--ms-border)] bg-black/20 p-4" open={index === 0}>
+                    <summary className="flex cursor-pointer list-none flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div className="flex gap-4">
+                        {item.service.image ? (
+                          <img src={item.service.image} alt="" className="h-20 w-20 rounded-md object-cover" />
+                        ) : (
+                          <PlaceholderAsset alt={`${item.service.title} order preview`} className="h-20 w-20 rounded-md" imageClassName="p-3" />
+                        )}
+                        <div>
+                          <h3 className="text-lg font-black">{item.service.title}</h3>
+                          <p className="mono mt-2 text-xs uppercase tracking-[0.16em] text-[var(--ms-body)]">
+                            {item.service.gameName} / {item.service.categoryName}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="mono text-lg font-black text-[var(--ms-price)]">{formatOrderMoney(item.total, item.currency)}</span>
+                    </summary>
+                    <div className="mt-5 border-t border-[var(--ms-border)] pt-5">
+                      <p className="leading-7 text-[var(--ms-body)]">
+                        {item.service.description || `${item.service.categoryName} service for ${item.service.gameName}.`}
+                      </p>
+                      <div className="mt-5 space-y-3">
+                        {options.length === 0 ? (
+                          <p className="text-sm text-[var(--ms-body)]">No selected options.</p>
+                        ) : (
+                          options.map(([label, option]) => (
+                            <div key={label} className="flex justify-between gap-4 border-b border-[var(--ms-border)] pb-3">
+                              <span className="text-[var(--ms-body)]">{label}</span>
+                              <span className="text-right">
+                                {formatOrderOptionValue(option.value)}
+                                <span className="mono ml-2 text-[var(--ms-price)]">
+                                  +{formatOrderMoney(order.currency === "EUR" ? option.priceEUR ?? 0 : option.priceUSD ?? 0, order.currency)}
+                                </span>
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3 mono text-xs uppercase tracking-[0.16em] text-[var(--ms-body)]">
+              <span className="rounded-full border border-[var(--ms-border)] px-3 py-1">{order.paymentStatus.replace("_", " ")}</span>
+              <span className="rounded-full border border-[var(--ms-border)] px-3 py-1">Order ref: {order.orderReference}</span>
+              <span className="rounded-full border border-[var(--ms-border)] px-3 py-1">Payment ref: {order.transactionId}</span>
+            </div>
+          </section>
+
+          <section className="mt-8 grid gap-6">
             <article className="rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-6">
               <h2 className="text-xl font-black">Price Breakdown</h2>
               <div className="mt-5 space-y-3">
-                <PriceRow label="Base price" value={`$${order.service.startingPrice.toFixed(2)}`} />
-                <PriceRow label="Options" value={`$${optionTotal.toFixed(2)}`} />
-                <PriceRow label="Service fee" value={`$${totals.serviceFee.toFixed(2)}`} />
-                <PriceRow label="Discount" value={`-$${totals.discount.toFixed(2)}`} />
+                <PriceRow label="Order total" value={formatOrderMoney(order.total, order.currency)} />
+                <PriceRow label="Currency" value={order.currency} />
+                <PriceRow label="Payment provider" value={order.paymentProvider} />
                 <div className="flex justify-between gap-4 border-t border-[var(--ms-border)] pt-4 text-lg font-black">
                   <span>Total</span>
-                  <span className="mono text-[var(--ms-price)]">${totals.total.toFixed(2)}</span>
+                  <span className="mono text-[var(--ms-price)]">{formatOrderMoney(order.total, order.currency)}</span>
                 </div>
               </div>
             </article>
@@ -117,28 +165,15 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
-                <button className="rounded-md border border-[var(--ms-border)] px-4 py-3 text-sm text-[var(--ms-body)]">
+                <Link href="/profile/chat" className="rounded-md border border-[var(--ms-border)] px-4 py-3 text-sm text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
                   Open Support Chat
-                </button>
-                {canRequestRefund ? <button className="ms-button px-4 py-3 text-sm">Request Refund</button> : null}
+                </Link>
+                {canRequestRefund ? <RefundRequestButton orderId={order.id} /> : null}
               </div>
             </div>
           </section>
+          </div>
         </div>
-
-        <OrderSummary
-          ctaHref="/refund-policy"
-          ctaLabel="Refund Policy"
-          rows={[
-            { label: "Subtotal", value: `$${totals.subtotal.toFixed(2)}` },
-            { label: "Service Fee", value: `$${totals.serviceFee.toFixed(2)}` },
-            { label: "Discount", value: `-$${totals.discount.toFixed(2)}` },
-            { label: "Taxes", value: `$${totals.taxes.toFixed(2)}` },
-          ]}
-          serviceName={order.service.offerTitle ?? order.service.name}
-          serviceMeta={`${order.region} / ${order.paymentStatus}`}
-          total={`$${totals.total.toFixed(2)}`}
-        />
       </section>
       <SiteFooter />
     </main>
@@ -149,7 +184,7 @@ function PriceRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4 border-b border-[var(--ms-border)] pb-3">
       <span className="text-[var(--ms-body)]">{label}</span>
-      <span className="mono">{value}</span>
+      <span className="mono text-right">{value}</span>
     </div>
   );
 }

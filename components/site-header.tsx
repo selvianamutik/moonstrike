@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogIn, Search, ShoppingCart, User } from "lucide-react";
+import { Bell, LogIn, Search, ShoppingCart, User, Gamepad } from "lucide-react";
 import { QuickSelectMenu } from "@/components/quick-select-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/useAuth";
@@ -54,14 +54,14 @@ export function SiteHeader() {
         </div>
 
         <nav className="ml-auto flex items-center gap-4 text-sm font-semibold text-[var(--ms-heading)] sm:gap-6">
-          <Link href="/services" className="hidden text-center hover:text-[var(--ms-gradient-end)] sm:block">
-            <span className="mono block text-xs text-[var(--ms-gradient-end)]">MENU</span>
-            Services
+          <Link href="/games" className="hidden text-center hover:text-[var(--ms-gradient-end)] sm:block">
+            <span className="mono block text-xs text-[var(--ms-gradient-end)]">GAMES</span>
+            <Gamepad size={22} className="mx-auto mt-1" aria-hidden="true" />
           </Link>
 
-          <Link href="/#about" className="hidden text-center hover:text-[var(--ms-gradient-end)] sm:block">
-            <span className="mono block text-xs text-[var(--ms-gradient-end)]">INFO</span>
-            About
+          <Link href="/notifications" className="hidden text-center hover:text-[var(--ms-gradient-end)] sm:block" aria-label="Notifications">
+            <span className="mono block text-xs text-[var(--ms-gradient-end)]">NOTIF</span>
+            <Bell size={22} className="mx-auto mt-1" aria-hidden="true" />
           </Link>
 
           <Link href="/cart" className="flex flex-col items-center hover:text-[var(--ms-gradient-end)]" aria-label="Cart">
