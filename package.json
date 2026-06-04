@@ -12,12 +12,14 @@
     "catalog:seed": "node scripts/seed-catalog.mjs"
   },
   "dependencies": {
+    "@stripe/cli": "^0.0.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.2",
     "lucide-react": "^1.16.0",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "stripe": "^22.2.0",
     "supabase": "^2.101.0"
   },
   "devDependencies": {

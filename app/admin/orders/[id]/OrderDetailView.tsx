@@ -6,32 +6,128 @@ import { ArrowLeft, MessageSquare } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { StatusBadge } from "@/components/admin/StatusBadge";
-import { getNextOrderActions, type AdminOrder } from "@/lib/admin-mock";
+import { getNextOrderActions, type AdminOrderActionStatus, type AdminOrderRecord } from "@/lib/admin/orders";
 import type { AdminOrderStatus } from "@/lib/admin-constants";
 
-export function OrderDetailView({ order: initialOrder }: { order: AdminOrder }) {
+export function OrderDetailView({ order: initialOrder }: { order: AdminOrderRecord }) {
   const [order, setOrder] = useState(initialOrder);
+  const [error, setError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [refundAmount, setRefundAmount] = useState(initialOrder.total.toFixed(2));
+  const [refundCategory, setRefundCategory] = useState("customer_request");
+  const [refundNote, setRefundNote] = useState("");
+  const [refundMessage, setRefundMessage] = useState("");
   const actions = getNextOrderActions(order.status);
 
-  function applyStatus(next: AdminOrderStatus) {
-    setOrder((o) => ({
-      ...o,
-      status: next,
-      timeline: [...o.timeline, { status: next, at: new Date().toLocaleString() }],
-    }));
+  async function applyStatus(next: AdminOrderActionStatus) {
+    if (next === "refund_requested") {
+      const confirmed = window.confirm("Mark this order as refund requested? Delivery work may need to pause while the request is reviewed.");
+
+      if (!confirmed) return;
+    }
+
+    setIsSaving(true);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/admin/orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setError(payload.error ?? "Unable to update order.");
+        return;
+      }
+
+      const returnedStatus = typeof payload.status === "string" ? (payload.status as AdminOrderStatus) : next;
+
+      setOrder((current) => ({
+        ...current,
+        status: returnedStatus as AdminOrderStatus,
+        updatedAt: new Date().toLocaleString(),
+        timeline: [...current.timeline, { status: returnedStatus as AdminOrderStatus, at: new Date().toLocaleString() }],
+      }));
+    } catch {
+      setError("Unable to reach admin order service.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function issueStripeRefund() {
+    const amount = Number(refundAmount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Refund amount must be greater than 0.");
+      return;
+    }
+
+    if (amount > order.total) {
+      setError("Refund amount cannot be higher than the order total.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Issue a ${order.currency} ${amount.toFixed(2)} Stripe refund? This sends money back through Stripe and marks the Moon Strike order as refunded.`,
+    );
+
+    if (!confirmed) return;
+
+    setIsSaving(true);
+    setError("");
+    setRefundMessage("");
+
+    try {
+      const response = await fetch(`/api/admin/orders/${order.id}/refund`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount,
+          category: refundCategory,
+          note: refundNote,
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setError(payload.error ?? "Unable to issue refund.");
+        return;
+      }
+
+      setRefundMessage(`Stripe refund issued${payload.refundId ? `: ${payload.refundId}` : "."}`);
+      setOrder((current) => ({
+        ...current,
+        status: "refunded",
+        updatedAt: new Date().toLocaleString(),
+        timeline: [...current.timeline, { status: "refunded", at: new Date().toLocaleString() }],
+      }));
+    } catch {
+      setError("Unable to reach refund service.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
     <div className="max-w-6xl mx-auto flex flex-col gap-6">
       <AdminPageHeader
-        breadcrumbs={[{ label: "Management" }, { label: "Orders", href: "/admin/orders" }, { label: order.id, active: true }]}
-        title={`Order ${order.id}`}
+        breadcrumbs={[{ label: "Management" }, { label: "Orders", href: "/admin/orders" }, { label: order.orderReference, active: true }]}
+        title="Order Detail"
         actions={
           <Link href="/admin/orders" className="flex items-center gap-2 text-sm text-[var(--ms-text-secondary)] hover:text-white">
             <ArrowLeft size={16} /> Back
           </Link>
         }
       />
+
+      {error ? (
+        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          {error}
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 flex flex-col gap-6">
@@ -44,13 +140,9 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrder }) 
                 <p className="text-[#64748B]">{order.customerEmail}</p>
               </div>
               <div>
-                <p className="text-[var(--ms-text-secondary)] text-xs uppercase mb-1">Service</p>
+                <p className="text-[var(--ms-text-secondary)] text-xs uppercase mb-1">Services</p>
                 <p className="text-white">{order.serviceName}</p>
-                <p className="text-[#64748B]">{order.region}</p>
-              </div>
-              <div>
-                <p className="text-[var(--ms-text-secondary)] text-xs uppercase mb-1">Payment</p>
-                <p className="text-white capitalize">{order.paymentProvider}</p>
+                <p className="text-[#64748B]">{order.gameName} / {order.itemCount} item{order.itemCount === 1 ? "" : "s"}</p>
               </div>
               <div>
                 <p className="text-[var(--ms-text-secondary)] text-xs uppercase mb-1">Amount</p>
@@ -58,21 +150,61 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrder }) 
               </div>
             </div>
 
-            {order.selectedOptions.length > 0 && (
-              <div className="mt-6">
-                <p className="text-xs text-[var(--ms-text-secondary)] uppercase mb-2">Options breakdown</p>
-                <ul className="space-y-2">
-                  {order.selectedOptions.map((opt, i) => (
-                    <li key={i} className="flex justify-between text-sm bg-[var(--ms-primary)] rounded-lg px-4 py-2 border border-[var(--ms-accent)]">
-                      <span className="text-white">
-                        {opt.group}: {opt.value}
-                      </span>
-                      {opt.priceModifier > 0 && <span className="text-[#22D3EE]">+${opt.priceModifier}</span>}
-                    </li>
-                  ))}
-                </ul>
+            <div className="mt-6 rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] p-4 text-sm">
+              <p className="text-[var(--ms-text-secondary)] text-xs uppercase mb-3">Payment information</p>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <p className="text-[#64748B] text-xs uppercase mb-1">Provider</p>
+                  <p className="text-white capitalize">{order.paymentProvider}</p>
+                </div>
+                <div>
+                  <p className="text-[#64748B] text-xs uppercase mb-1">Order reference</p>
+                  <p className="font-mono break-all text-white">{order.orderReference}</p>
+                </div>
+                <div>
+                  <p className="text-[#64748B] text-xs uppercase mb-1">Payment reference</p>
+                  <p className="font-mono break-all text-white">{order.transactionId}</p>
+                </div>
               </div>
-            )}
+            </div>
+
+            <div className="mt-6">
+              <p className="text-xs text-[var(--ms-text-secondary)] uppercase mb-2">Service breakdown</p>
+              <div className="space-y-3">
+                {order.items.map((item, index) => (
+                  <details key={item.id} className="rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] p-4" open={index === 0}>
+                    <summary className="flex cursor-pointer list-none flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-center gap-3">
+                        {item.serviceImage ? (
+                          <img src={item.serviceImage} alt="" className="h-12 w-12 rounded-md object-cover" />
+                        ) : (
+                          <div className="h-12 w-12 rounded-md border border-[var(--ms-accent)] bg-[#111827]" />
+                        )}
+                        <div>
+                          <p className="font-medium text-white">{item.serviceName}</p>
+                          <p className="text-xs text-[#64748B]">{item.gameName} / {item.categoryName}</p>
+                        </div>
+                      </div>
+                      <span className="font-mono font-medium text-[#22D3EE]">{item.amount}</span>
+                    </summary>
+                    <ul className="mt-4 space-y-2 border-t border-[var(--ms-accent)] pt-4">
+                      {item.selectedOptions.length === 0 ? (
+                        <li className="text-sm text-[var(--ms-text-secondary)]">No selected options.</li>
+                      ) : (
+                        item.selectedOptions.map((opt, i) => (
+                          <li key={`${item.id}-${i}`} className="flex justify-between rounded-lg border border-[var(--ms-accent)] bg-[#111827] px-4 py-2 text-sm">
+                            <span className="text-white">
+                              {opt.group}: {opt.value}
+                            </span>
+                            {opt.priceModifier > 0 && <span className="text-[#22D3EE]">+{opt.priceModifier.toFixed(2)} {item.currency}</span>}
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  </details>
+                ))}
+              </div>
+            </div>
           </section>
 
           <section className="bg-[var(--ms-secondary)] border border-[var(--ms-accent)] rounded-xl p-6">
@@ -97,14 +229,15 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrder }) 
             <p className="text-xs text-[var(--ms-text-secondary)] uppercase mb-2">Current status</p>
             <StatusBadge status={order.status} className="text-sm" />
             <div className="mt-6 flex flex-col gap-2">
-              {actions.map((action) => (
+              {actions.filter((action) => action.next !== "refunded").map((action) => (
                 <AdminButton
                   key={action.label}
                   variant={action.variant}
                   onClick={() => action.next && applyStatus(action.next)}
                   className="w-full"
+                  disabled={isSaving}
                 >
-                  {action.label}
+                  {isSaving ? "Saving..." : action.label}
                 </AdminButton>
               ))}
             </div>
@@ -119,6 +252,55 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrder }) 
               <p className="text-sm text-[var(--ms-text-secondary)] mb-2">
                 Payment: {order.paymentProvider === "stripe" ? "Card (Stripe)" : "Crypto (NowPayments)"}
               </p>
+              <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs leading-5 text-amber-300">
+                This issues a real Stripe refund. The amount cannot be higher than the order total.
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-[var(--ms-text-secondary)]">Refund amount</label>
+                  <div className="mt-1 flex items-center rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] px-3">
+                    <span className="font-mono text-xs text-[#64748B]">{order.currency}</span>
+                    <input
+                      type="number"
+                      min="0.01"
+                      max={order.total}
+                      step="0.01"
+                      value={refundAmount}
+                      onChange={(event) => setRefundAmount(event.target.value)}
+                      className="h-10 min-w-0 flex-1 bg-transparent px-3 text-sm text-white outline-none"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-[#64748B]">Maximum: {order.amount}</p>
+                </div>
+
+                <div>
+                  <label className="text-xs text-[var(--ms-text-secondary)]">Refund category</label>
+                  <select
+                    value={refundCategory}
+                    onChange={(event) => setRefundCategory(event.target.value)}
+                    className="mt-1 h-10 w-full rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] px-3 text-sm text-white outline-none"
+                  >
+                    <option value="customer_request">Customer request</option>
+                    <option value="duplicate_order">Duplicate order</option>
+                    <option value="service_unavailable">Service unavailable</option>
+                    <option value="admin_adjustment">Admin adjustment</option>
+                    <option value="suspected_fraud">Suspected fraud</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs text-[var(--ms-text-secondary)]">Refund note</label>
+                  <textarea
+                    value={refundNote}
+                    onChange={(event) => setRefundNote(event.target.value)}
+                    maxLength={500}
+                    rows={4}
+                    placeholder="Internal note sent to Stripe metadata"
+                    className="mt-1 w-full resize-none rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] px-3 py-2 text-sm text-white outline-none"
+                  />
+                </div>
+              </div>
               {order.paymentProvider === "nowpayments" && (
                 <div className="mb-3">
                   <label className="text-xs text-[var(--ms-text-secondary)]">Wallet address</label>
@@ -132,11 +314,13 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrder }) 
               <AdminButton
                 variant="danger"
                 className="w-full"
-                onClick={() => applyStatus("refunded")}
-                disabled={order.paymentProvider === "nowpayments" && !order.cryptoRefundAddress}
+                onClick={issueStripeRefund}
+                disabled={isSaving || order.paymentProvider !== "stripe"}
               >
-                Issue Refund
+                {isSaving ? "Issuing..." : "Issue Stripe Refund"}
               </AdminButton>
+              {refundMessage ? <p className="mt-2 text-xs text-emerald-400">{refundMessage}</p> : null}
+              {order.paymentProvider !== "stripe" ? <p className="mt-2 text-xs text-amber-400">Automatic refunds are only wired for Stripe orders.</p> : null}
               {order.paymentProvider === "nowpayments" && !order.cryptoRefundAddress && (
                 <p className="text-xs text-amber-400 mt-2">Awaiting wallet address</p>
               )}
