@@ -1,9 +1,20 @@
 import crypto from "crypto";
 
-const NOWPAYMENTS_API_BASE_URL = "https://api.nowpayments.io/v1";
+const DEFAULT_NOWPAYMENTS_API_BASE_URL = "https://api.nowpayments.io/v1";
 
 function cleanEnvValue(value: string | undefined) {
-  return value?.replace(/\s+(\/\/|#).*$/, "").trim();
+  const cleaned = value?.replace(/\s+(\/\/|#).*$/, "").trim();
+
+  if (!cleaned) return cleaned;
+
+  if (
+    (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+    (cleaned.startsWith("'") && cleaned.endsWith("'"))
+  ) {
+    return cleaned.slice(1, -1).trim();
+  }
+
+  return cleaned;
 }
 
 export function getNowPaymentsApiKey() {
@@ -24,6 +35,11 @@ export function getNowPaymentsIpnSecret() {
   }
 
   return secret;
+}
+
+export function getNowPaymentsApiBaseUrl() {
+  const configuredUrl = cleanEnvValue(process.env.NOWPAYMENTS_API_BASE_URL);
+  return (configuredUrl ?? DEFAULT_NOWPAYMENTS_API_BASE_URL).replace(/\/+$/, "");
 }
 
 export type NowPaymentsInvoice = {
@@ -54,27 +70,38 @@ function sortObject(value: unknown): unknown {
 }
 
 export async function createNowPaymentsInvoice(input: CreateNowPaymentsInvoiceInput) {
-  const response = await fetch(`${NOWPAYMENTS_API_BASE_URL}/invoice`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": getNowPaymentsApiKey(),
-    },
-    body: JSON.stringify({
-      price_amount: input.priceAmount.toFixed(2),
-      price_currency: input.priceCurrency,
-      order_id: input.orderId,
-      order_description: input.orderDescription,
-      ipn_callback_url: input.ipnCallbackUrl,
-      success_url: input.successUrl,
-      cancel_url: input.cancelUrl,
-    }),
-  });
+  const baseUrl = getNowPaymentsApiBaseUrl();
+  let response: Response;
 
-  const payload = (await response.json().catch(() => null)) as Partial<NowPaymentsInvoice> & { message?: string } | null;
+  try {
+    response = await fetch(`${baseUrl}/invoice`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": getNowPaymentsApiKey(),
+      },
+      body: JSON.stringify({
+        price_amount: input.priceAmount.toFixed(2),
+        price_currency: input.priceCurrency,
+        order_id: input.orderId,
+        order_description: input.orderDescription,
+        ipn_callback_url: input.ipnCallbackUrl,
+        success_url: input.successUrl,
+        cancel_url: input.cancelUrl,
+      }),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "network request failed";
+    throw new Error(`NOWPayments request failed for ${baseUrl}: ${message}`);
+  }
+
+  const payload = (await response.json().catch(() => null)) as
+    | (Partial<NowPaymentsInvoice> & { message?: string; error?: string })
+    | null;
 
   if (!response.ok || !payload?.invoice_url || !payload.id) {
-    throw new Error(payload?.message ?? "NOWPayments did not return an invoice URL.");
+    const providerMessage = payload?.message ?? payload?.error ?? "NOWPayments did not return an invoice URL.";
+    throw new Error(`NOWPayments ${response.status} from ${baseUrl}: ${providerMessage}`);
   }
 
   return {

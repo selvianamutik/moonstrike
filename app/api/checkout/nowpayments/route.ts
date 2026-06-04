@@ -68,15 +68,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: snapshotError.message }, { status: 500 });
   }
 
-  const invoice = await createNowPaymentsInvoice({
-    priceAmount: total,
-    priceCurrency: currency.toLowerCase() as "usd" | "eur",
-    orderId: checkoutSessionId,
-    orderDescription: serviceNames || "Moon Strike services",
-    ipnCallbackUrl: `${origin}/api/v1/webhooks/nowpayments`,
-    successUrl: `${origin}/order-confirmed?session=${checkoutSessionId}`,
-    cancelUrl: `${origin}/checkout?canceled=1`,
-  });
+  let invoice;
+
+  try {
+    invoice = await createNowPaymentsInvoice({
+      priceAmount: total,
+      priceCurrency: currency.toLowerCase() as "usd" | "eur",
+      orderId: checkoutSessionId,
+      orderDescription: serviceNames || "Moon Strike services",
+      ipnCallbackUrl: `${origin}/api/v1/webhooks/nowpayments`,
+      successUrl: `${origin}/order-confirmed?session=${checkoutSessionId}`,
+      cancelUrl: `${origin}/checkout?canceled=1`,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to create NOWPayments invoice.";
+
+    await supabase
+      .from("checkout_sessions")
+      .update({ status: "invoice_failed" })
+      .eq("id", checkoutSessionId);
+
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
 
   const { error: updateSnapshotError } = await supabase.from("checkout_sessions").update({
     status: "created",
