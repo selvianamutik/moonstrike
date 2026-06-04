@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CreditCard, LayoutDashboard, MessageSquare, Pencil, ReceiptText, ShoppingBag } from "lucide-react";
+import { CreditCard, MessageSquare, Pencil, ReceiptText, ShoppingBag } from "lucide-react";
 import { LogoutButton } from "@/components/common/LogoutButton";
 
 type ProfileSidebarProps = {
@@ -15,7 +15,6 @@ type ProfileSidebarProps = {
 };
 
 const navItems = [
-  { name: "Overview", href: "/profile", icon: LayoutDashboard },
   { name: "Orders", href: "/profile/orders", icon: ShoppingBag },
   { name: "Transactions", href: "/profile/transactions", icon: ReceiptText },
   { name: "Chat", href: "/profile/chat", icon: MessageSquare },

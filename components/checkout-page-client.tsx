@@ -39,7 +39,7 @@ export function CheckoutPageClient() {
   const { currency } = useCurrency();
   const [items, setItems] = useState<CheckoutCartItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittingProvider, setSubmittingProvider] = useState<"stripe" | "nowpayments" | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -90,7 +90,7 @@ export function CheckoutPageClient() {
   );
 
   async function handleStripeCheckout() {
-    setIsSubmitting(true);
+    setSubmittingProvider("stripe");
     setError("");
 
     try {
@@ -115,7 +115,37 @@ export function CheckoutPageClient() {
     } catch {
       setError("Unable to reach checkout service.");
     } finally {
-      setIsSubmitting(false);
+      setSubmittingProvider(null);
+    }
+  }
+
+  async function handleCryptoCheckout() {
+    setSubmittingProvider("nowpayments");
+    setError("");
+
+    try {
+      const response = await fetch("/api/checkout/nowpayments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currency }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setError(payload.error ?? "Unable to create crypto invoice.");
+        return;
+      }
+
+      if (!payload.redirectTo) {
+        setError("NOWPayments did not return a payment URL.");
+        return;
+      }
+
+      window.location.href = payload.redirectTo;
+    } catch {
+      setError("Unable to reach crypto checkout service.");
+    } finally {
+      setSubmittingProvider(null);
     }
   }
 
@@ -158,11 +188,36 @@ export function CheckoutPageClient() {
             <>
               <h2 className="mt-12 text-2xl font-black">Payment Method</h2>
               <div className="ms-card mt-6 rounded-xl p-8">
+                <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-md border border-[var(--primary)] bg-[var(--ms-hover-bg)] p-5 shadow-[0_0_22px_rgba(136,82,255,0.22)]">
                   <h3 className="text-xl font-black">Stripe Checkout</h3>
                   <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">
                     Continue to Stripe's hosted test checkout to complete payment securely.
                   </p>
+                  <button
+                    type="button"
+                    disabled={submittingProvider !== null}
+                    onClick={handleStripeCheckout}
+                    className="ms-button mt-5 h-12 w-full text-sm font-black disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {submittingProvider === "stripe" ? "Opening Stripe..." : "Pay with Stripe Sandbox"}
+                  </button>
+                </div>
+
+                <div className="rounded-md border border-[var(--ms-border)] bg-[var(--ms-field)] p-5">
+                  <h3 className="text-xl font-black">Crypto Payment</h3>
+                  <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">
+                    Continue to NOWPayments hosted checkout and pay with supported cryptocurrencies.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={submittingProvider !== null}
+                    onClick={handleCryptoCheckout}
+                    className="mt-5 h-12 w-full rounded-md border border-[var(--ms-border)] px-5 text-sm font-black text-[var(--ms-heading)] hover:border-[var(--ms-gradient-end)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {submittingProvider === "nowpayments" ? "Opening Crypto..." : "Pay with Crypto"}
+                  </button>
+                </div>
                 </div>
                 <div className="mt-6">
                   <p className="mono text-xs uppercase tracking-[0.18em] text-[var(--ms-body)]">
@@ -188,16 +243,8 @@ export function CheckoutPageClient() {
                     Stripe shows the final available methods based on your device, region, currency, and Dashboard settings.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={handleStripeCheckout}
-                  className="ms-button mt-8 h-14 w-full text-lg font-black disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isSubmitting ? "Opening Stripe..." : "Pay with Stripe Sandbox"}
-                </button>
                 <p className="mt-4 text-center text-xs text-[var(--ms-body)]">
-                  You will be redirected to Stripe Checkout in test mode.
+                  You will be redirected to the selected provider's hosted checkout.
                 </p>
               </div>
             </>

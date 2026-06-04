@@ -334,7 +334,7 @@ USD and EUR are calculated independently. Do not convert one currency into the o
 - Shown when status is `delivered` AND within 7 days of `deliveredAt`
 - Hidden once `refund_requested`, `refunded`, or `completed` (terminal or already attempted)
 - On click: confirmation dialog → sets `status → refund_requested`
-- If `paymentProvider = "nowpayments"`: wallet address input shown before confirming
+- If `paymentProvider = "nowpayments"`: wallet address input is required before confirming a refund request
 
 If `orderId` doesn't belong to the logged-in user → call `notFound()` to render the 404 page.
 
@@ -1047,17 +1047,18 @@ const { data: settings } = await supabase
 |---|---|---|
 | Auto-complete cron (7-day window) | not-started | Supabase scheduled function pending. |
 | Order state machine | in-progress | Mock labels/helpers exist. Backend enforcement pending. |
-| Stripe integration | in-progress | Stripe sandbox Checkout Session creation, frozen checkout snapshots, idempotent `checkout.session.completed` webhook fulfillment, transaction ledger writes, and signature verification are wired. Refund API pending. |
-| NowPayments integration | not-started | Checkout + crypto refund pending. |
-| NowPayments webhook verification | not-started | HMAC-SHA512 middleware pending. |
-| Refund router | not-started | Pending. |
+| Payment provider abstraction | planned | Payment provider may change based on business/onboarding practicality. Stripe is current sandbox, but Paddle, PayOp, 2Checkout, or another provider may become the main provider. Keep checkout, webhook, fulfillment, transaction, and refund code provider-neutral where possible. |
+| Stripe integration | in-progress | Stripe sandbox Checkout Session creation, frozen checkout snapshots, idempotent `checkout.session.completed` webhook fulfillment, transaction ledger writes, signature verification, and refund API are wired. Stripe may remain sandbox/fallback if another provider becomes primary. |
+| NowPayments integration | in-progress | Hosted crypto invoice checkout, checkout snapshots, IPN webhook verification, and order fulfillment are wired. Crypto refund/payout flow remains pending. |
+| NowPayments webhook verification | in-progress | `/api/v1/webhooks/nowpayments` verifies `x-nowpayments-sig` with HMAC-SHA512 over sorted JSON body. |
+| Refund router | in-progress | Stripe refunds are wired. Future providers should implement the same refund interface. |
 | Rate limiting | in-progress | Auth/admin login/password-reset/register limits exist. Broader API limits pending. |
 | Audit log (admin actions) | in-progress | Implemented for selected admin auth/CMS actions; expand coverage. |
 | Google Sheets integration | not-started | Orders + Transactions tabs pending. |
 | Real-time chat | not-started | Supabase Realtime pending. |
 | Admin second factor | removed | Extra login factors intentionally out of scope. |
 | Anonymous cart API routes | in-progress | Browser-session cart uses `ms_cart_session` and server-side service role routes for add/list/remove plus checkout readout. |
-| Backend API routes | in-progress | Auth/admin/CMS/catalog/cart APIs, Stripe-backed `POST /api/checkout`, and `/api/v1/webhooks/stripe` exist. NowPayments, chat, and notifications pending. |
+| Backend API routes | in-progress | Auth/admin/CMS/catalog/cart APIs, Stripe-backed `POST /api/checkout`, NowPayments-backed `POST /api/checkout/nowpayments`, `/api/v1/webhooks/stripe`, and `/api/v1/webhooks/nowpayments` exist. Payment routes should be refactored toward provider abstraction before adding more gateways. Chat and notifications pending. |
 ---
 
 ## 8. Stack & Decisions
@@ -1073,7 +1074,7 @@ const { data: settings } = await supabase
 | Auth (customers) | Supabase Auth — email/password + Google OAuth |
 | Auth (admin) | Manual — scrypt password hash in `admin_users` table, signed HttpOnly JWT cookie on successful login. No OTP. Verified server-side on every `/admin/*` request. Single Supabase project — no separate project needed. |
 | Image hosting | Supabase Storage (origin) + Cloudflare Images (CDN + transforms) |
-| Payment | Stripe (card, PayPal, Google Pay, Apple Pay) + NowPayments (crypto) |
+| Payment | Provider-flexible. Current implementation uses Stripe sandbox for hosted checkout/refunds and NowPayments is planned for crypto. Main provider may change to Paddle, PayOp, 2Checkout, or another easier merchant/onboarding option. |
 | SMTP | Resend — auth emails + order notifications. See §13. |
 | Currency | Fixed USD/EUR values per service — no runtime conversion. Global state shared across navbar, service detail, and cart. Changing in any one location updates all others. |
 
@@ -1081,8 +1082,9 @@ const { data: settings } = await supabase
 
 | Service | Notes |
 |---|---|
-| Stripe | Card, PayPal, Google Pay, Apple Pay — all via Stripe. Single integration. |
-| NowPayments | Crypto payments + refund API. Requires customer wallet address for refunds. |
+| Stripe | Current sandbox implementation for hosted checkout, dynamic payment methods, webhooks, transaction ledger, and refunds. May become fallback if another provider is easier for production onboarding. |
+| Paddle / PayOp / 2Checkout / other gateway | Candidate primary providers if Stripe business activation is difficult. Must support hosted checkout or payment redirect, webhooks, transaction references, refunds, and Indonesia-compatible payout/onboarding. |
+| NowPayments | Hosted invoice checkout and IPN fulfillment are wired for crypto payments. Crypto refund/payout API remains pending and requires customer wallet address for refunds. |
 | TrustPilot | TrustBox **Carousel** widget embed (script tag). Loads reviews client-side from TrustPilot's CDN — no server-side API calls, no rate limits, no caching needed. Displays on Landing and Services pages. |
 | Google Sheets | Orders tab + Transactions tab. See §13 for schema and trigger rules. |
 
@@ -1577,7 +1579,7 @@ Refund can also be requested from `pending`, `confirmed`, and `in_progress`
 | `pending` / `confirmed` / `in_progress` | `refund_requested` | Customer changed mind (no time limit) | Customer |
 | `delivered` | `refund_requested` | Customer disputes delivery (within 7 days of `deliveredAt`) | Customer |
 | `refund_requested` | `refunded` | Admin approves and issues via gateway | Admin |
-| `refund_requested` | `completed` | Admin denies refund — terminal, no further attempts | Admin |
+| `refund_requested` | previous workflow status | Admin denies refund. Restore `refund_previous_status`, clear it, and set transaction `refund_status = rejected`. Customer notification can be added by the later notification system. | Admin |
 
 **Rules:**
 - `completed` and `refunded` are terminal — no further transitions
@@ -1705,7 +1707,7 @@ Admin                    ->  Strict at login, relaxed after session verification
 |---|---|
 | `in_progress → delivered` | "Your boost is complete!" |
 | `refund_requested → refunded` | "Your refund has been approved and is being processed." |
-| `refund_requested → completed` (denied) | "Your refund request has been denied." |
+| `refund_requested → previous status` (denied) | "Your refund request has been denied." |
 
 **Admin (in-app bell + email via Resend):**
 
@@ -1808,7 +1810,7 @@ Not written to Sheets: user registrations, admin actions, failed payments.
 
 ### NowPayments Webhook Verification
 
-**Approach:** HMAC-SHA512 signature middleware, same pattern as Stripe.
+**Approach:** Hosted invoice checkout with IPN verification. The webhook parses JSON, recursively sorts object keys, signs the sorted JSON with HMAC-SHA512, and timing-safe compares it with `x-nowpayments-sig`.
 
 **Required env var:** `NOWPAYMENTS_IPN_SECRET` — from NowPayments dashboard > API Settings > IPN Secret. ⚠️ Setup pending.
 
@@ -1922,7 +1924,7 @@ Test every flow end-to-end as a real user before going live. Use Stripe test car
 | Customer requests refund (post-delivery, after 7 days) | Button hidden — refund not available |
 | Admin approves refund — Stripe | Refund issued via Stripe API, status → refunded |
 | Admin approves refund — NowPayments | Wallet address collected, refund issued via NowPayments API, status → refunded |
-| Admin denies refund | Status → completed (terminal), refund button no longer shown |
+| Admin denies refund | Status restores to pre-refund workflow state; transaction refund status is `rejected`; customer notification pending notification feature |
 | Second refund attempt on same order | Not possible — button hidden after first attempt |
 | 7-day auto-complete cron | Delivered order auto-moves to completed after 7 days with no refund request |
 | Support chat (anonymous) | Chat opens, message sent to admin |
