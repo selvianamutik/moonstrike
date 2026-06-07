@@ -20,7 +20,7 @@ export function OrderSummary({ ctaHref, ctaLabel, rows, serviceName, serviceMeta
     <aside className="ms-card h-fit rounded-xl p-8 shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
       <h2 className="border-b border-[var(--ms-border)] pb-5 text-2xl font-black">Order Summary</h2>
       <div className="flex gap-4 border-b border-[var(--ms-border)] py-7">
-        <PlaceholderAsset alt="Order item preview" className="h-20 w-20 rounded-md" imageClassName="p-3" />
+        <PlaceholderAsset isHidden={false} alt="Order item preview" className="h-20 w-20 rounded-md" imageClassName="p-3" />
         <div className="flex-1">
           <h3 className="font-bold">{serviceName}</h3>
           <p className="mono mt-1 text-xs text-[var(--ms-price)]">{serviceMeta}</p>

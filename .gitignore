@@ -16,3 +16,7 @@ MOONSTRIKE_AGENTS.md
 moon_strike_brand_guidelines.md
 moon_strike_page_functionalities.md
 .vercel
+.codex/*
+claude.md
+ui-ux-audit.md
+ui-ux-remediation-plan.md

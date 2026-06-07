@@ -80,12 +80,8 @@ export function ServicesCatalog({
     (service) => matchesCategory(service, activeCategory) && matchesQuery(service, query),
   );
   const activeLabel = serviceTabs.find((tab) => tab.value === activeCategory)?.label ?? "Services";
-  const fixedTabs: ScrollingTabItem[] = serviceTabs.slice(0, 2).map((tab) => ({
-    href: servicesHref(tab.value, query),
-    key: tab.value,
-    label: tab.label,
-  }));
-  const scrollingTabs: ScrollingTabItem[] = serviceTabs.slice(2).map((tab) => ({
+  const fixedTabs: ScrollingTabItem[] = [];
+  const scrollingTabs: ScrollingTabItem[] = serviceTabs.map((tab) => ({
     href: servicesHref(tab.value, query),
     key: tab.value,
     label: tab.label,

@@ -1,11 +1,13 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
-import { LogIn, Search, ShoppingCart, User } from "lucide-react";
+import { LogIn, Search, ShoppingCart, User, Gamepad2, Bell, CircleUserRound } from "lucide-react";
 import { QuickSelectMenu } from "@/components/quick-select-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/useAuth";
 import { useCurrency } from "@/hooks/useCurrency";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faDollarSign, faEuroSign } from "@fortawesome/free-solid-svg-icons";
 
 export function SiteHeader() {
   const { user, loading } = useAuth();
@@ -46,7 +48,7 @@ export function SiteHeader() {
           className="ms-button hidden h-11 px-4 mono text-xs uppercase tracking-[0.16em] md:inline-flex"
           aria-label="Toggle currency"
         >
-          {currency === "USD" ? "$ USD" : "€ EUR"}
+          <FontAwesomeIcon icon={currency === "USD" ? faDollarSign : faEuroSign} /> {currency === "USD" ? "USD" : "EUR"}
         </button>
 
         <div className="hidden xl:block">
@@ -54,27 +56,27 @@ export function SiteHeader() {
         </div>
 
         <nav className="ml-auto flex items-center gap-4 text-sm font-semibold text-[var(--ms-heading)] sm:gap-6">
-          <Link href="/services" className="hidden text-center hover:text-[var(--ms-gradient-end)] sm:block">
-            <span className="mono block text-xs text-[var(--ms-gradient-end)]">MENU</span>
-            Services
-          </Link>
-
-          <Link href="/#about" className="hidden text-center hover:text-[var(--ms-gradient-end)] sm:block">
-            <span className="mono block text-xs text-[var(--ms-gradient-end)]">INFO</span>
-            About
+          <Link href="/games" className="hidden text-center hover:text-[var(--ms-gradient-end)] sm:block">
+            <Gamepad2 size={22} className="mt-1 mx-auto" aria-hidden="true" />
+            Games
           </Link>
 
           <Link href="/cart" className="flex flex-col items-center hover:text-[var(--ms-gradient-end)]" aria-label="Cart">
-            <span className="mono hidden text-xs text-[var(--ms-gradient-end)] sm:block">CART</span>
             <ShoppingCart size={22} className="mt-1" aria-hidden="true" />
+            Cart
           </Link>
+
+          {/* <button type="button" aria-label="Notifications (coming soon)" className="hidden text-center hover:text-[var(--ms-gradient-end)] sm:block cursor-pointer">
+            <Bell size={22} className="mt-1 mx-auto" aria-hidden="true"/>
+            Notif
+          </button> */}
 
           {loading ? (
             <div className="h-11 w-11 animate-pulse rounded bg-white/5" />
           ) : isLoggedIn ? (
             <Link href="/profile" className="flex flex-col items-center hover:text-[var(--ms-gradient-end)]" aria-label="Profile">
-              <span className="mono hidden text-xs text-[var(--ms-gradient-end)] sm:block">USER</span>
-              <User size={23} className="mt-1" aria-hidden="true" />
+              <CircleUserRound size={23} className="mt-1" aria-hidden="true" />
+              User
             </Link>
           ) : (
             <Link href="/login" className="ms-button h-11 px-3 mono text-xs uppercase tracking-[0.16em] md:px-4">
@@ -87,3 +89,5 @@ export function SiteHeader() {
     </header>
   );
 }
+
+

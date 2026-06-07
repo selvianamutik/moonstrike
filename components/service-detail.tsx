@@ -395,6 +395,7 @@ export function ServiceDetail({
             </div>
           ) : (
             <PlaceholderAsset
+              isHidden={false}
               alt={`${service.title} service preview`}
               className="mt-12 h-[380px] rounded-lg border border-[var(--ms-border)]"
               priority

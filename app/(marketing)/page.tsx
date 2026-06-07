@@ -26,7 +26,7 @@ export default async function Home() {
         </p>
         <div className="relative mt-6">
           <div className="grid overflow-hidden rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] lg:grid-cols-[1fr_280px]">
-            <PlaceholderAsset alt="Void Descent seasonal event" className="min-h-[450px]" priority imageClassName="p-20">
+            <PlaceholderAsset alt="Void Descent seasonal event" className="min-h-[450px]" priority imageClassName="p-20" isHidden={true}>
               {hero.imageUrl && (
                 <img src={hero.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-80" />
               )}
@@ -47,7 +47,7 @@ export default async function Home() {
               <p className="mono text-sm uppercase tracking-[0.18em] text-[var(--ms-body)]">Coming Soon</p>
               {["Elite Trials Return", "Mythic+ Cache Update", "Ranked Climb Events"].map((item) => (
                 <div key={item} className="mt-5 flex gap-4">
-                  <PlaceholderAsset alt={`${item} preview`} className="h-12 w-20 rounded" imageClassName="p-3" />
+                  <PlaceholderAsset alt={`${item} preview`} className="h-12 w-20 rounded" imageClassName="p-3" isHidden={false}/>
                   <p className="text-sm leading-4">
                     <Badge variant="featured" />
                     <span className="mt-2 block text-[var(--ms-body)]">{item}</span>

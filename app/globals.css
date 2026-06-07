@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 :root {
   --ms-primary: #050816;
@@ -259,14 +259,22 @@ html[data-theme="light"] .ms-button {
   to   { opacity: 1; transform: translateX(0); }
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 .ms-genre-exit-next     { animation: ms-genre-exit-next     240ms ease-in  both; }
 .ms-genre-exit-previous { animation: ms-genre-exit-previous 240ms ease-in  both; }
 .ms-genre-enter-next    { animation: ms-genre-enter-next    240ms ease-out both; }
 .ms-genre-enter-previous{ animation: ms-genre-enter-previous 240ms ease-out both; }
 
+.animate-fadeIn { animation: fadeIn 300ms ease-out both; }
+
 @media (prefers-reduced-motion: reduce) {
   .ms-genre-exit-next, .ms-genre-exit-previous,
-  .ms-genre-enter-next, .ms-genre-enter-previous { animation: none; }
+  .ms-genre-enter-next, .ms-genre-enter-previous,
+  .animate-fadeIn { animation: none; }
 }
 
 .ms-focus-ring:focus-visible {
@@ -278,4 +286,61 @@ html[data-theme="light"] .ms-button {
   .ms-shell {
     width: min(100% - 28px, 1180px);
   }
+}
+
+/* ─── prefers-reduced-motion global override ─────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .ms-button:hover {
+    transform: none;
+  }
+
+  .ms-card-hover:hover {
+    transform: none;
+  }
+}
+
+/* ─── Light mode border contrast fix (WCAG AA 3:1 for UI components) ─────── */
+html[data-theme="light"] .ms-card {
+  border-color: rgba(14, 45, 74, 0.28);
+}
+
+html[data-theme="light"] input,
+html[data-theme="light"] select,
+html[data-theme="light"] textarea {
+  border-color: rgba(14, 45, 74, 0.35);
+}
+
+html[data-theme="light"] .ms-card-hover:hover {
+  border-color: var(--ms-lm-teal);
+  box-shadow: 0 18px 60px rgba(17, 118, 128, 0.18);
+}
+
+/* ─── Global focus-visible ring ─────────────────────────────────────────────
+   Ensures keyboard focus is always visible without clobbering mouse UX.
+   Components using outline-none must opt-in to focus-visible ring themselves. */
+:focus-visible {
+  outline: 2px solid var(--ms-gradient-end);
+  outline-offset: 3px;
+}
+
+html[data-theme="light"] :focus-visible {
+  outline-color: var(--ms-lm-teal);
+}
+
+/* Interactive elements always get pointer cursor */
+button:not([disabled]),
+[role="button"]:not([aria-disabled="true"]),
+label[for],
+select,
+summary {
+  cursor: pointer;
 }

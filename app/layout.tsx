@@ -3,6 +3,7 @@ import { GlobalChatBubble } from "@/components/global-chat-bubble";
 import { JetBrains_Mono, Montserrat } from "next/font/google";
 import { EmailVerificationBanner } from '@/components/common/EmailVerificationBanner'
 import "./globals.css";
+import Script from "next/script";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -35,6 +36,12 @@ export default function RootLayout({
         <EmailVerificationBanner />
         {children}
         <GlobalChatBubble />
+
+        <Script
+          src="https://kit.fontawesome.com/92a240245c.js" 
+          crossOrigin="anonymous"
+          strategy="afterInteractive" 
+        />
       </body>
     </html>
   );
