@@ -34,7 +34,7 @@ export default async function ProfileChatPage() {
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
       <SiteHeader />
-      <section className="ms-shell grid gap-10 py-16 lg:grid-cols-[300px_1fr]">
+      <section className="ms-shell grid gap-8 py-16 lg:grid-cols-[270px_minmax(0,1fr)]">
         <ProfileSidebar
           displayName={displayName}
           email={user.email}

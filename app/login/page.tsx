@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { authProviders, hasEmailPassword } from '@/lib/auth/providers'
+import { createClient } from '@/lib/supabase/client'
 
 type AuthMode = 'login' | 'register' | 'reset'
 
@@ -30,6 +32,12 @@ function getAuthErrorMessage(params: URLSearchParams) {
   if (description) return description
 
   return getCallbackMessage(params.get('error'))
+}
+
+function needsGooglePasswordCompletion(
+  user: ReturnType<typeof useAuth>['user']
+) {
+  return !!user && authProviders(user).includes('google') && !hasEmailPassword(user)
 }
 
 function PasswordToggle({
@@ -102,13 +110,45 @@ function AuthCard() {
   const [resetMessage, setResetMessage] = useState<string | null>(null)
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null)
   const [isResendingVerification, setIsResendingVerification] = useState(false)
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null)
+  const [resendCooldown, setResendCooldown] = useState(0)
 
   useEffect(() => {
     if (!window.location.hash) return
 
     const hashParams = new URLSearchParams(window.location.hash.slice(1))
-    if (hashParams.get('type') === 'recovery' && hashParams.get('access_token')) {
+    const hashType = hashParams.get('type')
+    const accessToken = hashParams.get('access_token')
+    const refreshToken = hashParams.get('refresh_token')
+
+    if (hashType === 'recovery' && accessToken) {
       router.replace(`/reset-password${window.location.hash}`)
+      return
+    }
+
+    if (hashType === 'signup' && accessToken && refreshToken) {
+      const supabase = createClient()
+
+      supabase.auth
+        .setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        })
+        .then(({ error: sessionError }) => {
+          if (sessionError) {
+            setError(sessionError.message)
+            window.history.replaceState(
+              null,
+              '',
+              window.location.pathname + window.location.search
+            )
+            return
+          }
+
+          router.replace(next)
+          router.refresh()
+        })
+
       return
     }
 
@@ -117,10 +157,41 @@ function AuthCard() {
       setError(hashError)
       window.history.replaceState(null, '', window.location.pathname + window.location.search)
     }
-  }, [])
+  }, [next, router])
 
   useEffect(() => {
-    if (!loading && user?.email_confirmed_at) router.push(next)
+    if (resendCooldown <= 0) return
+
+    const timeoutId = window.setTimeout(() => {
+      setResendCooldown((current) => Math.max(current - 1, 0))
+    }, 1000)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [resendCooldown])
+
+  useEffect(() => {
+    if (loading || !user?.email_confirmed_at) return
+
+    let isCurrent = true
+    const supabase = createClient()
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (!isCurrent) return
+
+      const currentUser = data.user
+      if (!currentUser?.email_confirmed_at) return
+
+      if (needsGooglePasswordCompletion(currentUser)) {
+        router.push(`/register/complete?next=${encodeURIComponent(next)}`)
+        return
+      }
+
+      router.push(next)
+    })
+
+    return () => {
+      isCurrent = false
+    }
   }, [loading, next, router, user])
 
   const switchMode = (nextMode: AuthMode) => {
@@ -130,6 +201,8 @@ function AuthCard() {
     setRegisterSuccess(false)
     setResetSuccess(false)
     setResetMessage(null)
+    setVerificationMessage(null)
+    setUnconfirmedEmail(null)
 
     const params = new URLSearchParams(searchParams.toString())
     params.delete('error')
@@ -154,6 +227,12 @@ function AuthCard() {
     setIsSubmitting(false)
 
     if (signInError) {
+      if (signInError.message.toLowerCase().includes('email not confirmed')) {
+        setUnconfirmedEmail(email.trim())
+        setError('This email is registered but not verified. Check your inbox or resend the verification email.')
+        return
+      }
+
       setError(signInError.message)
       return
     }
@@ -191,7 +270,7 @@ function AuthCard() {
     }
 
     if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-      setError('This email is already registered. Log in, reset your password, or resend verification if the account is still unverified.')
+      setError('This email is already registered. Go to Login and sign in with this email. If it is not verified yet, the Resend Verification button will appear there.')
       return
     }
 
@@ -220,12 +299,15 @@ function AuthCard() {
 
   const handleGoogle = async () => {
     setError(null)
-    const { error: googleError } = await signInWithGoogle(next)
+    const { error: googleError } = await signInWithGoogle(
+      next,
+      mode === 'register' ? 'register' : 'login'
+    )
     if (googleError) setError(googleError.message)
   }
 
   const handleResendVerification = async () => {
-    const targetEmail = user?.email ?? email
+    const targetEmail = user?.email ?? unconfirmedEmail ?? email
     setError(null)
     setVerificationMessage(null)
 
@@ -244,6 +326,7 @@ function AuthCard() {
     }
 
     setVerificationMessage('Verification email sent. Check your inbox and return after confirming.')
+    setResendCooldown(60)
   }
 
   if (loading) {
@@ -303,11 +386,13 @@ function AuthCard() {
           </p>
         )}
 
-        {searchParams.get('unverified') === '1' && (
+        {(searchParams.get('unverified') === '1' || unconfirmedEmail) && (
           <div className="mt-6 rounded-md border border-[var(--ms-border)] bg-[var(--ms-hover-bg)] px-4 py-4">
             <h2 className="font-display text-base font-black">Verify your email</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">
-              You are signed in, but this account must verify its email before opening protected account pages.
+              {unconfirmedEmail
+                ? 'This account exists but still needs email verification before login.'
+                : 'You are signed in, but this account must verify its email before opening protected account pages.'}
             </p>
             {verificationMessage && (
               <p className="mono mt-3 text-xs leading-5 text-[var(--ms-gradient-end)]">
@@ -317,10 +402,14 @@ function AuthCard() {
             <button
               type="button"
               onClick={handleResendVerification}
-              disabled={isResendingVerification}
+              disabled={isResendingVerification || resendCooldown > 0}
               className="ms-button mt-4 h-10 px-4 mono text-xs uppercase tracking-[0.14em] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isResendingVerification ? 'Sending...' : 'Resend Verification'}
+              {isResendingVerification
+                ? 'Sending...'
+                : resendCooldown > 0
+                  ? `Resend in ${resendCooldown}s`
+                  : 'Resend Verification'}
             </button>
           </div>
         )}
@@ -335,7 +424,11 @@ function AuthCard() {
               type="email"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                setUnconfirmedEmail(null)
+                setVerificationMessage(null)
+              }}
               placeholder="player@moonstrike.gg"
               className="mt-2 h-13 w-full rounded-md border border-[var(--ms-border)] bg-[var(--ms-field)] px-4 outline-none focus:border-[var(--ms-gradient-end)]"
             />

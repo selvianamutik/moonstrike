@@ -9,7 +9,11 @@
     "lint": "tsc --noEmit",
     "admin:seed": "node scripts/seed-admin.mjs",
     "admin:reseed": "node scripts/seed-admin.mjs",
-    "catalog:seed": "node scripts/seed-catalog.mjs"
+    "catalog:seed": "node scripts/seed-catalog.mjs",
+    "refund-orders:seed": "node scripts/seed-refund-orders.mjs",
+    "refund-orders:reseed": "node scripts/seed-refund-orders.mjs",
+    "refund-orders:cleanup": "node scripts/seed-refund-orders.mjs cleanup",
+    "user-data:cleanup": "node scripts/cleanup-user-data.mjs"
   },
   "dependencies": {
     "@stripe/cli": "^0.0.1",

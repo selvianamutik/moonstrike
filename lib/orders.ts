@@ -34,26 +34,28 @@ type CustomerOrderItemRow = {
   selected_options_snapshot: OrderOptionSnapshot;
   total: number | string;
   currency: OrderCurrency;
-  region: string;
   services: ServiceRelation;
 };
 
 export type CustomerOrderRow = {
   id: string;
+  order_ref: string;
   checkout_session_id: string;
-  selected_options_snapshot: OrderOptionSnapshot;
-  total: number | string;
-  currency: OrderCurrency;
-  region: string;
-  payment_provider: string;
-  stripe_payment_intent_id: string | null;
-  nowpayments_payment_id: string | null;
   status: string;
   refund_previous_status: string | null;
+  completed_at: string | null;
   created_at: string;
   order_items: CustomerOrderItemRow[] | null;
-  services: ServiceRelation;
-  service_id: string | null;
+};
+
+type CustomerOrderTransactionRow = {
+  checkout_session_id: string;
+  transaction_ref: string;
+  provider: string;
+  provider_payment_id: string;
+  amount: number | string;
+  currency: OrderCurrency;
+  status: string;
 };
 
 export type CustomerOrderItem = {
@@ -61,7 +63,6 @@ export type CustomerOrderItem = {
   selectedOptionsSnapshot: OrderOptionSnapshot;
   total: number;
   currency: OrderCurrency;
-  region: string;
   service: {
     id: string;
     title: string;
@@ -79,11 +80,11 @@ export type CustomerOrder = {
   selectedOptionsSnapshot: OrderOptionSnapshot;
   total: number;
   currency: OrderCurrency;
-  region: string;
   paymentProvider: string;
   transactionId: string;
   paymentStatus: string;
   status: string;
+  completedAt: string | null;
   createdAt: string;
   itemCount: number;
   serviceSummary: string;
@@ -105,7 +106,6 @@ function mapItem(row: CustomerOrderItemRow): CustomerOrderItem {
     selectedOptionsSnapshot: row.selected_options_snapshot ?? {},
     total: Number(row.total),
     currency: row.currency,
-    region: row.region,
     service: {
       id: row.service_id,
       title: service?.title ?? "Service",
@@ -117,44 +117,26 @@ function mapItem(row: CustomerOrderItemRow): CustomerOrderItem {
   };
 }
 
-function legacyItemFromOrder(row: CustomerOrderRow): CustomerOrderItem {
-  const service = relationOne(row.services);
-  const game = relationOne(service?.games);
-  const category = relationOne(service?.service_categories);
-
-  return {
-    id: row.id,
-    selectedOptionsSnapshot: row.selected_options_snapshot ?? {},
-    total: Number(row.total),
-    currency: row.currency,
-    region: row.region,
-    service: {
-      id: row.service_id ?? "",
-      title: service?.title ?? "Service",
-      image: service?.image ?? null,
-      description: service?.description ?? "",
-      gameName: game?.name ?? "Game",
-      categoryName: category?.name ?? "Service",
-    },
-  };
-}
-
-function mapOrder(row: CustomerOrderRow): CustomerOrder {
-  const items = row.order_items?.length ? row.order_items.map(mapItem) : [legacyItemFromOrder(row)];
+function mapOrder(row: CustomerOrderRow, transaction?: CustomerOrderTransactionRow): CustomerOrder {
+  const items = row.order_items?.map(mapItem) ?? [];
   const serviceSummary = items.length === 1 ? items[0].service.title : `${items.length} services`;
+  const fallbackCurrency = items[0]?.currency ?? "USD";
+  const fallbackTotal = items.reduce((sum, item) => sum + item.total, 0);
+  const currency = transaction?.currency ?? fallbackCurrency;
+  const total = transaction ? Number(transaction.amount) : fallbackTotal;
 
   return {
     id: row.id,
     checkoutSessionId: row.checkout_session_id,
-    orderReference: row.checkout_session_id,
-    selectedOptionsSnapshot: row.selected_options_snapshot ?? {},
-    total: Number(row.total),
-    currency: row.currency,
-    region: row.region,
-    paymentProvider: row.payment_provider,
-    transactionId: row.stripe_payment_intent_id ?? row.nowpayments_payment_id ?? row.checkout_session_id,
-    paymentStatus: row.payment_provider === "stripe" && row.stripe_payment_intent_id?.startsWith("test_") ? "test_pending" : "paid",
+    orderReference: row.order_ref,
+    selectedOptionsSnapshot: {},
+    total,
+    currency,
+    paymentProvider: transaction?.provider ?? "unknown",
+    transactionId: transaction?.transaction_ref ?? row.checkout_session_id,
+    paymentStatus: transaction?.status ?? "pending",
     status: row.status,
+    completedAt: row.completed_at,
     createdAt: row.created_at,
     itemCount: items.length,
     serviceSummary,
@@ -164,7 +146,35 @@ function mapOrder(row: CustomerOrderRow): CustomerOrder {
 }
 
 const orderSelect =
-  "id, service_id, checkout_session_id, selected_options_snapshot, total, currency, region, payment_provider, stripe_payment_intent_id, nowpayments_payment_id, status, refund_previous_status, created_at, services(title, image, description, games(name), service_categories(name)), order_items(id, service_id, selected_options_snapshot, total, currency, region, services(title, image, description, games(name), service_categories(name)))";
+  "id, order_ref, checkout_session_id, status, refund_previous_status, completed_at, created_at, order_items(id, service_id, selected_options_snapshot, total, currency, services(title, image, description, games(name), service_categories(name)))";
+
+const REFUND_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function canRequestOrderRefund(status: string, completedAt?: string | null, now = new Date()) {
+  if (["refund_requested", "refunded"].includes(status)) return false;
+  if (status !== "completed") return true;
+  if (!completedAt) return false;
+
+  const completedTime = new Date(completedAt).getTime();
+  if (Number.isNaN(completedTime)) return false;
+
+  return now.getTime() - completedTime <= REFUND_WINDOW_MS;
+}
+
+async function getTransactionsByCheckoutSession(userId: string, checkoutSessionIds: string[]) {
+  if (checkoutSessionIds.length === 0) return new Map<string, CustomerOrderTransactionRow>();
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("checkout_session_id, transaction_ref, provider, provider_payment_id, amount, currency, status")
+    .eq("user_id", userId)
+    .in("checkout_session_id", checkoutSessionIds)
+    .returns<CustomerOrderTransactionRow[]>();
+
+  if (error) throw error;
+  return new Map((data ?? []).map((transaction) => [transaction.checkout_session_id, transaction]));
+}
 
 export async function listCustomerOrders(userId: string) {
   const supabase = createAdminClient();
@@ -176,20 +186,26 @@ export async function listCustomerOrders(userId: string) {
     .returns<CustomerOrderRow[]>();
 
   if (error) throw error;
-  return (data ?? []).map(mapOrder);
+  const rows = data ?? [];
+  const transactions = await getTransactionsByCheckoutSession(userId, rows.map((order) => order.checkout_session_id));
+  return rows.map((order) => mapOrder(order, transactions.get(order.checkout_session_id)));
 }
 
 export async function getCustomerOrder(userId: string, orderId: string) {
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(orderId);
+  const query = supabase
     .from("orders")
     .select(orderSelect)
-    .eq("user_id", userId)
-    .eq("id", orderId)
-    .maybeSingle<CustomerOrderRow>();
+    .eq("user_id", userId);
+
+  const { data, error } = await (isUuid ? query.eq("id", orderId) : query.eq("order_ref", orderId)).maybeSingle<CustomerOrderRow>();
 
   if (error) throw error;
-  return data ? mapOrder(data) : null;
+  if (!data) return null;
+
+  const transactions = await getTransactionsByCheckoutSession(userId, [data.checkout_session_id]);
+  return mapOrder(data, transactions.get(data.checkout_session_id));
 }
 
 export async function getCustomerOrderByCheckoutSession(userId: string, checkoutSessionId: string) {
@@ -202,7 +218,10 @@ export async function getCustomerOrderByCheckoutSession(userId: string, checkout
     .maybeSingle<CustomerOrderRow>();
 
   if (error) throw error;
-  return data ? mapOrder(data) : null;
+  if (!data) return null;
+
+  const transactions = await getTransactionsByCheckoutSession(userId, [data.checkout_session_id]);
+  return mapOrder(data, transactions.get(data.checkout_session_id));
 }
 
 export function formatOrderMoney(value: number, currency: OrderCurrency) {
@@ -219,6 +238,25 @@ export function formatOrderDate(value: string) {
     month: "short",
     year: "numeric",
   }).format(new Date(value));
+}
+
+export function formatOrderDateTime(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+export function formatPaymentProvider(value: string) {
+  if (value === "stripe") return "Stripe";
+  if (value === "nowpayments") return "NOWPayments";
+  if (value === "lemonsqueezy") return "Lemon Squeezy";
+  if (value === "polar") return "Polar";
+  if (value === "paddle") return "Paddle";
+  return value === "unknown" ? "Pending" : value;
 }
 
 export function formatOrderOptionValue(value: OrderOptionValue) {

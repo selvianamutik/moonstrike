@@ -14,8 +14,6 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [refundAmount, setRefundAmount] = useState(initialOrder.total.toFixed(2));
-  const [refundCategory, setRefundCategory] = useState("customer_request");
-  const [refundNote, setRefundNote] = useState("");
   const [refundMessage, setRefundMessage] = useState("");
   const actions = getNextOrderActions(order.status);
 
@@ -57,7 +55,7 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
     }
   }
 
-  async function issueStripeRefund() {
+  async function issueRefund() {
     const amount = Number(refundAmount);
 
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -70,9 +68,14 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
       return;
     }
 
-    const confirmed = window.confirm(
-      `Issue a ${order.currency} ${amount.toFixed(2)} Stripe refund? This sends money back through Stripe and marks the Moon Strike order as refunded.`,
-    );
+    const confirmed =
+      order.paymentProvider === "stripe"
+        ? window.confirm(
+            `Issue a ${order.currency} ${amount.toFixed(2)} Stripe refund? This sends money back through Stripe and marks the Moon Strike order as refunded.`,
+          )
+        : window.confirm(
+            `Mark this ${order.currency} ${amount.toFixed(2)} ${order.paymentProvider} order as manually refunded? Only continue after you have sent the refund through the external provider or wallet transfer.`,
+          );
 
     if (!confirmed) return;
 
@@ -84,11 +87,7 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
       const response = await fetch(`/api/admin/orders/${order.id}/refund`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount,
-          category: refundCategory,
-          note: refundNote,
-        }),
+        body: JSON.stringify({ amount }),
       });
       const payload = await response.json().catch(() => ({}));
 
@@ -97,7 +96,11 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
         return;
       }
 
-      setRefundMessage(`Stripe refund issued${payload.refundId ? `: ${payload.refundId}` : "."}`);
+      setRefundMessage(
+        order.paymentProvider === "stripe"
+          ? `Stripe refund issued${payload.refundId ? `: ${payload.refundId}` : "."}`
+          : "Manual refund recorded.",
+      );
       setOrder((current) => ({
         ...current,
         status: "refunded",
@@ -253,7 +256,9 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
                 Payment: {order.paymentProvider === "stripe" ? "Card (Stripe)" : "Crypto (NowPayments)"}
               </p>
               <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs leading-5 text-amber-300">
-                This issues a real Stripe refund. The amount cannot be higher than the order total.
+                {order.paymentProvider === "stripe"
+                  ? "This issues a real Stripe refund. The amount cannot be higher than the order total."
+                  : "Crypto refunds are manual. Send the refund through NOWPayments, a wallet transfer, or another provider first, then record it here."}
               </p>
               <div className="space-y-4">
                 <div>
@@ -261,10 +266,8 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
                   <div className="mt-1 flex items-center rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] px-3">
                     <span className="font-mono text-xs text-[#64748B]">{order.currency}</span>
                     <input
-                      type="number"
-                      min="0.01"
-                      max={order.total}
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={refundAmount}
                       onChange={(event) => setRefundAmount(event.target.value)}
                       className="h-10 min-w-0 flex-1 bg-transparent px-3 text-sm text-white outline-none"
@@ -272,58 +275,16 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
                   </div>
                   <p className="mt-1 text-xs text-[#64748B]">Maximum: {order.amount}</p>
                 </div>
-
-                <div>
-                  <label className="text-xs text-[var(--ms-text-secondary)]">Refund category</label>
-                  <select
-                    value={refundCategory}
-                    onChange={(event) => setRefundCategory(event.target.value)}
-                    className="mt-1 h-10 w-full rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] px-3 text-sm text-white outline-none"
-                  >
-                    <option value="customer_request">Customer request</option>
-                    <option value="duplicate_order">Duplicate order</option>
-                    <option value="service_unavailable">Service unavailable</option>
-                    <option value="admin_adjustment">Admin adjustment</option>
-                    <option value="suspected_fraud">Suspected fraud</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs text-[var(--ms-text-secondary)]">Refund note</label>
-                  <textarea
-                    value={refundNote}
-                    onChange={(event) => setRefundNote(event.target.value)}
-                    maxLength={500}
-                    rows={4}
-                    placeholder="Internal note sent to Stripe metadata"
-                    className="mt-1 w-full resize-none rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] px-3 py-2 text-sm text-white outline-none"
-                  />
-                </div>
               </div>
-              {order.paymentProvider === "nowpayments" && (
-                <div className="mb-3">
-                  <label className="text-xs text-[var(--ms-text-secondary)]">Wallet address</label>
-                  <input
-                    className="w-full mt-1 bg-[var(--ms-primary)] border border-[var(--ms-accent)] rounded-lg px-3 py-2 text-sm text-white font-mono"
-                    defaultValue={order.cryptoRefundAddress ?? ""}
-                    placeholder="Customer wallet for refund"
-                  />
-                </div>
-              )}
               <AdminButton
                 variant="danger"
                 className="w-full"
-                onClick={issueStripeRefund}
-                disabled={isSaving || order.paymentProvider !== "stripe"}
+                onClick={issueRefund}
+                disabled={isSaving}
               >
-                {isSaving ? "Issuing..." : "Issue Stripe Refund"}
+                {isSaving ? "Issuing..." : order.paymentProvider === "stripe" ? "Issue Stripe Refund" : "Record Manual Refund"}
               </AdminButton>
               {refundMessage ? <p className="mt-2 text-xs text-emerald-400">{refundMessage}</p> : null}
-              {order.paymentProvider !== "stripe" ? <p className="mt-2 text-xs text-amber-400">Automatic refunds are only wired for Stripe orders.</p> : null}
-              {order.paymentProvider === "nowpayments" && !order.cryptoRefundAddress && (
-                <p className="text-xs text-amber-400 mt-2">Awaiting wallet address</p>
-              )}
             </section>
           )}
         </aside>

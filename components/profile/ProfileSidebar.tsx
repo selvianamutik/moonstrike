@@ -31,7 +31,7 @@ export function ProfileSidebar({ displayName, email, initials, memberSince, tota
   const pathname = usePathname();
 
   return (
-    <aside className="ms-card h-fit rounded-xl p-5 lg:sticky lg:top-28">
+    <aside className="ms-card h-fit max-w-full rounded-xl p-5 lg:sticky lg:top-28">
       <div className="flex items-center gap-4 border-b border-[var(--ms-border)] pb-5">
         <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-[var(--ms-gradient-end)] bg-[var(--ms-hover-bg)] font-display text-xl font-black">
           {initials}

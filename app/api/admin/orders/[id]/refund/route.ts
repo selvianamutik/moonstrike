@@ -5,18 +5,10 @@ import { getAdminSession } from "@/lib/admin/session";
 import { getStripeClient } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const REFUND_CATEGORIES = new Set(["customer_request", "duplicate_order", "service_unavailable", "admin_adjustment", "suspected_fraud", "other"]);
-
 function parseRefundAmount(value: unknown) {
   if (typeof value === "number") return value;
   if (typeof value === "string") return Number(value);
   return NaN;
-}
-
-function toStripeReason(category: string) {
-  if (category === "duplicate_order") return "duplicate" as const;
-  if (category === "suspected_fraud") return "fraudulent" as const;
-  return "requested_by_customer" as const;
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -29,33 +21,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { id } = await params;
   const body = await request.json().catch(() => null);
   const amount = parseRefundAmount(body?.amount);
-  const category = typeof body?.category === "string" ? body.category : "";
-  const note = typeof body?.note === "string" ? body.note.trim() : "";
 
   if (!Number.isFinite(amount) || amount <= 0) {
     return NextResponse.json({ error: "Refund amount must be greater than 0." }, { status: 400 });
   }
 
-  if (!REFUND_CATEGORIES.has(category)) {
-    return NextResponse.json({ error: "Choose a valid refund category." }, { status: 400 });
-  }
-
-  if (note.length > 500) {
-    return NextResponse.json({ error: "Refund note must be 500 characters or fewer." }, { status: 400 });
-  }
-
   const supabase = createAdminClient();
   const { data: order, error: orderError } = await supabase
     .from("orders")
-    .select("id, checkout_session_id, total, currency, payment_provider, status")
+    .select("id, checkout_session_id, status, order_ref")
     .eq("id", id)
     .maybeSingle<{
       id: string;
       checkout_session_id: string;
-      total: number | string;
-      currency: "USD" | "EUR";
-      payment_provider: "stripe" | "nowpayments";
       status: string;
+      order_ref: string;
     }>();
 
   if (orderError) {
@@ -66,25 +46,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Order not found." }, { status: 404 });
   }
 
-  if (order.payment_provider !== "stripe") {
-    return NextResponse.json({ error: "Automatic refunds are only wired for Stripe orders." }, { status: 400 });
-  }
-
   if (order.status === "refunded") {
     return NextResponse.json({ error: "This order is already marked as refunded." }, { status: 400 });
   }
 
-  const orderTotal = Number(order.total);
-  if (amount > orderTotal) {
-    return NextResponse.json({ error: "Refund amount cannot be higher than the order total." }, { status: 400 });
-  }
-
   const { data: transaction, error: transactionError } = await supabase
     .from("transactions")
-    .select("id, provider_payment_id, amount, currency, refund_status, raw_provider_payload")
+    .select("id, provider, provider_payment_id, amount, currency, refund_status, raw_provider_payload")
     .eq("checkout_session_id", order.checkout_session_id)
     .maybeSingle<{
       id: string;
+      provider: "stripe" | "nowpayments";
       provider_payment_id: string;
       amount: number | string;
       currency: "USD" | "EUR";
@@ -110,40 +82,48 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const normalizedAmount = Math.round(amount * 100) / 100;
-  const amountInCents = Math.round(normalizedAmount * 100);
-  const refund = await getStripeClient().refunds.create({
-    payment_intent: transaction.provider_payment_id,
-    amount: amountInCents,
-    reason: toStripeReason(category),
-    metadata: {
-      order_id: order.id,
-      checkout_session_id: order.checkout_session_id,
-      category,
-      note,
-    },
-  });
-
   const refundedAt = new Date().toISOString();
+  const providerRefund =
+    transaction.provider === "stripe"
+      ? await getStripeClient().refunds.create({
+          payment_intent: transaction.provider_payment_id,
+          amount: Math.round(normalizedAmount * 100),
+          reason: "requested_by_customer",
+          metadata: {
+            order_id: order.id,
+            checkout_session_id: order.checkout_session_id,
+          },
+        })
+      : null;
+
   const { error: updateTransactionError } = await supabase
     .from("transactions")
     .update({
       status: "refunded",
       refund_status: "refunded",
-      provider_refund_id: refund.id,
+      provider_refund_id: providerRefund?.id ?? null,
       refund_amount: normalizedAmount,
-      refund_currency: order.currency,
-      refund_category: category,
-      refund_note: note || null,
+      refund_currency: transaction.currency,
+      refund_category: null,
+      refund_note: null,
       refunded_at: refundedAt,
       raw_provider_payload: {
         ...(transaction.raw_provider_payload ?? {}),
-        refund: {
-          id: refund.id,
-          amount: refund.amount,
-          currency: refund.currency,
-          status: refund.status,
-          reason: refund.reason,
-        },
+        refund: providerRefund
+          ? {
+              id: providerRefund.id,
+              amount: providerRefund.amount,
+              currency: providerRefund.currency,
+              status: providerRefund.status,
+              reason: providerRefund.reason,
+            }
+          : {
+              manual: true,
+              provider: transaction.provider,
+              amount: normalizedAmount,
+              currency: transaction.currency,
+              recorded_at: refundedAt,
+            },
       },
       updated_at: refundedAt,
     })
@@ -166,7 +146,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   await writeAuditLog({
-    action: `Issued Stripe refund ${refund.id} for order ${order.id.slice(0, 8)}`,
+    action: providerRefund
+      ? `Issued Stripe refund ${providerRefund.id} for order ${order.id.slice(0, 8)}`
+      : `Recorded manual ${transaction.provider} refund for order ${order.id.slice(0, 8)}`,
     status: "success",
     request,
     admin,
@@ -174,11 +156,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   revalidatePath("/admin/orders");
   revalidatePath(`/admin/orders/${order.id}`);
+  revalidatePath(`/admin/orders/${order.order_ref}`);
   revalidatePath("/admin/transactions");
   revalidatePath("/profile");
   revalidatePath("/profile/orders");
-  revalidatePath(`/profile/orders/${order.id}`);
+  revalidatePath(`/profile/orders/${order.order_ref}`);
   revalidatePath("/profile/transactions");
 
-  return NextResponse.json({ ok: true, refundId: refund.id });
+  return NextResponse.json({ ok: true, refundId: providerRefund?.id ?? null, manual: !providerRefund });
 }

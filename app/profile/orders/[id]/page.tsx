@@ -10,6 +10,8 @@ import { formatMemberSince, getUserDisplayName, getUserInitials } from "@/lib/au
 import {
   formatOrderMoney,
   formatOrderOptionValue,
+  formatPaymentProvider,
+  canRequestOrderRefund,
   getCustomerOrder,
 } from "@/lib/orders";
 
@@ -17,7 +19,7 @@ type ProfileOrderDetailPageProps = {
   params: Promise<{ id: string }>;
 };
 
-const timelineSteps = ["Placed", "Confirmed", "In Progress", "Delivered", "Completed"];
+const timelineSteps = ["Pending", "Confirmed", "In Progress", "Delivered", "Completed"];
 
 function completedStepCount(status: string) {
   if (status === "completed") return 5;
@@ -40,13 +42,13 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
   const initials = getUserInitials(displayName, user.email);
   const memberSince = formatMemberSince(user.created_at);
   const completedSteps = completedStepCount(order.status);
-  const canRequestRefund = !["completed", "refund_requested", "refunded"].includes(order.status);
+  const canRequestRefund = canRequestOrderRefund(order.status, order.completedAt);
 
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
       <SiteHeader />
       
-      <section className="ms-shell grid gap-10 py-16 lg:grid-cols-[300px_1fr]">
+      <section className="ms-shell grid gap-8 py-16 lg:grid-cols-[270px_minmax(0,1fr)]">
         <ProfileSidebar displayName={displayName} email={user.email} initials={initials} memberSince={memberSince} />
 
         <div>
@@ -54,14 +56,22 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
           <div className="flex flex-col justify-between gap-5 border-b border-[var(--ms-border)] pb-7 md:flex-row md:items-end">
             <div>
               <p className="mono text-xs uppercase tracking-[0.28em] text-[var(--ms-gradient-end)]">
-                Profile / Order Detail
+                Profile / Order Detail / {order.orderReference}
               </p>
               <h1 className="font-display mt-3 text-4xl font-black tracking-[-0.05em]">Order Detail</h1>
-              <p className="mt-3 text-[var(--ms-body)]">{order.serviceSummary}</p>
+              <p className="mt-3 text-[var(--ms-body)]">{order.orderReference}</p>
             </div>
-            <span className="w-fit rounded-full border border-[var(--ms-gradient-end)]/50 px-4 py-2 mono text-sm uppercase text-[var(--ms-success)]">
-              {order.status.replace("_", " ")}
-            </span>
+            <div className="flex flex-col items-start gap-3 md:items-end">
+              <span className="w-fit rounded-full border border-[var(--ms-gradient-end)]/50 px-4 py-2 mono text-sm uppercase text-[var(--ms-success)]">
+                {order.status.replace("_", " ")}
+              </span>
+              <div className="flex flex-wrap items-center gap-3">
+                <Link href="/profile/chat" className="inline-flex items-center justify-center rounded-md border border-[var(--ms-border)] px-4 py-3 text-sm text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
+                  Open Chat
+                </Link>
+                {canRequestRefund ? <RefundRequestButton orderId={order.id} compact /> : null}
+              </div>
+            </div>
           </div>
           <section className="mt-8 rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-6">
             <h2 className="text-xl font-black">Order Timeline</h2>
@@ -81,6 +91,24 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
                   </div>
                 );
               })}
+            </div>
+          </section>
+
+          <section className="mt-8 rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-6">
+            <h2 className="text-xl font-black">Order Information</h2>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <InfoRow label="Checkout Session" value={order.checkoutSessionId} />
+              <InfoRow label="Transaction Reference" value={order.transactionId} />
+              <InfoRow label="Payment Provider" value={formatPaymentProvider(order.paymentProvider)} />
+              <InfoRow label="Payment Status" value={order.paymentStatus.replace("_", " ")} />
+              <InfoRow label="Created" value={new Intl.DateTimeFormat("en-US", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              }).format(new Date(order.createdAt))} />
+              <InfoRow label="Currency" value={order.currency} />
             </div>
           </section>
 
@@ -134,11 +162,6 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
                 );
               })}
             </div>
-            <div className="mt-5 flex flex-wrap gap-3 mono text-xs uppercase tracking-[0.16em] text-[var(--ms-body)]">
-              <span className="rounded-full border border-[var(--ms-border)] px-3 py-1">{order.paymentStatus.replace("_", " ")}</span>
-              <span className="rounded-full border border-[var(--ms-border)] px-3 py-1">Order ref: {order.orderReference}</span>
-              <span className="rounded-full border border-[var(--ms-border)] px-3 py-1">Payment ref: {order.transactionId}</span>
-            </div>
           </section>
 
           <section className="mt-8 grid gap-6">
@@ -147,7 +170,7 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
               <div className="mt-5 space-y-3">
                 <PriceRow label="Order total" value={formatOrderMoney(order.total, order.currency)} />
                 <PriceRow label="Currency" value={order.currency} />
-                <PriceRow label="Payment provider" value={order.paymentProvider} />
+                <PriceRow label="Payment provider" value={formatPaymentProvider(order.paymentProvider)} />
                 <div className="flex justify-between gap-4 border-t border-[var(--ms-border)] pt-4 text-lg font-black">
                   <span>Total</span>
                   <span className="mono text-[var(--ms-price)]">{formatOrderMoney(order.total, order.currency)}</span>
@@ -156,22 +179,6 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
             </article>
           </section>
 
-          <section className="mt-8 rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-6">
-            <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-xl font-black">Support Actions</h2>
-                <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">
-                  Use support chat for delivery questions, booster updates, or refund requests.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <Link href="/profile/chat" className="rounded-md border border-[var(--ms-border)] px-4 py-3 text-sm text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
-                  Open Support Chat
-                </Link>
-                {canRequestRefund ? <RefundRequestButton orderId={order.id} /> : null}
-              </div>
-            </div>
-          </section>
           </div>
         </div>
       </section>
@@ -185,6 +192,15 @@ function PriceRow({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between gap-4 border-b border-[var(--ms-border)] pb-3">
       <span className="text-[var(--ms-body)]">{label}</span>
       <span className="mono text-right">{value}</span>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-[var(--ms-border)] bg-black/20 p-4">
+      <p className="mono text-[10px] uppercase tracking-[0.16em] text-[var(--ms-body)]">{label}</p>
+      <p className="mt-2 break-all font-bold capitalize text-[var(--ms-heading)]">{value}</p>
     </div>
   );
 }

@@ -31,7 +31,6 @@ export type CartLineItem = {
   id: string;
   serviceSlug: string;
   quantity: number;
-  region: string;
   selectedOptions: Array<{
     group: string;
     value: string;
@@ -44,7 +43,6 @@ export type DetailOrder = {
   userName: string;
   serviceSlug: string;
   quantity: number;
-  region: string;
   selectedOptions: CartLineItem["selectedOptions"];
   status: "waiting_payment" | "paid" | "assigned" | "in_progress" | "completed" | "cancelled" | "refunded";
   paymentStatus: "pending" | "paid" | "failed" | "refunded";
@@ -228,7 +226,6 @@ export const cartItems: CartLineItem[] = [
     id: "cart_1001",
     serviceSlug: "wow-mythic-plus",
     quantity: 1,
-    region: "USA",
     selectedOptions: [
       { group: "Key Level", value: "+15", priceModifier: 21 },
       { group: "Number of Runs", value: "1 run", priceModifier: 0 },
@@ -240,7 +237,6 @@ export const cartItems: CartLineItem[] = [
     id: "cart_1002",
     serviceSlug: "valorant-rank-boost",
     quantity: 1,
-    region: "Europe",
     selectedOptions: [
       { group: "Current Rank", value: "Gold II", priceModifier: 0 },
       { group: "Target Rank", value: "Diamond I", priceModifier: 60 },
@@ -255,7 +251,6 @@ export const detailOrders: DetailOrder[] = [
     userName: "Guest Customer",
     serviceSlug: "wow-mythic-plus",
     quantity: 1,
-    region: "USA",
     selectedOptions: cartItems[0].selectedOptions,
     status: "in_progress",
     paymentStatus: "paid",

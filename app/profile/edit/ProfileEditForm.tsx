@@ -64,9 +64,7 @@ export function ProfileEditForm({
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [accountError, setAccountError] = useState<string | null>(null)
 
-  const hasEmailProvider = providers.includes('email')
   const hasGoogleProvider = providers.includes('google')
-  const emailLoginConnected = hasEmailProvider || providers.includes('email_password')
 
   useEffect(() => {
     const supabase = createClient()
@@ -211,9 +209,20 @@ export function ProfileEditForm({
 
     const { supabase } = activeSession
 
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+      email,
+      password: currentPassword,
+    })
+
+    if (verifyError) {
+      setIsSavingPassword(false)
+      setPasswordError('Current password is incorrect.')
+      return
+    }
+
     const { error: updateError } = await supabase.auth.updateUser({
       password: newPassword,
-      current_password: currentPassword,
+      data: { has_email_password: true },
     })
     setIsSavingPassword(false)
 
@@ -476,74 +485,6 @@ export function ProfileEditForm({
           <div className="rounded-md border border-[var(--ms-border)] bg-[var(--ms-field)] p-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="font-bold">Email Password</h3>
-                <p className="mt-1 text-sm text-[var(--ms-body)]">
-                  {emailLoginConnected
-                    ? 'Email/password login is enabled.'
-                    : 'Add a password so this Google account can also use email login.'}
-                </p>
-              </div>
-              <span className="mono rounded-full border border-[var(--ms-border)] px-3 py-1 text-[10px] uppercase text-[var(--ms-body)]">
-                {emailLoginConnected ? 'Connected' : 'Not Connected'}
-              </span>
-            </div>
-
-            {!emailLoginConnected && (
-              <form onSubmit={handleAddPassword} className="mt-5 space-y-4">
-                <div>
-                  <label className="mono text-xs uppercase tracking-[0.16em] text-[var(--ms-body)]" htmlFor="account-password">
-                    New Password
-                  </label>
-                  <div className="mt-2 flex h-13 items-center rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-card)] px-4 focus-within:border-[var(--ms-gradient-end)]">
-                    <input
-                      id="account-password"
-                      type={showAccountPassword ? 'text' : 'password'}
-                      value={accountPassword}
-                      onChange={(e) => setAccountPassword(e.target.value)}
-                      className="min-w-0 flex-1 bg-transparent outline-none"
-                    />
-                    <PasswordToggle
-                      shown={showAccountPassword}
-                      onToggle={() => setShowAccountPassword((current) => !current)}
-                      label={showAccountPassword ? 'Hide password' : 'Show password'}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mono text-xs uppercase tracking-[0.16em] text-[var(--ms-body)]" htmlFor="confirm-account-password">
-                    Confirm Password
-                  </label>
-                  <div className="mt-2 flex h-13 items-center rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-card)] px-4 focus-within:border-[var(--ms-gradient-end)]">
-                    <input
-                      id="confirm-account-password"
-                      type={showConfirmAccountPassword ? 'text' : 'password'}
-                      value={confirmAccountPassword}
-                      onChange={(e) => setConfirmAccountPassword(e.target.value)}
-                      className="min-w-0 flex-1 bg-transparent outline-none"
-                    />
-                    <PasswordToggle
-                      shown={showConfirmAccountPassword}
-                      onToggle={() => setShowConfirmAccountPassword((current) => !current)}
-                      label={showConfirmAccountPassword ? 'Hide confirm password' : 'Show confirm password'}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isAddingPassword}
-                  className="ms-button h-11 px-5 mono text-xs uppercase tracking-[0.14em] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isAddingPassword ? 'Saving...' : 'Add Email Login'}
-                </button>
-              </form>
-            )}
-          </div>
-
-          <div className="rounded-md border border-[var(--ms-border)] bg-[var(--ms-field)] p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
                 <h3 className="font-bold">Google</h3>
                 <p className="mt-1 text-sm text-[var(--ms-body)]">
                   {hasGoogleProvider
@@ -581,15 +522,6 @@ export function ProfileEditForm({
           </p>
         )}
       </section>
-
-      <div className="lg:col-span-2">
-        <Link
-          href="/profile"
-          className="inline-flex h-11 items-center justify-center rounded-md border border-[var(--ms-border)] px-5 text-sm text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]"
-        >
-          Back to Profile
-        </Link>
-      </div>
     </div>
   )
 }
