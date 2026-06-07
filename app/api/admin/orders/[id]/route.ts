@@ -31,9 +31,9 @@ export async function PATCH(
   if (status === 'deny_refund') {
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select('id, checkout_session_id, refund_previous_status')
+      .select('id, checkout_session_id, refund_previous_status, order_ref')
       .eq('id', id)
-      .maybeSingle<{ id: string; checkout_session_id: string; refund_previous_status: string | null }>()
+      .maybeSingle<{ id: string; checkout_session_id: string; refund_previous_status: string | null; order_ref: string }>()
 
     if (orderError) {
       return NextResponse.json({ error: orderError.message }, { status: 500 })
@@ -62,6 +62,10 @@ export async function PATCH(
     payload.delivered_at = new Date().toISOString()
   }
 
+  if (nextStatus === 'completed' && status !== 'deny_refund') {
+    payload.completed_at = new Date().toISOString()
+  }
+
   if (nextStatus === 'refund_requested') {
     payload.refund_requested_at = new Date().toISOString()
   }
@@ -70,8 +74,8 @@ export async function PATCH(
     .from('orders')
     .update(payload)
     .eq('id', id)
-    .select('id')
-    .maybeSingle<{ id: string }>()
+    .select('id, order_ref')
+    .maybeSingle<{ id: string; order_ref: string }>()
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -92,6 +96,7 @@ export async function PATCH(
 
   revalidatePath('/admin/orders')
   revalidatePath(`/admin/orders/${id}`)
+  revalidatePath(`/admin/orders/${data.order_ref}`)
 
   return NextResponse.json({ ok: true, status: nextStatus })
 }

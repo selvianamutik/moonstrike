@@ -50,7 +50,9 @@ export async function POST(request: Request) {
   const stripe = getStripeClient()
   const snapshotItems = cartItems.map((item) => snapshotFromCartItem(item, cartItemToStripeProduct(item)))
   const cartFingerprint = `${user.id}:${cartId}:${cartItems.map((item) => `${item.id}:${item.added_at}:${item.price_usd}:${item.price_eur}`).join('|')}:${currency}`
-  const idempotencyKey = `checkout:${createHash('sha256').update(cartFingerprint).digest('hex')}`
+  const checkoutFingerprint = createHash('sha256').update(cartFingerprint).digest('hex')
+  const checkoutSessionId = `co_${checkoutFingerprint.slice(0, 32)}`
+  const idempotencyKey = `checkout:${checkoutFingerprint}`
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
     customer_email: user.email ?? undefined,
@@ -65,6 +67,7 @@ export async function POST(request: Request) {
     })),
     metadata: {
       cartId,
+      checkoutSessionId,
       userId: user.id,
       currency,
     },
@@ -75,7 +78,7 @@ export async function POST(request: Request) {
   })
 
   const { error: snapshotError } = await supabase.from('checkout_sessions').upsert({
-    id: session.id,
+    id: checkoutSessionId,
     cart_id: cartId,
     user_id: user.id,
     currency,
@@ -89,7 +92,8 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    checkoutSessionId: session.id,
+    checkoutSessionId,
+    providerSessionId: session.id,
     redirectTo: session.url,
   })
 }

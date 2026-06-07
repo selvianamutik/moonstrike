@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Download, DollarSign, Clock, CheckCircle, AlertTriangle } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
@@ -74,64 +75,42 @@ export function TransactionsPageClient({
       />
 
       <AdminDataTable
-        columns={["TXN ID", "CUSTOMER", "SERVICE", "DATE", "AMOUNT", "METHOD", "STATUS", "ACTIONS"]}
+        columns={["TRANSACTION ID", "CUSTOMER", "DATE", "AMOUNT", "PROVIDER", "STATUS", "ACTIONS"]}
         footer={<AdminPagination showingFrom={filtered.length > 0 ? 1 : 0} showingTo={filtered.length} total={transactions.length} totalPages={1} />}
       >
         {filtered.length === 0 ? (
           <tr>
-            <td className="px-6 py-8 text-center text-[var(--ms-text-secondary)]" colSpan={8}>
+            <td className="px-6 py-8 text-center text-[var(--ms-text-secondary)]" colSpan={7}>
               No transactions found.
             </td>
           </tr>
         ) : (
           filtered.map((transaction) => (
             <tr key={transaction.id} className="transition-colors hover:bg-[#111827]">
-              <td className="px-6 py-4 font-mono font-medium text-white">{transaction.id}</td>
               <td className="px-6 py-4">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--ms-accent)] text-xs font-bold text-white">
-                    {transaction.customerInitials}
-                  </div>
-                  <div>
-                    <div className="text-sm text-white">{transaction.customerName}</div>
-                    <div className="text-xs text-[#64748B]">{transaction.customerEmail}</div>
-                  </div>
-                </div>
+                <span className="font-mono font-medium text-white">{transaction.id}</span>
               </td>
               <td className="px-6 py-4">
-                <div className="flex max-w-[220px] flex-wrap gap-1">
-                  {transaction.services.map((service) => (
-                    <span key={service} className="rounded bg-[var(--ms-accent)] px-2 py-0.5 text-xs text-[var(--ms-text-secondary)]">
-                      {service}
-                    </span>
-                  ))}
+                <div>
+                  <div className="text-sm text-white">{transaction.customerName}</div>
+                  <div className="text-xs text-[#64748B]">{transaction.customerEmail}</div>
                 </div>
               </td>
               <td className="px-6 py-4">{transaction.date}</td>
               <td className="px-6 py-4 font-medium text-[#22D3EE]">{transaction.amount}</td>
               <td className="px-6 py-4 text-sm">
                 {transaction.method}
-                <span className="block text-xs text-[#64748B]">
-                  {transaction.paymentProvider === "stripe" ? "via Stripe" : "via NowPayments"}
-                </span>
               </td>
               <td className="px-6 py-4">
                 <StatusBadge status={transaction.status as StatusType} />
               </td>
               <td className="px-6 py-4">
-                <button
-                  type="button"
-                  disabled={!transaction.canRefund}
-                  title={transaction.refundBlockedReason}
-                  onClick={() => alert(transaction.canRefund ? "Refund API is not wired yet." : transaction.refundBlockedReason)}
-                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
-                    transaction.canRefund
-                      ? "border-red-500/40 text-red-400 hover:bg-red-500/10"
-                      : "cursor-not-allowed border-[var(--ms-accent)] text-[#64748B]"
-                  }`}
+                <Link
+                  href={`/admin/transactions/${transaction.id}`}
+                  className="inline-flex rounded-lg border border-[var(--ms-accent)] px-3 py-1.5 text-sm font-medium text-[var(--ms-text-secondary)] transition-colors hover:border-[#22D3EE] hover:text-white"
                 >
-                  Issue Refund
-                </button>
+                  Detail
+                </Link>
               </td>
             </tr>
           ))

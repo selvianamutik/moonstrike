@@ -7,9 +7,9 @@
 
 ## Current Progress Snapshot
 
-_Last refreshed: 2026-06-01_
+_Last refreshed: 2026-06-05_
 
-Moon Strike has moved past the static prototype phase. The current working surface is Supabase-backed auth, admin auth, game CMS, genre CMS, service category CMS, service CMS, service image upload, CMS-backed storefront browsing, CMS-backed Quick Select, browser-session cart APIs, real add-to-cart/remove-cart flows, real-cart checkout, Stripe sandbox Checkout Sessions, frozen checkout snapshots, idempotent Stripe webhook fulfillment, payment transactions, order confirmation, real customer order history/detail readout, and real admin order management.
+Moon Strike has moved past the static prototype phase. The current working surface is Supabase-backed auth, admin auth, game CMS, genre CMS, service category CMS, service CMS, service image upload, CMS-backed storefront browsing, CMS-backed Quick Select, browser-session cart APIs, real add-to-cart/remove-cart flows, real-cart checkout, Stripe sandbox Checkout Sessions, NowPayments crypto checkout, frozen checkout snapshots, idempotent payment webhook fulfillment, payment transactions, internal order references, order confirmation, real customer order history/detail readout, and real admin order management.
 
 **Implemented / mostly working:**
 - Customer auth: email/password, Google OAuth, verification, reset password, profile edit, connected accounts, and auth gates.
@@ -17,12 +17,12 @@ Moon Strike has moved past the static prototype phase. The current working surfa
 - Admin games: create/edit/list/delete/archive, image upload, genre add/delete, active/draft/archived states.
 - Admin services: list/filter/search/delete, service categories per game, slug-based edit/preview routes, service images, custom badges, sticky editor layout, and validated option schema builder.
 - Storefront catalog: landing game section, `/games`, `/services`, `/[game-slug]`, category pages, service detail pages, and Quick Select use CMS data instead of mock service data.
-- Seeds: `npm run admin:seed`, `npm run admin:reseed`, and `npm run catalog:seed` for 20 games with 20 services per game plus option schemas.
+- Seeds: `npm run admin:seed`, `npm run admin:reseed`, `npm run catalog:seed`, and `npm run refund-orders:reseed` for refund/order testing data.
 - Browser-session cart: anonymous/login/logout in the same browser all use the same `ms_cart_session` cart; service detail Add to Cart and Buy Now persist selected option snapshots.
+- Orders/payments: one internal order per checkout, `order_items` for purchased services, `transactions` for provider refs, `order_ref` slugs for user/admin URLs, Stripe refund execution, and manual non-Stripe refund recording.
 
 **Still pending / mock-backed:**
-- NowPayments payment submission and webhook handling.
-- Order lifecycle persistence, refunds, and Google Sheets sync.
+- Google Sheets sync and order notification emails.
 - Support chat persistence/realtime.
 - Dedicated `/hot-offers` route and final CMS polish for all landing blocks.
 
@@ -208,8 +208,8 @@ On page load, read `[category-slug]` from the URL:
 If no Game record matches `[game-slug]` → call `notFound()`.
 
 **Featured Game Banner — query logic (unchanged):**
-1. Fetch active `PromoBanner` where `gameId = this game` and `region` includes the active region.
-2. If none found, fall back to a banner where `gameId IS NULL` and region matches.
+1. Fetch active `PromoBanner` where `gameId = this game`.
+2. If none found, fall back to a global banner where `gameId IS NULL`.
 3. If still none found, hide the section entirely.
 
 ---
@@ -285,6 +285,8 @@ USD and EUR are calculated independently. Do not convert one currency into the o
 
 ### 3.6 Login & Register (`/login`, `/register`)
 
+**Google register completion:** When Google OAuth is started from the Register tab, `/auth/callback` redirects Google accounts without email/password login to `/register/complete`. The page shows the verified Google email as read-only and asks only for password + confirm password. Saving calls Supabase `updateUser({ password, data: { has_email_password: true } })`, so the same Google-created account can immediately log in with email/password without needing to connect email again from Profile Edit.
+
 **Layout:** Centered card on full background. No navbar or footer.
 
 **Login:** Logo + tagline · Login/Register tab toggle · Email · Password (eye toggle) · Forgot Password · Google OAuth divider · Login CTA.
@@ -310,6 +312,16 @@ USD and EUR are calculated independently. Do not convert one currency into the o
 ### 3.7 Customer Profile (`/profile`)
 
 **Layout:** Left sidebar (profile info) + main tabbed content.
+
+**Current order/profile implementation note:**
+- `/profile/orders` is the default dashboard destination and uses a left profile/menu card plus a customer order list.
+- Order filters are active client-side: All, Pending, Confirmed, In Progress, Delivered, Completed, Refund Requested, Refunded.
+- Customer order URLs use public internal refs, e.g. `/profile/orders/MS-20260604-000007`; UUID fallback remains supported internally.
+- Order list rows show thumbnail, `order_ref`, status badge, game badges, date/time, item count, amount, and View Details.
+- Order detail shows timeline first, then order/payment information, then an accordion list of services in the order.
+- Refund request button is shown for `pending`, `confirmed`, `in_progress`, `delivered`, and `completed` only until 7 days after `completed_at`.
+- Refund request button is hidden for `refund_requested` and `refunded`.
+- Crypto refund details are not collected from the user at request time. Admin handles crypto refunds manually or through whichever external provider/wallet transfer is appropriate.
 
 **Sidebar:** Avatar · Username · Email · Member since · Total Orders + Total Spent · Edit Profile button · Logout.
 
@@ -555,7 +567,7 @@ Checkout
 > All models use Supabase PostgreSQL. Dynamic fields are stored as JSONB. All TypeScript fields use camelCase — Supabase maps these to snake_case DB columns automatically (e.g. `optionsSchema` ↔ `options_schema`).
 
 **Shared type used throughout:**
-Currency = "USD" | "EUR" controls visible pricing only. Service availability is not region-based; active services are globally available unless modeled later as an option schema field.
+Currency = "USD" | "EUR" controls visible pricing only. Service availability is not region-based; active services are globally available unless modeled later as an option schema field. Region fields have been removed from the active order/payment schema.
 
 ---
 
@@ -610,7 +622,6 @@ The `/games` page sidebar and Landing Page game filter tabs auto-populate from d
 | status | string | `"active" \| "draft" \| "archived"` |
 | isHotOffer | boolean | `true` → appears in HOT OFFERS tab |
 | hotOfferAt | Date \| null | Set to `NOW()` when `isHotOffer` toggled on; cleared to `null` when toggled off. Used to sort Hot Offers page (`hotOfferAt DESC`). |
-| region | Region[] | Legacy DB compatibility only. Keep default `["USA", "EUROPE"]`; do not expose as service availability in CMS. |
 | badges | string[] | Admin-managed. Options: `"Starts in < 15 mins"`, `"100% Completion"`, `"Safe & Secure"`, `"24/7 Support"` |
 | requirements | string[] | Rendered as checklist on Service Detail |
 | whatYouGet | Benefit[] | 2x2 benefit cards on Service Detail — see Benefit model below |
@@ -757,6 +768,16 @@ Each CartItem becomes exactly one Order on checkout. Adding the same service twi
 ---
 
 ### Order
+
+**Current normalized order model:**
+- `orders`: internal lifecycle record. Fields include `id`, `order_ref`, `user_id`, `checkout_session_id`, `status`, `delivered_at`, `completed_at`, `refund_requested_at`, `refund_previous_status`, `created_at`, and `updated_at`.
+- `order_items`: purchased service rows for an order. Stores `service_id`, frozen `selected_options_snapshot`, item `total`, and `currency`.
+- `transactions`: payment ledger. Stores provider, provider payment/session refs, amount, currency, method, status, refund status, refund amount/currency, optional provider refund ID, and raw provider payload.
+- `checkout_sessions`: frozen cart snapshot used to fulfill one payment into one internal order with one or more order items.
+- UI/support should use `orders.order_ref`, not Supabase UUIDs, for user/admin-facing order URLs.
+- Payment provider refs must stay in `transactions`, not in `orders`.
+
+Current implementation: `orders` stores lifecycle and internal `orderRef` only; `order_items` stores purchased services/options/item totals; `transactions` stores provider, gateway references, paid amount, currency, and refund metadata. Region is not stored in active order/payment tables.
 
 Orders only exist post-payment. No pre-payment state. No escrow — refunds go directly through the payment gateway. See §11 for the full state machine.
 
@@ -923,8 +944,7 @@ One record per block — shared across dark and light mode. Theme changes CSS on
 | id | string | |
 | name | string | |
 | image | string | Media Library URL |
-| gameId | string \| null | FK → Game. If set, banner only shows on that game's Services page. If null, acts as a regional default/fallback. |
-| region | Region[] | Legacy compatibility only; keep default both regions. |
+| gameId | string \| null | FK → Game. If set, banner only shows on that game's Services page. If null, acts as a global default/fallback. |
 | link | string? | Optional CTA link |
 | status | string | `"active" \| "scheduled" \| "draft"` |
 | scheduledAt | Date? | |
@@ -999,10 +1019,10 @@ const { data: settings } = await supabase
 | Global Footer | done | Shared footer exists; some placeholder links may remain. |
 | Global Chat Bubble | in-progress | UI exists; Supabase realtime/persistence is pending. |
 | Customer Login | in-progress | Supabase email/password, Google OAuth, reset password, rate limits, safe `next`, callback errors, resend verification, and auth gates are wired. Cart is browser-session based, so the same browser cart remains visible before/after login/logout. |
-| Customer Register | in-progress | Supabase sign-up, provider-aware checks, app rate limit, Google OAuth, confirm password validation, verification/resend UX are wired. Profile persistence beyond auth metadata is pending. |
+| Customer Register | in-progress | Supabase sign-up, provider-aware checks, app rate limit, Google OAuth, Google register completion at `/register/complete`, confirm password validation, verification/resend UX are wired. Profile persistence beyond auth metadata is pending. |
 | Customer Profile | in-progress | Auth-gated profile and edit flow exist, including metadata username updates, password changes, Google identity linking, connected accounts, email/password addition for OAuth users, real order history from `orders`, and real transaction history from `transactions`. Avatar upload remains pending. |
-| Order History | in-progress | `/profile` reads real customer `orders` rows, shows status badges, selected option summaries, and totals. Transaction History reads real `transactions` rows. Filtering is visual-only for now. |
-| Order Detail | in-progress | `/profile/orders/[id]` reads real customer-owned orders, verifies ownership, shows service details, selected option snapshots, timeline, price summary, and support/refund actions. Actions are still UI-only. |
+| Order History | in-progress | `/profile/orders` reads real customer `orders` lifecycle rows with internal `order_ref`, joins service details from `order_items`, and reads totals/provider refs from `transactions`. Status filtering is active client-side. Transaction History reads real `transactions` rows. |
+| Order Detail | in-progress | `/profile/orders/[id]` reads real customer-owned orders by `order_ref` or UUID fallback, verifies ownership, shows provider payment ref, service accordions, selected option snapshots, timeline, price summary, chat link, and refund request action with 7-day completed-order rule. |
 | Cart | in-progress | Real browser-session cart APIs, selected option snapshots, Add to Cart, Buy Now, remove item, Stripe checkout handoff, cart clearing after paid checkout, and currency display are wired. Cart count badge and edit configured options remain pending. |
 | Search | in-progress | `/services`, `/games`, and Quick Select search are wired. Global live overlay below navbar remains pending. |
 | Currency toggle | in-progress | Header, service cards, service detail, cart, and checkout use global USD/EUR currency display. |
@@ -1024,9 +1044,9 @@ const { data: settings } = await supabase
 | Admin Services List | done | CMS-backed list/filter/search/delete with active/draft/archived tabs, game/category filters, image thumbnails, slug-based edit/preview links, and service category management modal. |
 | Admin Service CMS | done | CMS-backed create/edit with upload image, custom badges, base USD/EUR price, service category, benefits, requirements, sticky section nav/actions, and validated option builder. |
 | Admin Service Preview | done | `/admin/services/:game-slug/:service-slug/preview` via catch-all route renders draft storefront preview. Old ID URLs redirect when possible. |
-| Admin Order Management | in-progress | `/admin/orders` reads real `orders` rows, enriches customer/service data, supports search/filter tabs, and links to real order detail. Pagination is still single-page. |
-| Admin Order Detail | in-progress | `/admin/orders/[id]` reads real order data and persists status transitions through `PATCH /api/admin/orders/[id]` with audit logging. Chat/refund gateway actions remain pending. |
-| Admin Transactions | in-progress | `/admin/transactions` reads real `transactions` rows, enriches customer/service data, shows payment stats, and supports search/status filters. Refund action is still pending. |
+| Admin Order Management | in-progress | `/admin/orders` reads real `orders` rows as lifecycle records, displays internal `order_ref`, enriches customer/service/payment data from `order_items` and `transactions`, supports search/filter tabs, and links to real order detail. Pagination is still single-page. |
+| Admin Order Detail | in-progress | `/admin/orders/[id]` reads real order data by `order_ref` or UUID fallback, keeps gateway refs in the payment panel, persists status transitions through `PATCH /api/admin/orders/[id]` with audit logging, issues Stripe refunds, and records manual non-Stripe refunds. |
+| Admin Transactions | in-progress | `/admin/transactions` reads real `transactions` rows as the payment ledger, stores gateway refs via `provider_payment_id` / `provider_session_id`, enriches customer/service data from orders/order_items, shows payment stats, and supports search/status filters. |
 | Admin Content Library | in-progress | CMS-backed content rows/forms and image upload are partially wired. Landing content uses several CMS blocks; full coverage/QA pending. |
 | Landing Page CMS blocks | in-progress | Hero and several landing blocks are CMS-managed; remaining sections need cleanup. |
 | Promotional Banners CMS | in-progress | Banner/content management exists; full scheduling/fallback behavior pending. |
@@ -1047,11 +1067,11 @@ const { data: settings } = await supabase
 |---|---|---|
 | Auto-complete cron (7-day window) | not-started | Supabase scheduled function pending. |
 | Order state machine | in-progress | Mock labels/helpers exist. Backend enforcement pending. |
-| Payment provider abstraction | planned | Payment provider may change based on business/onboarding practicality. Stripe is current sandbox, but Paddle, PayOp, 2Checkout, or another provider may become the main provider. Keep checkout, webhook, fulfillment, transaction, and refund code provider-neutral where possible. |
-| Stripe integration | in-progress | Stripe sandbox Checkout Session creation, frozen checkout snapshots, idempotent `checkout.session.completed` webhook fulfillment, transaction ledger writes, signature verification, and refund API are wired. Stripe may remain sandbox/fallback if another provider becomes primary. |
-| NowPayments integration | in-progress | Hosted crypto invoice checkout, checkout snapshots, IPN webhook verification, and order fulfillment are wired. Crypto refund/payout flow remains pending. |
+| Payment provider abstraction | planned | Payment provider may change based on business/onboarding practicality. Stripe is current sandbox, but Indonesia support/business verification makes it risky as the production primary. Prefer a Merchant of Record provider for card/PayPal if game-service use is approved. Keep checkout, webhook, fulfillment, transaction, and refund code provider-neutral where possible. |
+| Stripe integration | in-progress | Stripe sandbox Checkout Session creation, frozen checkout snapshots, internal checkout IDs, idempotent `checkout.session.completed` webhook fulfillment, transaction ledger writes, signature verification, and refund API are wired. Stripe may remain sandbox/fallback because direct production activation is difficult for Indonesia. |
+| NowPayments integration | in-progress | Hosted crypto invoice checkout, checkout snapshots, IPN webhook verification, and order fulfillment are wired. Crypto refunds are manual/admin-assisted and can be recorded in Moon Strike after external transfer. |
 | NowPayments webhook verification | in-progress | `/api/v1/webhooks/nowpayments` verifies `x-nowpayments-sig` with HMAC-SHA512 over sorted JSON body. |
-| Refund router | in-progress | Stripe refunds are wired. Future providers should implement the same refund interface. |
+| Refund router | in-progress | Stripe refunds are wired through the provider API. Non-Stripe refunds are recorded manually after admin completes the external transfer. Future providers should implement provider-specific execution behind the same admin surface. |
 | Rate limiting | in-progress | Auth/admin login/password-reset/register limits exist. Broader API limits pending. |
 | Audit log (admin actions) | in-progress | Implemented for selected admin auth/CMS actions; expand coverage. |
 | Google Sheets integration | not-started | Orders + Transactions tabs pending. |
@@ -1074,16 +1094,34 @@ const { data: settings } = await supabase
 | Auth (customers) | Supabase Auth — email/password + Google OAuth |
 | Auth (admin) | Manual — scrypt password hash in `admin_users` table, signed HttpOnly JWT cookie on successful login. No OTP. Verified server-side on every `/admin/*` request. Single Supabase project — no separate project needed. |
 | Image hosting | Supabase Storage (origin) + Cloudflare Images (CDN + transforms) |
-| Payment | Provider-flexible. Current implementation uses Stripe sandbox for hosted checkout/refunds and NowPayments is planned for crypto. Main provider may change to Paddle, PayOp, 2Checkout, or another easier merchant/onboarding option. |
+| Payment | Provider-flexible. Current implementation uses Stripe sandbox for hosted checkout/refunds and NowPayments for crypto. Stripe production is not ideal because Indonesia support/business verification is difficult. Preferred card/PayPal direction is a Merchant of Record provider if Moon Strike's game-service model is approved. |
 | SMTP | Resend — auth emails + order notifications. See §13. |
 | Currency | Fixed USD/EUR values per service — no runtime conversion. Global state shared across navbar, service detail, and cart. Changing in any one location updates all others. |
+
+### Payment Provider Direction
+
+- Stripe is useful for sandbox validation and as a fallback integration, but it should not be assumed to be the production primary because business verification and country support are difficult for Indonesia.
+- Merchant of Record providers are preferred for primary card/PayPal checkout because they can simplify merchant onboarding, tax/VAT handling, compliance, and fraud operations.
+- Current MoR candidates: Lemon Squeezy first, then Paddle or Polar depending on acceptable-use approval and API fit.
+- Main approval risk: Moon Strike sells digital game services such as coaching, rank support, dungeon/raid completion help, and account progression. Before integrating an MoR provider, ask support whether this model is allowed. Do not describe the business as selling accounts, cheats, hacks, gambling, stolen goods, or game currency.
+- Provider architecture rule: keep `orders` internal and provider-neutral; store external payment references only in `transactions.provider_payment_id`, `transactions.provider_session_id`, and `transactions.raw_provider_payload`.
+
+### Recent Payment/Order Changes
+
+- `orders` now represent internal order lifecycle only and expose `order_ref` for UI/support.
+- `order_items` now represent purchased services, frozen option snapshots, item totals, and item currency.
+- `transactions` now represent the payment ledger and own provider, provider payment ID, provider session ID, paid amount, currency, raw provider payload, and refund metadata.
+- Stripe checkout now uses internal checkout IDs for `checkout_sessions`; Stripe Checkout Session IDs are provider refs, not primary Moon Strike order identity.
+- NowPayments hosted crypto checkout and IPN fulfillment are wired.
+- Region-based checkout/order data was removed. Currency is display-only and services are globally available unless modeled later as an option schema field.
 
 ### Third-Party APIs
 
 | Service | Notes |
 |---|---|
-| Stripe | Current sandbox implementation for hosted checkout, dynamic payment methods, webhooks, transaction ledger, and refunds. May become fallback if another provider is easier for production onboarding. |
-| Paddle / PayOp / 2Checkout / other gateway | Candidate primary providers if Stripe business activation is difficult. Must support hosted checkout or payment redirect, webhooks, transaction references, refunds, and Indonesia-compatible payout/onboarding. |
+| Stripe | Current sandbox implementation for hosted checkout, dynamic payment methods, webhooks, transaction ledger, and refunds. Likely fallback/sandbox because production business verification and country support are problematic for Indonesia. |
+| Lemon Squeezy / Polar / Paddle | Merchant of Record candidates for card/PayPal checkout. MoR is preferred because it can simplify taxes/compliance/merchant onboarding. Before integration, confirm that game coaching/boosting/progression services are allowed by acceptable-use policy. |
+| PayOp / 2Checkout / other PSP | Candidate payment-service providers if broader payment-method coverage is needed. They may not simplify tax/compliance as much as MoR. Must support hosted checkout or payment redirect, webhooks, transaction references, refunds, and Indonesia-compatible payout/onboarding. |
 | NowPayments | Hosted invoice checkout and IPN fulfillment are wired for crypto payments. Crypto refund/payout API remains pending and requires customer wallet address for refunds. |
 | TrustPilot | TrustBox **Carousel** widget embed (script tag). Loads reviews client-side from TrustPilot's CDN — no server-side API calls, no rate limits, no caching needed. Displays on Landing and Services pages. |
 | Google Sheets | Orders tab + Transactions tab. See §13 for schema and trigger rules. |
@@ -1369,6 +1407,11 @@ Full-page storefront render using draft data. Read-only - no checkout.
 
 **Issue Refund button — context-aware, auto-routes, admin never manually selects an API:**
 
+**Current implementation note:**
+- Stripe orders call the real Stripe refund API using `transactions.provider_payment_id`.
+- NOWPayments/crypto orders are manual/admin-assisted. Admin sends the refund externally first, then records the refund in Moon Strike.
+- Future providers should implement provider-specific execution behind the same admin action surface.
+
 | Scenario | State | Action |
 |---|---|---|
 | Stripe order | Active | Calls Stripe refund API with `stripePaymentIntentId` automatically |
@@ -1395,6 +1438,9 @@ Full-page storefront render using draft data. Read-only - no checkout.
 - `in_progress` → Mark as Delivered
 - `refund_requested` → Approve Refund (red) or Deny Refund (outlined)
 - Open Chat button (links to Admin Messages filtered to this customer)
+- Current refund panel: payment method display, refund amount text input, and provider-aware Issue/Record Refund button.
+- No refund category or refund note fields in the admin UI. Refund metadata shape can differ per provider.
+- Stripe refunds call the real Stripe refund API. NOWPayments/crypto refunds are recorded manually after admin completes the external wallet/provider transfer.
 - Refund panel (visible when `refund_requested`): payment method display · wallet address field (crypto only, pre-filled if provided) · Issue Refund button
 
 ---
@@ -1519,6 +1565,13 @@ Full-page storefront render using draft data. Read-only - no checkout.
 ---
 
 ## 11. Order State Machine
+
+**Current implementation note:**
+- `pending -> confirmed -> in_progress -> delivered -> completed` is admin-driven.
+- `completed_at` is set when admin marks an order completed.
+- Customers can request refunds from active statuses, and from `completed` until 7 days after `completed_at`.
+- Denied refunds restore `refund_previous_status`; there is no `refund_rejected` order status.
+- Stripe refunds execute through Stripe. NOWPayments/crypto refunds are recorded manually after admin completes an external transfer.
 
 ### State Diagram
 
@@ -1890,7 +1943,7 @@ Admin auth does not use Supabase Auth — see §8 and §10.2.
 
 ---
 
-*Last updated: 2026-06-03 - Stripe sandbox checkout with frozen snapshots/idempotent fulfillment, transaction ledger writes, order confirmation, real customer order history/detail, and real admin order/transaction management reflected.*
+*Last updated: 2026-06-05 - Order refs in user/admin URLs, normalized order/items/transaction model, completed-at refund window, Stripe refunds, manual non-Stripe refund recording, active customer order filters, and refund seed/reseed scripts reflected.*
 *Design references: all screenshots stored in `/design-refs/`.*
 
 ---
@@ -2200,6 +2253,8 @@ All admin write routes require the signed admin session cookie, use server-side 
 npm run admin:seed       Seed the single admin account
 npm run admin:reseed     Replace/reseed the single admin account
 npm run catalog:seed     Seed 20 games, genres, categories, and 20 services per game with option schemas
+npm run refund-orders:seed     Clean seed refund/order test scenarios for USD and EUR
+npm run refund-orders:reseed   Alias for the same clean refund/order reseed
 ```
 
 ---
@@ -2282,6 +2337,15 @@ NEXT_PUBLIC_CLOUDFLARE_IMAGES_ACCOUNT_HASH=abc123xyz
 ```
 
 > For Stripe webhooks in local dev: use the Stripe CLI (`stripe listen --forward-to localhost:3000/api/webhooks/stripe`) to forward webhook events to your local server. The CLI provides a temporary `STRIPE_WEBHOOK_SECRET` for local use only.
+
+---
+
+## Current QA Overrides
+
+- Multi-item checkout should create one internal `orders` row and multiple `order_items` rows, not one order per cart item.
+- NowPayments checkout should create one internal order after verified IPN fulfillment. Crypto refunds are manual/admin-assisted: admin completes the external transfer first, then records the refund in Moon Strike.
+- Completed-order refund eligibility uses `orders.completed_at`; customer refund is allowed until 7 days after completion.
+- Use `npm run refund-orders:reseed` to seed USD/EUR refund scenarios covering active, completed-window, completed-expired, refund-requested, and refunded states.
 
 
 

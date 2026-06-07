@@ -240,7 +240,7 @@ export function CheckoutPageClient() {
                     ))}
                   </div>
                   <p className="mt-3 text-xs leading-5 text-[var(--ms-body)]">
-                    Stripe shows the final available methods based on your device, region, currency, and Dashboard settings.
+                    Stripe shows the final available methods based on your device, currency, and Dashboard settings.
                   </p>
                 </div>
                 <p className="mt-4 text-center text-xs text-[var(--ms-body)]">

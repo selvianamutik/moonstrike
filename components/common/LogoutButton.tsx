@@ -1,19 +1,16 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 
 export function LogoutButton() {
-  const router = useRouter()
   const { signOut } = useAuth()
   const [isSigningOut, setIsSigningOut] = useState(false)
 
   const handleLogout = async () => {
     setIsSigningOut(true)
     await signOut()
-    router.replace('/login')
-    router.refresh()
+    window.location.replace('/login')
   }
 
   return (

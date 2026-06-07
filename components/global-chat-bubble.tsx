@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 const messages = [
   {
     author: "Moon Strike Support",
-    body: "Need help choosing a boost? Send your game, region, and target goal.",
+    body: "Need help choosing a boost? Send your game and target goal.",
     side: "left",
     time: "Now",
   },
@@ -28,7 +28,7 @@ export function GlobalChatBubble() {
 
   if (
     pathname === "/login" ||
-    pathname === "/register" ||
+    pathname.startsWith("/register") ||
     pathname === "/reset-password" ||
     pathname.startsWith("/auth") ||
     pathname.startsWith("/admin")

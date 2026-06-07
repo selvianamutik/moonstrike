@@ -37,11 +37,15 @@ async function resolveConfirmedOrder(userId: string, session: string): Promise<R
     .eq("id", session)
     .maybeSingle<{ user_id: string; provider: string }>();
 
-  if (checkoutSession?.user_id !== userId) {
+  if (!checkoutSession && !session.startsWith("cs_")) {
     return { order: null };
   }
 
-  if (checkoutSession.provider === "nowpayments") {
+  if (checkoutSession && checkoutSession.user_id !== userId) {
+    return { order: null };
+  }
+
+  if (checkoutSession?.provider === "nowpayments") {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       order = await getCustomerOrderByCheckoutSession(userId, session);
       if (order) return { order };
@@ -56,11 +60,16 @@ async function resolveConfirmedOrder(userId: string, session: string): Promise<R
   }
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    await fulfillStripeCheckoutSession(session).catch((fulfillmentError) => {
+    const fulfillment = await fulfillStripeCheckoutSession(session).catch((fulfillmentError) => {
       console.error("Failed to fulfill Stripe checkout session from confirmation page", fulfillmentError);
+      return null;
     });
 
-    order = await getCustomerOrderByCheckoutSession(userId, session);
+    if (fulfillment && "checkoutSessionId" in fulfillment) {
+      order = await getCustomerOrderByCheckoutSession(userId, fulfillment.checkoutSessionId);
+    } else {
+      order = await getCustomerOrderByCheckoutSession(userId, session);
+    }
 
     if (order) {
       return { order };
@@ -122,9 +131,6 @@ export default async function OrderConfirmedPage({ searchParams }: OrderConfirme
           <h1 className="font-display mt-4 text-4xl font-black tracking-[-0.05em] md:text-5xl">
             Your order is in the queue
           </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-[var(--ms-body)]">
-            Stripe confirmed your payment and created one order with {order.itemCount} service{order.itemCount === 1 ? "" : "s"}.
-          </p>
         </div>
 
         <div className="mx-auto mt-12 max-w-5xl rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)]">
@@ -132,7 +138,7 @@ export default async function OrderConfirmedPage({ searchParams }: OrderConfirme
             <div>
               <p className="mono text-xs uppercase tracking-[0.18em] text-[var(--ms-body)]">Order Reference</p>
               <p className="mt-2 break-all font-bold">{order.orderReference}</p>
-              <p className="mono mt-2 break-all text-xs uppercase tracking-[0.14em] text-[var(--ms-body)]">Payment Reference: {order.transactionId}</p>
+              <p className="mono mt-2 break-all text-xs uppercase tracking-[0.14em] text-[var(--ms-body)]">Transaction ID: {order.transactionId}</p>
             </div>
             <div className="mono text-3xl font-black text-[var(--ms-price)]">{formatOrderMoney(order.total, order.currency)}</div>
           </div>
@@ -178,7 +184,7 @@ export default async function OrderConfirmedPage({ searchParams }: OrderConfirme
         </div>
 
         <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Link href={`/profile/orders/${order.id}`} className="ms-button flex h-12 items-center px-6 mono text-xs uppercase tracking-[0.14em]">
+          <Link href={`/profile/orders/${order.orderReference}`} className="ms-button flex h-12 items-center px-6 mono text-xs uppercase tracking-[0.14em]">
             View Order Detail
           </Link>
           <Link href="/games" className="flex h-12 items-center rounded-md border border-[var(--ms-border)] px-6 mono text-xs uppercase tracking-[0.14em] text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">

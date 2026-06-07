@@ -1,9 +1,8 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireVerifiedUser } from "@/lib/auth/session";
+import { canRequestOrderRefund } from "@/lib/orders";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-const BLOCKED_REFUND_STATUSES = new Set(["completed", "refund_requested", "refunded"]);
 
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireVerifiedUser("/profile/orders");
@@ -12,9 +11,9 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
   const { data: order, error: orderError } = await supabase
     .from("orders")
-    .select("id, user_id, status")
+    .select("id, user_id, status, completed_at, order_ref")
     .eq("id", id)
-    .maybeSingle<{ id: string; user_id: string; status: string }>();
+    .maybeSingle<{ id: string; user_id: string; status: string; completed_at: string | null; order_ref: string }>();
 
   if (orderError) {
     return NextResponse.json({ error: orderError.message }, { status: 500 });
@@ -24,8 +23,8 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: "Order not found." }, { status: 404 });
   }
 
-  if (BLOCKED_REFUND_STATUSES.has(order.status)) {
-    return NextResponse.json({ error: "This order cannot request a refund from its current status." }, { status: 400 });
+  if (!canRequestOrderRefund(order.status, order.completed_at)) {
+    return NextResponse.json({ error: "Refund requests are available until 7 days after an order is completed." }, { status: 400 });
   }
 
   const { error: updateError } = await supabase
@@ -45,8 +44,10 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   revalidatePath("/profile");
   revalidatePath("/profile/orders");
   revalidatePath(`/profile/orders/${id}`);
+  revalidatePath(`/profile/orders/${order.order_ref}`);
   revalidatePath("/admin/orders");
   revalidatePath(`/admin/orders/${id}`);
+  revalidatePath(`/admin/orders/${order.order_ref}`);
 
   return NextResponse.json({ ok: true });
 }

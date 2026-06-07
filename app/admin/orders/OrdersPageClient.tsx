@@ -74,7 +74,7 @@ export function OrdersPageClient({ orders }: { orders: AdminOrderRecord[] }) {
                 <StatusBadge status={order.status as AdminOrderStatus} />
               </td>
               <td className="px-6 py-4">
-                <Link href={`/admin/orders/${order.id}`} className="inline-flex p-2 text-[var(--ms-text-secondary)] hover:text-[#22D3EE]" aria-label="View">
+                <Link href={`/admin/orders/${order.orderReference}`} className="inline-flex p-2 text-[var(--ms-text-secondary)] hover:text-[#22D3EE]" aria-label="View">
                   <Eye size={16} />
                 </Link>
               </td>

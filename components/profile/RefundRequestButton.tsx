@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function RefundRequestButton({ orderId }: { orderId: string }) {
+export function RefundRequestButton({ orderId, compact = false }: { orderId: string; compact?: boolean }) {
   const router = useRouter();
   const [isRequesting, setIsRequesting] = useState(false);
   const [error, setError] = useState("");
@@ -39,9 +39,11 @@ export function RefundRequestButton({ orderId }: { orderId: string }) {
 
   return (
     <div>
-      <p className="mb-3 max-w-md text-xs leading-5 text-amber-300">
-        Refund requests pause review of this order and must be approved before money is returned.
-      </p>
+      {!compact ? (
+        <p className="mb-3 max-w-md text-xs leading-5 text-amber-300">
+          Refund requests pause review of this order and must be approved before money is returned.
+        </p>
+      ) : null}
       <button type="button" onClick={requestRefund} disabled={isRequesting} className="ms-button px-4 py-3 text-sm disabled:cursor-not-allowed disabled:opacity-60">
         {isRequesting ? "Requesting..." : "Request Refund"}
       </button>

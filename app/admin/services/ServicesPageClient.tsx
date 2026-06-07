@@ -488,7 +488,8 @@ export function ServicesPageClient({
               <label className="block text-sm font-medium text-[#94A3B8]">
                 <span className="mb-2 block">Sort Order</span>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value)}
                   className="w-full rounded-lg border border-[#172554] bg-[#111827] px-4 py-3 text-sm text-white outline-none focus:border-[#8B5CF6]"

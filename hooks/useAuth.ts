@@ -77,9 +77,10 @@ export function useAuth() {
   )
 
   const signInWithGoogle = useCallback(
-    async (next?: string) => {
+    async (next?: string, intent: 'login' | 'register' = 'login') => {
       const redirectTo = new URL('/auth/callback', window.location.origin)
       if (next) redirectTo.searchParams.set('next', next)
+      if (intent === 'register') redirectTo.searchParams.set('intent', 'register')
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

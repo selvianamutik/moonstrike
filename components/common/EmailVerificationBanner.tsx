@@ -13,7 +13,7 @@ export function EmailVerificationBanner() {
 
   if (
     pathname === '/login' ||
-    pathname === '/register' ||
+    pathname.startsWith('/register') ||
     pathname === '/reset-password' ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/admin')
