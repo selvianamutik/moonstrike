@@ -114,6 +114,7 @@ export function ServicesCatalog({
       </div>
 
       <PlaceholderAsset
+        isHidden={false}
         alt="Featured boosting service banner"
         className="mt-8 flex min-h-72 flex-col items-start justify-between gap-8 rounded-md px-8 py-10 md:flex-row md:items-center md:px-16"
         priority

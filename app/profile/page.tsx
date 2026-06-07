@@ -93,7 +93,7 @@ export default async function ProfilePage() {
                 return (
                   <article key={order.id} className="ms-card ms-card-hover rounded-xl p-5">
                     <div className="grid gap-5 md:grid-cols-[96px_1fr_auto] md:items-center">
-                      <PlaceholderAsset alt={`${order.service.name} order preview`} className="h-24 rounded-md" imageClassName="p-4" />
+                      <PlaceholderAsset isHidden={false} alt={`${order.service.name} order preview`} className="h-24 rounded-md" imageClassName="p-4" />
                       <div>
                         <div className="flex flex-wrap items-center gap-3">
                           <h4 className="text-xl font-black">{order.service.offerTitle ?? order.service.name}</h4>

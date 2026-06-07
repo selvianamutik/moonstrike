@@ -43,7 +43,7 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
 
           <section className="mt-8 rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-6">
             <div className="grid gap-5 md:grid-cols-[140px_1fr]">
-              <PlaceholderAsset alt={`${order.service.name} order preview`} className="h-32 rounded-md" imageClassName="p-5" />
+              <PlaceholderAsset isHidden={false} alt={`${order.service.name} order preview`} className="h-32 rounded-md" imageClassName="p-5" />
               <div>
                 <h2 className="text-2xl font-black">{order.service.offerTitle ?? order.service.name}</h2>
                 <p className="mt-3 leading-7 text-[var(--ms-body)]">{order.service.description}</p>

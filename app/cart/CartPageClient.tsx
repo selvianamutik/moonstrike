@@ -81,6 +81,7 @@ export function CartPageClient() {
               >
                 <div className="grid gap-5 md:grid-cols-[120px_1fr_auto]">
                   <PlaceholderAsset
+                    isHidden={false}
                     alt={`${item.service.name} preview`}
                     className="h-28 rounded-md"
                     imageClassName="p-4"
