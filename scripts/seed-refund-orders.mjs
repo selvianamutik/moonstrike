@@ -60,7 +60,19 @@ async function findUserByEmail(supabase, email) {
 
 async function ensureUser(supabase, email, password) {
   const existing = await findUserByEmail(supabase, email)
-  if (existing) return existing
+  if (existing) {
+    const { data, error } = await supabase.auth.admin.updateUserById(existing.id, {
+      user_metadata: {
+        ...(existing.user_metadata ?? {}),
+        username: 'refund_tester',
+        full_name: 'Refund Tester',
+        has_email_password: true,
+      },
+    })
+
+    if (error) throw error
+    return data.user
+  }
 
   const { data, error } = await supabase.auth.admin.createUser({
     email,
@@ -123,10 +135,29 @@ async function deleteExistingSeedRows(supabase) {
   }
 }
 
+async function deleteExistingSeedAuditRows(supabase, userId) {
+  const { error: auditDeleteError } = await supabase
+    .from('audit_logs')
+    .delete()
+    .ilike('action', `%[refund-test] ${testEmail}%`)
+
+  if (auditDeleteError) throw auditDeleteError
+
+  if (userId) {
+    const { error: moderationDeleteError } = await supabase
+      .from('user_moderation_events')
+      .delete()
+      .eq('user_id', userId)
+
+    if (moderationDeleteError) throw moderationDeleteError
+  }
+}
+
 async function cleanupRefundTestUser() {
   const user = await findUserByEmail(supabase, testEmail)
 
   await deleteExistingSeedRows(supabase)
+  await deleteExistingSeedAuditRows(supabase, user?.id)
 
   if (!user) {
     console.log(`No refund test user found for ${testEmail}. Seed rows were cleaned.`)
@@ -221,6 +252,18 @@ async function getSeedServices(supabase) {
     throw new Error('No active services found. Run npm run catalog:seed first.')
   }
 
+  return data
+}
+
+async function getSeedAdmin(supabase) {
+  const { data, error } = await supabase
+    .from('admin_users')
+    .select('id, display_name, email')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
   return data
 }
 
@@ -463,6 +506,142 @@ async function seedRefundOrders({ userId, cartId, services }) {
   return rows
 }
 
+function auditRowsForRefundTester(userId) {
+  const timestamp = new Date().toISOString()
+  const actorLabel = testEmail
+
+  return [
+    {
+      actor_type: 'system',
+      actor_label: actorLabel,
+      event_type: 'auth',
+      action: `[refund-test] ${testEmail} signed in for refund QA`,
+      status: 'success',
+      timestamp,
+    },
+    {
+      actor_type: 'system',
+      actor_label: actorLabel,
+      event_type: 'checkout',
+      action: `[refund-test] ${testEmail} created Stripe checkout`,
+      status: 'success',
+      timestamp,
+    },
+    {
+      actor_type: 'system',
+      actor_label: actorLabel,
+      event_type: 'payment_webhook',
+      action: `[refund-test] ${testEmail} NOWPayments webhook blocked sample`,
+      status: 'blocked',
+      timestamp,
+    },
+    {
+      actor_type: 'system',
+      actor_label: actorLabel,
+      event_type: 'refund',
+      action: `[refund-test] ${testEmail} automatic refund unavailable sample`,
+      status: 'blocked',
+      timestamp,
+    },
+    {
+      actor_type: 'system',
+      actor_label: actorLabel,
+      event_type: 'order_lifecycle',
+      action: `[refund-test] ${testEmail} confirmed order completion sample`,
+      status: 'success',
+      timestamp,
+    },
+    {
+      actor_type: 'system',
+      actor_label: actorLabel,
+      event_type: 'cms',
+      action: `[refund-test] ${testEmail} CMS audit visibility sample`,
+      status: 'success',
+      timestamp,
+    },
+    {
+      actor_type: 'system',
+      actor_label: actorLabel,
+      event_type: 'settings',
+      action: `[refund-test] ${testEmail} settings audit visibility sample`,
+      status: 'success',
+      timestamp,
+    },
+    {
+      actor_type: 'system',
+      actor_label: actorLabel,
+      event_type: 'cron',
+      action: `[refund-test] ${testEmail} auto-complete cron failed sample`,
+      status: 'critical',
+      timestamp,
+    },
+    {
+      actor_type: 'system',
+      actor_label: actorLabel,
+      event_type: 'security',
+      action: `[refund-test] ${testEmail} security review blocked sample for ${userId}`,
+      status: 'blocked',
+      timestamp,
+    },
+    {
+      actor_type: 'system',
+      actor_label: actorLabel,
+      event_type: 'admin_action',
+      action: `[refund-test] ${testEmail} admin review action sample`,
+      status: 'success',
+      timestamp,
+    },
+  ]
+}
+
+async function seedRefundTesterReviewData(user) {
+  await deleteExistingSeedAuditRows(supabase, user.id)
+
+  const admin = await getSeedAdmin(supabase)
+  const moderationRows = [
+    {
+      user_id: user.id,
+      admin_id: admin?.id ?? null,
+      action: 'banned',
+      reason: '[refund-test] Temporary ban sample for moderation history.',
+      created_at: daysAgo(5),
+    },
+    {
+      user_id: user.id,
+      admin_id: admin?.id ?? null,
+      action: 'unbanned',
+      reason: '[refund-test] Resolved after identity/payment review.',
+      created_at: daysAgo(4),
+    },
+    {
+      user_id: user.id,
+      admin_id: admin?.id ?? null,
+      action: 'banned',
+      reason: '[refund-test] Repeat refund-risk review sample.',
+      created_at: daysAgo(2),
+    },
+    {
+      user_id: user.id,
+      admin_id: admin?.id ?? null,
+      action: 'unbanned',
+      reason: '[refund-test] Final QA reset; account active.',
+      created_at: daysAgo(1),
+    },
+  ]
+
+  const { error: moderationError } = await supabase
+    .from('user_moderation_events')
+    .insert(moderationRows)
+
+  if (moderationError) throw moderationError
+
+  const { error: auditError } = await supabase
+    .from('audit_logs')
+    .insert(auditRowsForRefundTester(user.id))
+
+  if (auditError) throw auditError
+}
+
 async function reseedRefundOrders() {
   const user = await ensureUser(supabase, testEmail, testPassword)
   const cartId = await ensureCart(supabase, user.id)
@@ -471,6 +650,7 @@ async function reseedRefundOrders() {
   await deleteExistingSeedRows(supabase)
 
   const rows = await seedRefundOrders({ userId: user.id, cartId, services })
+  await seedRefundTesterReviewData(user)
 
   console.log(`Seeded refund test user: ${testEmail}`)
   console.log(`Password: ${testPassword}`)
@@ -479,6 +659,7 @@ async function reseedRefundOrders() {
     console.log(`- ${row.scenario.ref}: ${row.scenario.status} (${row.scenario.provider}) - ${row.scenario.note}`)
   })
   console.log('')
+  console.log('Seeded related audit events and moderation history for the refund test user.')
   console.log('Note: seeded provider IDs are fake. Use these orders to test refund visibility/status rules.')
   console.log('Stripe refund execution still needs a real Stripe test PaymentIntent. NOWPayments crypto refunds are manual/admin-assisted for now.')
 }

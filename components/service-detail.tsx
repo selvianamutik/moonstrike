@@ -385,6 +385,8 @@ export function ServiceDetail({
         return;
       }
 
+      window.dispatchEvent(new Event("moonstrike:cart-updated"));
+
       if (nextAction === "cart") {
         router.push("/cart");
         return;

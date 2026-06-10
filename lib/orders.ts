@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { DEFAULT_ADMIN_SETTINGS, getAdminSettings } from "@/lib/admin/settings";
 
 export type OrderCurrency = "USD" | "EUR";
 export type OrderOptionValue = string | number | boolean | string[];
@@ -44,6 +45,7 @@ export type CustomerOrderRow = {
   status: string;
   refund_previous_status: string | null;
   completed_at: string | null;
+  delivered_at: string | null;
   created_at: string;
   order_items: CustomerOrderItemRow[] | null;
 };
@@ -85,6 +87,7 @@ export type CustomerOrder = {
   paymentStatus: string;
   status: string;
   completedAt: string | null;
+  deliveredAt: string | null;
   createdAt: string;
   itemCount: number;
   serviceSummary: string;
@@ -137,6 +140,7 @@ function mapOrder(row: CustomerOrderRow, transaction?: CustomerOrderTransactionR
     paymentStatus: transaction?.status ?? "pending",
     status: row.status,
     completedAt: row.completed_at,
+    deliveredAt: row.delivered_at,
     createdAt: row.created_at,
     itemCount: items.length,
     serviceSummary,
@@ -146,11 +150,11 @@ function mapOrder(row: CustomerOrderRow, transaction?: CustomerOrderTransactionR
 }
 
 const orderSelect =
-  "id, order_ref, checkout_session_id, status, refund_previous_status, completed_at, created_at, order_items(id, service_id, selected_options_snapshot, total, currency, services(title, image, description, games(name), service_categories(name)))";
+  "id, order_ref, checkout_session_id, status, refund_previous_status, completed_at, delivered_at, created_at, order_items(id, service_id, selected_options_snapshot, total, currency, services(title, image, description, games(name), service_categories(name)))";
 
-const REFUND_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-export function canRequestOrderRefund(status: string, completedAt?: string | null, now = new Date()) {
+export function canRequestOrderRefund(status: string, completedAt?: string | null, refundWindowDays = DEFAULT_ADMIN_SETTINGS.refundWindowDays, now = new Date()) {
   if (["refund_requested", "refunded"].includes(status)) return false;
   if (status !== "completed") return true;
   if (!completedAt) return false;
@@ -158,7 +162,55 @@ export function canRequestOrderRefund(status: string, completedAt?: string | nul
   const completedTime = new Date(completedAt).getTime();
   if (Number.isNaN(completedTime)) return false;
 
-  return now.getTime() - completedTime <= REFUND_WINDOW_MS;
+  return now.getTime() - completedTime <= refundWindowDays * DAY_MS;
+}
+
+export async function getRefundWindowDays() {
+  try {
+    const settings = await getAdminSettings();
+    return settings.refundWindowDays;
+  } catch {
+    return DEFAULT_ADMIN_SETTINGS.refundWindowDays;
+  }
+}
+
+export async function autoCompleteDeliveredOrders(userId?: string) {
+  const settings = await getAdminSettings();
+  if (settings.autoCompleteDays <= 0) {
+    return {
+      completedCount: 0,
+      orderReferences: [] as string[],
+      autoCompleteDays: settings.autoCompleteDays,
+    };
+  }
+
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - settings.autoCompleteDays * DAY_MS).toISOString();
+  const timestamp = now.toISOString();
+  const supabase = createAdminClient();
+  let query = supabase
+    .from("orders")
+    .update({
+      status: "completed",
+      completed_at: timestamp,
+      updated_at: timestamp,
+    })
+    .eq("status", "delivered")
+    .not("delivered_at", "is", null)
+    .lte("delivered_at", cutoff);
+
+  if (userId) {
+    query = query.eq("user_id", userId);
+  }
+
+  const { data, error } = await query.select("order_ref").returns<Array<{ order_ref: string }>>();
+  if (error) throw error;
+
+  return {
+    completedCount: data?.length ?? 0,
+    orderReferences: (data ?? []).map((order) => order.order_ref),
+    autoCompleteDays: settings.autoCompleteDays,
+  };
 }
 
 async function getTransactionsByCheckoutSession(userId: string, checkoutSessionIds: string[]) {
@@ -177,6 +229,8 @@ async function getTransactionsByCheckoutSession(userId: string, checkoutSessionI
 }
 
 export async function listCustomerOrders(userId: string) {
+  await autoCompleteDeliveredOrders(userId);
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("orders")
@@ -192,6 +246,8 @@ export async function listCustomerOrders(userId: string) {
 }
 
 export async function getCustomerOrder(userId: string, orderId: string) {
+  await autoCompleteDeliveredOrders(userId);
+
   const supabase = createAdminClient();
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(orderId);
   const query = supabase
@@ -209,6 +265,8 @@ export async function getCustomerOrder(userId: string, orderId: string) {
 }
 
 export async function getCustomerOrderByCheckoutSession(userId: string, checkoutSessionId: string) {
+  await autoCompleteDeliveredOrders(userId);
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("orders")

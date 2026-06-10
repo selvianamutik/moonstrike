@@ -6,6 +6,7 @@ import { PlaceholderAsset } from "@/components/asset-image";
 import { OrderSummary } from "@/components/order-summary";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { CartListSkeleton } from "@/components/storefront-skeletons";
 import { useCurrency } from "@/hooks/useCurrency";
 
 type CartApiItem = {
@@ -85,6 +86,7 @@ export function CartPageClient() {
       }
 
       setItems((current) => current.filter((item) => item.id !== id));
+      window.dispatchEvent(new Event("moonstrike:cart-updated"));
     } catch {
       setError("Unable to reach the cart service.");
     } finally {
@@ -130,7 +132,7 @@ export function CartPageClient() {
           ) : null}
 
           {isLoading ? (
-            <div className="ms-card mt-8 rounded-xl p-10 text-center text-[var(--ms-body)]">Loading cart...</div>
+            <CartListSkeleton />
           ) : items.length === 0 ? (
             <div className="ms-card mt-8 rounded-xl p-10 text-center">
               <h2 className="text-2xl font-black">Your cart is empty</h2>

@@ -1,11 +1,11 @@
 import { ProfileSidebar } from "@/components/profile/ProfileSidebar";
-import Link from "next/link";
+import { ProfileTransactionsList } from "@/components/profile/ProfileTransactionsList";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { requireVerifiedUser } from "@/lib/auth/session";
 import { formatMemberSince, getUserDisplayName, getUserInitials } from "@/lib/auth/user-display";
-import { formatOrderDate, formatOrderMoney, listCustomerOrders, type CustomerOrder } from "@/lib/orders";
-import { formatTransactionMoney, listCustomerTransactions } from "@/lib/transactions";
+import { formatOrderMoney, listCustomerOrders, type CustomerOrder } from "@/lib/orders";
+import { listCustomerTransactions } from "@/lib/transactions";
 
 export const dynamic = "force-dynamic";
 
@@ -50,32 +50,7 @@ export default async function ProfileTransactionsPage() {
             <h1 className="font-display mt-3 text-4xl font-black tracking-[-0.05em]">Transactions</h1>
           </div>
 
-          <section className="mt-8 overflow-hidden rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)]">
-            <div className="grid grid-cols-[1fr_1fr_auto] gap-4 border-b border-[var(--ms-border)] px-5 py-4 mono text-xs uppercase tracking-[0.16em] text-[var(--ms-body)] md:grid-cols-[1.3fr_1fr_1fr_1fr_1fr_auto]">
-              <span>Transaction ID</span>
-              <span className="hidden md:block">Provider</span>
-              <span>Date</span>
-              <span>Amount</span>
-              <span className="hidden md:block">Status</span>
-              <span className="text-right">Action</span>
-            </div>
-            {transactions.length === 0 ? (
-              <div className="px-5 py-6 text-sm text-[var(--ms-body)]">No transactions yet.</div>
-            ) : (
-              transactions.map((transaction) => (
-                <div key={transaction.id} className="grid grid-cols-[1fr_1fr_auto] items-center gap-4 border-b border-[var(--ms-border)] px-5 py-4 text-sm last:border-0 md:grid-cols-[1.3fr_1fr_1fr_1fr_1fr_auto]">
-                  <span className="mono truncate">{transaction.id}</span>
-                  <span className="hidden md:block">{transaction.method}</span>
-                  <span>{formatOrderDate(transaction.createdAt)}</span>
-                  <span className="mono text-[var(--ms-price)]">{formatTransactionMoney(transaction.amount, transaction.currency)}</span>
-                  <span className="hidden text-[var(--ms-success)] md:block">{transaction.status.replace("_", " ")}</span>
-                  <Link href={`/profile/transactions/${transaction.id}`} className="inline-flex h-9 items-center justify-center rounded-md border border-[var(--ms-border)] px-3 text-xs text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
-                    Detail
-                  </Link>
-                </div>
-              ))
-            )}
-          </section>
+          <ProfileTransactionsList transactions={transactions} />
         </div>
       </section>
       <SiteFooter />

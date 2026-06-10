@@ -1,5 +1,5 @@
 import type { AdminOrderStatus } from "@/lib/admin-constants";
-import type { OrderOptionSnapshot, OrderOptionValue } from "@/lib/orders";
+import { autoCompleteDeliveredOrders, type OrderOptionSnapshot, type OrderOptionValue } from "@/lib/orders";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type AdminCustomer = { email?: string; user_metadata?: Record<string, unknown> } | null;
@@ -75,6 +75,7 @@ export type AdminOrderRecord = {
   categoryName: string;
   optionsSummary: string;
   createdAt: string;
+  createdAtIso: string;
   updatedAt: string;
   amount: string;
   total: number;
@@ -209,6 +210,7 @@ function mapOrder(row: AdminOrderRow, user: AdminCustomer | undefined, transacti
     categoryName: items.length === 1 ? items[0].categoryName : "Multiple services",
     optionsSummary,
     createdAt: formatDate(row.created_at),
+    createdAtIso: row.created_at,
     updatedAt: formatDate(row.updated_at),
     amount: formatMoney(total, currency),
     total,
@@ -247,6 +249,8 @@ async function getTransactionsByCheckoutSession(checkoutSessionIds: string[]) {
 }
 
 export async function listAdminOrders() {
+  await autoCompleteDeliveredOrders();
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("orders")
@@ -262,6 +266,8 @@ export async function listAdminOrders() {
 }
 
 export async function getAdminOrder(id: string) {
+  await autoCompleteDeliveredOrders();
+
   const supabase = createAdminClient();
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
   const query = supabase

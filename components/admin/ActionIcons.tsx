@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Pencil, Eye, EyeOff, Trash2, Ban, History } from "lucide-react";
+import { ActionTooltip } from "@/components/common/ActionTooltip";
 
 type ActionIconsProps = {
   editHref?: string;
@@ -14,34 +15,46 @@ export function ActionIcons({ editHref, onHide, onDelete, onBan, historyHref, pr
   return (
     <div className="flex items-center gap-1">
       {editHref && (
-        <Link href={editHref} className="p-2 text-[var(--ms-text-secondary)] hover:text-[#8B5CF6] transition-colors" aria-label="Edit">
-          <Pencil size={16} />
-        </Link>
+        <ActionTooltip label="Edit">
+          <Link href={editHref} className="admin-action-icon hover:border-[#8B5CF6] hover:text-[#8B5CF6]" aria-label="Edit">
+            <Pencil size={16} />
+          </Link>
+        </ActionTooltip>
       )}
       {previewHref && (
-        <Link href={previewHref} className="p-2 text-[var(--ms-text-secondary)] hover:text-[#22D3EE] transition-colors" aria-label="Preview">
-          <Eye size={16} />
-        </Link>
+        <ActionTooltip label="Preview">
+          <Link href={previewHref} className="admin-action-icon hover:border-[#22D3EE] hover:text-[#22D3EE]" aria-label="Preview">
+            <Eye size={16} />
+          </Link>
+        </ActionTooltip>
       )}
       {historyHref && (
-        <Link href={historyHref} className="p-2 text-[var(--ms-text-secondary)] hover:text-[#22D3EE] transition-colors" aria-label="History">
-          <History size={16} />
-        </Link>
+        <ActionTooltip label="History">
+          <Link href={historyHref} className="admin-action-icon hover:border-[#22D3EE] hover:text-[#22D3EE]" aria-label="History">
+            <History size={16} />
+          </Link>
+        </ActionTooltip>
       )}
       {onHide && (
-        <button type="button" onClick={onHide} className="p-2 text-[var(--ms-text-secondary)] hover:text-[#22D3EE] transition-colors" aria-label="Hide">
-          <EyeOff size={16} />
-        </button>
+        <ActionTooltip label="Hide">
+          <button type="button" onClick={onHide} className="admin-action-icon hover:border-[#22D3EE] hover:text-[#22D3EE]" aria-label="Hide">
+            <EyeOff size={16} />
+          </button>
+        </ActionTooltip>
       )}
       {onBan && (
-        <button type="button" onClick={onBan} className="p-2 text-[var(--ms-text-secondary)] hover:text-amber-400 transition-colors" aria-label="Ban">
-          <Ban size={16} />
-        </button>
+        <ActionTooltip label="Ban">
+          <button type="button" onClick={onBan} className="admin-action-icon hover:border-amber-400 hover:text-amber-400" aria-label="Ban">
+            <Ban size={16} />
+          </button>
+        </ActionTooltip>
       )}
       {onDelete && (
-        <button type="button" onClick={onDelete} className="p-2 text-[var(--ms-text-secondary)] hover:text-red-400 transition-colors" aria-label="Delete">
-          <Trash2 size={16} />
-        </button>
+        <ActionTooltip label="Delete">
+          <button type="button" onClick={onDelete} className="admin-action-icon hover:border-red-400 hover:text-red-400" aria-label="Delete">
+            <Trash2 size={16} />
+          </button>
+        </ActionTooltip>
       )}
     </div>
   );

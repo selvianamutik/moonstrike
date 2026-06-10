@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { OrderSummary } from "@/components/order-summary";
+import { CheckoutSkeleton } from "@/components/storefront-skeletons";
 import { useCurrency } from "@/hooks/useCurrency";
 
 type CheckoutCartItem = {
@@ -175,7 +176,7 @@ export function CheckoutPageClient() {
           ) : null}
 
           {isLoading ? (
-            <div className="ms-card mt-12 rounded-xl p-8 text-[var(--ms-body)]">Loading checkout...</div>
+            <CheckoutSkeleton />
           ) : items.length === 0 ? (
             <div className="ms-card mt-12 rounded-xl p-8">
               <h2 className="text-2xl font-black">Your cart is empty</h2>

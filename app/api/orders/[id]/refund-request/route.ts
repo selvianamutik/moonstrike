@@ -1,10 +1,11 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
+import { writeAuditLog } from "@/lib/admin/audit";
 import { requireVerifiedUser } from "@/lib/auth/session";
-import { canRequestOrderRefund } from "@/lib/orders";
+import { canRequestOrderRefund, getRefundWindowDays } from "@/lib/orders";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireVerifiedUser("/profile/orders");
   const { id } = await params;
   const supabase = createAdminClient();
@@ -23,8 +24,17 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: "Order not found." }, { status: 404 });
   }
 
-  if (!canRequestOrderRefund(order.status, order.completed_at)) {
-    return NextResponse.json({ error: "Refund requests are available until 7 days after an order is completed." }, { status: 400 });
+  const refundWindowDays = await getRefundWindowDays();
+
+  if (!canRequestOrderRefund(order.status, order.completed_at, refundWindowDays)) {
+    await writeAuditLog({
+      action: `Customer refund request blocked for ${order.order_ref}`,
+      status: "blocked",
+      request,
+      eventType: "refund",
+      actorLabel: user.email ?? "Customer",
+    });
+    return NextResponse.json({ error: `Refund requests are available until ${refundWindowDays} days after an order is completed.` }, { status: 400 });
   }
 
   const { error: updateError } = await supabase
@@ -38,8 +48,23 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     .eq("user_id", user.id);
 
   if (updateError) {
+    await writeAuditLog({
+      action: `Customer refund request failed for ${order.order_ref}: ${updateError.message}`,
+      status: "critical",
+      request,
+      eventType: "refund",
+      actorLabel: user.email ?? "Customer",
+    });
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
+
+  await writeAuditLog({
+    action: `Customer requested refund for ${order.order_ref}`,
+    status: "success",
+    request,
+    eventType: "refund",
+    actorLabel: user.email ?? "Customer",
+  });
 
   revalidatePath("/profile");
   revalidatePath("/profile/orders");
