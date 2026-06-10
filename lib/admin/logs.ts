@@ -6,6 +6,17 @@ export type AuditLogRow = {
   actor_id: string | null
   actor_type: 'admin' | 'system'
   actor_label: string
+  event_type:
+    | 'auth'
+    | 'admin_action'
+    | 'checkout'
+    | 'payment_webhook'
+    | 'refund'
+    | 'order_lifecycle'
+    | 'cms'
+    | 'settings'
+    | 'cron'
+    | 'security'
   action: string
   ip_address: string | null
   status: 'success' | 'critical' | 'blocked'
@@ -16,7 +27,7 @@ export async function listAuditLogs(limit = 100) {
   const { data, error } = await supabase
     .from('audit_logs')
     .select(
-      'id, timestamp, actor_id, actor_type, actor_label, action, ip_address, status'
+      'id, timestamp, actor_id, actor_type, actor_label, event_type, action, ip_address, status'
     )
     .order('timestamp', { ascending: false })
     .limit(limit)

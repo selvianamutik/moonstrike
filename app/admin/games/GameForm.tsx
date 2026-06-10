@@ -6,6 +6,7 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { AdminFormField, adminInputClass, adminSelectClass, adminTextareaClass } from "@/components/admin/AdminFormField";
 import { GAME_PLATFORMS } from "@/lib/admin-constants";
+import { cleanupUploadedMedia } from "@/lib/cms/client-media-cleanup";
 import type { GenreRow } from "@/lib/cms/genres";
 import type { GameRow } from "@/lib/cms/games";
 
@@ -77,6 +78,7 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [pendingImagePath, setPendingImagePath] = useState("");
 
   async function uploadImage(file: File) {
     setError("");
@@ -94,6 +96,7 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
       });
       const result = (await response.json().catch(() => null)) as {
         imageUrl?: string;
+        storagePath?: string;
         error?: string;
       } | null;
 
@@ -102,7 +105,12 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
         return;
       }
 
+      if (pendingImagePath) {
+        void cleanupUploadedMedia([pendingImagePath]);
+      }
+
       setImage(result.imageUrl);
+      setPendingImagePath(result.storagePath ?? "");
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Unable to upload game image.");
     } finally {
@@ -138,6 +146,7 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
         return;
       }
 
+      setPendingImagePath("");
       router.push("/admin/games");
       router.refresh();
     } catch {
@@ -227,7 +236,14 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
           <AdminButton type="submit" disabled={isSaving || isUploading}>
             {isUploading ? "Uploading..." : isSaving ? "Saving..." : "Save Game"}
           </AdminButton>
-          <AdminButton href="/admin/games" variant="secondary">
+          <AdminButton
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              if (pendingImagePath) void cleanupUploadedMedia([pendingImagePath]);
+              router.push("/admin/games");
+            }}
+          >
             Cancel
           </AdminButton>
         </div>

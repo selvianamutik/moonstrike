@@ -76,36 +76,6 @@ export function CategoryTabs({ activeIndex = 0, items }: { activeIndex?: number;
   );
 }
 
-export function RegionSelector({
-  active = "USA",
-  availableRegions = ["USA", "EUROPE"],
-  onChange,
-}: {
-  active?: "USA" | "EUROPE";
-  availableRegions?: Array<"USA" | "EUROPE">;
-  onChange?: (region: "USA" | "EUROPE") => void;
-}) {
-  return (
-    <div className="inline-flex rounded-full border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-1">
-      {(["USA", "EUROPE"] as const).map((region) => (
-        <button
-          key={region}
-          type="button"
-          disabled={!availableRegions.includes(region)}
-          onClick={() => onChange?.(region)}
-          className={`h-9 rounded-full px-4 mono text-xs font-bold uppercase tracking-[0.18em] ${
-            active === region
-              ? "bg-[var(--primary)] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]"
-              : "text-[var(--ms-body)] hover:text-[var(--ms-heading)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-[var(--ms-body)]"
-          }`}
-        >
-          {region}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 type GameCardProps = {
   description: string;
   genre: string;

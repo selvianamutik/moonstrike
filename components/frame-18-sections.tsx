@@ -5,7 +5,7 @@ import type { LandingBenefitsData } from "@/lib/cms/landing";
 
 const steps = [
   ["1. Choose Your Service", "Pick the boost, coaching, raid, or item service that matches your goal."],
-  ["2. Configure Options", "Select region, run size, delivery speed, and other service-specific options."],
+  ["2. Configure Options", "Select run size, delivery speed, and other service-specific options."],
   ["3. Track Progress", "Follow order updates and use support chat for questions or extra instructions."],
   ["4. Enjoy the Result", "Log back in after delivery and review the completed work."],
 ];

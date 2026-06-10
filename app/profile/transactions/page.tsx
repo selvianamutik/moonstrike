@@ -1,10 +1,11 @@
 import { ProfileSidebar } from "@/components/profile/ProfileSidebar";
+import { ProfileTransactionsList } from "@/components/profile/ProfileTransactionsList";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { requireVerifiedUser } from "@/lib/auth/session";
 import { formatMemberSince, getUserDisplayName, getUserInitials } from "@/lib/auth/user-display";
-import { formatOrderDate, formatOrderMoney, listCustomerOrders, type CustomerOrder } from "@/lib/orders";
-import { formatTransactionMoney, listCustomerTransactions } from "@/lib/transactions";
+import { formatOrderMoney, listCustomerOrders, type CustomerOrder } from "@/lib/orders";
+import { listCustomerTransactions } from "@/lib/transactions";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export default async function ProfileTransactionsPage() {
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
       <SiteHeader />
-      <section className="ms-shell grid gap-10 py-16 lg:grid-cols-[300px_1fr]">
+      <section className="ms-shell grid gap-8 py-16 lg:grid-cols-[270px_minmax(0,1fr)]">
         <ProfileSidebar
           displayName={displayName}
           email={user.email}
@@ -49,28 +50,7 @@ export default async function ProfileTransactionsPage() {
             <h1 className="font-display mt-3 text-4xl font-black tracking-[-0.05em]">Transactions</h1>
           </div>
 
-          <section className="mt-8 overflow-hidden rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)]">
-            <div className="grid grid-cols-[1fr_1fr_1fr] gap-4 border-b border-[var(--ms-border)] px-5 py-4 mono text-xs uppercase tracking-[0.16em] text-[var(--ms-body)] md:grid-cols-[1fr_1.5fr_1fr_1fr_1fr]">
-              <span>TXN ID</span>
-              <span className="hidden md:block">Method</span>
-              <span>Date</span>
-              <span>Amount</span>
-              <span className="hidden md:block">Status</span>
-            </div>
-            {transactions.length === 0 ? (
-              <div className="px-5 py-6 text-sm text-[var(--ms-body)]">No transactions yet.</div>
-            ) : (
-              transactions.map((transaction) => (
-                <div key={transaction.id} className="grid grid-cols-[1fr_1fr_1fr] gap-4 border-b border-[var(--ms-border)] px-5 py-4 text-sm last:border-0 md:grid-cols-[1fr_1.5fr_1fr_1fr_1fr]">
-                  <span className="mono truncate">{transaction.id}</span>
-                  <span className="hidden md:block">{transaction.method}</span>
-                  <span>{formatOrderDate(transaction.createdAt)}</span>
-                  <span className="mono text-[var(--ms-price)]">{formatTransactionMoney(transaction.amount, transaction.currency)}</span>
-                  <span className="hidden text-[var(--ms-success)] md:block">{transaction.status.replace("_", " ")}</span>
-                </div>
-              ))
-            )}
-          </section>
+          <ProfileTransactionsList transactions={transactions} />
         </div>
       </section>
       <SiteFooter />

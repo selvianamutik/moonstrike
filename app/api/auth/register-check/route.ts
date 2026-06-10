@@ -62,10 +62,10 @@ function getProviderMessage(providers: string[]) {
   }
 
   if (providers.includes('email')) {
-    return 'This email is already registered. Log in, reset your password, or resend verification if needed.'
+    return 'This email is already registered. Open the Login tab and sign in with this email. If the email is not verified yet, click the Resend Verification button shown on the login form.'
   }
 
-  return 'This email is already registered. Use the original sign-in method for this account.'
+  return 'This email is already registered. Open the Login tab and use the original sign-in method for this account.'
 }
 
 export async function POST(request: NextRequest) {

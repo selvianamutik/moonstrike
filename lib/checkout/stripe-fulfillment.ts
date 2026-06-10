@@ -1,12 +1,12 @@
 import type Stripe from "stripe";
-import { getCartService, getServiceCategory, getServiceGame, type CartItemRow } from "@/lib/cart";
 import { isCheckoutSnapshotItems, type CheckoutSnapshotItem } from "@/lib/checkout/snapshot";
+import { createOrderReference, createTransactionReference } from "@/lib/order-ref";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripeClient } from "@/lib/stripe";
 
 type FulfillmentResult =
-  | { status: "existing"; orderCount: number }
-  | { status: "created"; orderCount: number }
+  | { status: "existing"; orderCount: number; checkoutSessionId: string }
+  | { status: "created"; orderCount: number; checkoutSessionId: string }
   | { status: "unpaid"; orderCount: 0 }
   | { status: "empty_cart"; orderCount: 0 };
 
@@ -42,11 +42,11 @@ export async function fulfillStripeCheckoutSession(sessionOrId: Stripe.Checkout.
     .eq("checkout_session_id", checkoutSessionId);
 
   if (existingError) throw existingError;
-  if (existing?.length) return { status: "existing", orderCount: existing.length };
+  if (existing?.length) return { status: "existing", orderCount: existing.length, checkoutSessionId };
 
   const { data: checkoutSession, error: checkoutError } = await supabase
     .from("checkout_sessions")
-    .select("id, cart_id, user_id, currency, items")
+    .select("id, cart_id, user_id, currency, items, created_at")
     .eq("id", checkoutSessionId)
     .maybeSingle<{
       id: string;
@@ -54,6 +54,7 @@ export async function fulfillStripeCheckoutSession(sessionOrId: Stripe.Checkout.
       user_id: string;
       currency: "USD" | "EUR";
       items: unknown;
+      created_at: string;
     }>();
 
   if (checkoutError) throw checkoutError;
@@ -72,6 +73,7 @@ export async function fulfillStripeCheckoutSession(sessionOrId: Stripe.Checkout.
 
   const stripePaymentIntentId = paymentIntentId(session);
   const currency = checkoutSession.currency;
+  const referenceDate = new Date(checkoutSession.created_at);
   const amountTotal =
     typeof session.amount_total === "number"
       ? session.amount_total / 100
@@ -80,6 +82,7 @@ export async function fulfillStripeCheckoutSession(sessionOrId: Stripe.Checkout.
   const { error: transactionError } = await supabase.from("transactions").upsert(
     {
       checkout_session_id: checkoutSession.id,
+      transaction_ref: createTransactionReference(referenceDate, checkoutSession.id),
       user_id: checkoutSession.user_id,
       provider: "stripe",
       provider_payment_id: stripePaymentIntentId,
@@ -102,22 +105,13 @@ export async function fulfillStripeCheckoutSession(sessionOrId: Stripe.Checkout.
   );
   if (transactionError) throw transactionError;
 
-  const firstItem = checkoutSession.items[0];
-  const orderTotal = checkoutSession.items.reduce((total, item) => total + (currency === "EUR" ? item.priceEUR : item.priceUSD), 0);
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .upsert(
       {
-        cart_item_id: firstItem.cartItemId,
-        service_id: firstItem.serviceId,
+        order_ref: createOrderReference(referenceDate, checkoutSession.id),
         user_id: checkoutSession.user_id,
         checkout_session_id: checkoutSession.id,
-        selected_options_snapshot: {},
-        total: orderTotal,
-        currency,
-        region: "USA",
-        payment_provider: "stripe",
-        stripe_payment_intent_id: stripePaymentIntentId,
         status: "pending",
       },
       {
@@ -136,7 +130,6 @@ export async function fulfillStripeCheckoutSession(sessionOrId: Stripe.Checkout.
     selected_options_snapshot: item.selectedOptionsSnapshot,
     total: currency === "EUR" ? item.priceEUR : item.priceUSD,
     currency,
-    region: "USA",
   }));
 
   const { error: insertError } = await supabase
@@ -146,14 +139,6 @@ export async function fulfillStripeCheckoutSession(sessionOrId: Stripe.Checkout.
       ignoreDuplicates: true,
     });
   if (insertError) throw insertError;
-
-  await supabase
-    .from("orders")
-    .update({
-      total: orderTotal,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", order.id);
 
   const { error: clearError } = await supabase.from("cart_items").delete().eq("cart_id", checkoutSession.cart_id);
   if (clearError) throw clearError;
@@ -165,18 +150,5 @@ export async function fulfillStripeCheckoutSession(sessionOrId: Stripe.Checkout.
 
   await supabase.from("carts").update({ updated_at: new Date().toISOString() }).eq("id", checkoutSession.cart_id);
 
-  return { status: "created", orderCount: checkoutSession.items.length };
-}
-
-export function cartItemToStripeProduct(item: CartItemRow) {
-  const service = getCartService(item);
-  const game = getServiceGame(service);
-  const category = getServiceCategory(service);
-  const image = service?.image?.startsWith("http") ? service.image : undefined;
-
-  return {
-    name: service?.title ?? "Moon Strike Service",
-    description: [game?.name, category?.name].filter(Boolean).join(" / ") || undefined,
-    images: image ? [image] : undefined,
-  };
+  return { status: "created", orderCount: checkoutSession.items.length, checkoutSessionId: checkoutSession.id };
 }

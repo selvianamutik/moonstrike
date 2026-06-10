@@ -1,4 +1,4 @@
-import type { AdminUserStatus } from "@/lib/admin-mock";
+export type AdminUserStatus = "active" | "banned" | "pending";
 
 const styles: Record<AdminUserStatus, { dot: string; text: string }> = {
   active: { dot: "bg-green-500", text: "text-green-500" },

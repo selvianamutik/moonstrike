@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { AdminFormField, adminInputClass, adminSelectClass, adminTextareaClass } from "@/components/admin/AdminFormField";
+import { cleanupUploadedMedia } from "@/lib/cms/client-media-cleanup";
 import type { GameRow } from "@/lib/cms/games";
 import type { ServiceCategoryRow } from "@/lib/cms/service-categories";
 import type { ServiceBenefit, ServiceOption, ServiceRow } from "@/lib/cms/services";
@@ -182,6 +183,7 @@ export function ServiceForm({
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [pendingImagePath, setPendingImagePath] = useState("");
 
   const availableCategories = useMemo(
     () =>
@@ -347,14 +349,19 @@ export function ServiceForm({
       formData.set("image", compressed);
 
       const response = await fetch("/api/admin/services/image", { method: "POST", body: formData });
-      const result = (await response.json().catch(() => null)) as { imageUrl?: string; error?: string } | null;
+      const result = (await response.json().catch(() => null)) as { imageUrl?: string; storagePath?: string; error?: string } | null;
 
       if (!response.ok || !result?.imageUrl) {
         setError(result?.error ?? "Unable to upload service image.");
         return;
       }
 
+      if (pendingImagePath) {
+        void cleanupUploadedMedia([pendingImagePath]);
+      }
+
       setImage(result.imageUrl);
+      setPendingImagePath(result.storagePath ?? "");
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Unable to upload service image.");
     } finally {
@@ -406,6 +413,7 @@ export function ServiceForm({
         return;
       }
 
+      setPendingImagePath("");
       router.push("/admin/services");
       router.refresh();
     } catch {
@@ -444,7 +452,14 @@ export function ServiceForm({
             <p className="text-xs text-[#94A3B8]">Actions stay available while you scroll.</p>
           </div>
           <div className="flex gap-3">
-            <AdminButton type="button" variant="secondary" onClick={() => router.push("/admin/services")}>
+            <AdminButton
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                if (pendingImagePath) void cleanupUploadedMedia([pendingImagePath]);
+                router.push("/admin/services");
+              }}
+            >
               Discard
             </AdminButton>
             <AdminButton type="submit" disabled={isSaving || isUploading}>
@@ -525,10 +540,10 @@ export function ServiceForm({
             <h2 className="mb-4 text-lg font-bold text-white">Pricing</h2>
             <div className="grid gap-4 md:grid-cols-2">
               <AdminFormField label="Base Price (USD)">
-                <input type="number" min="0" step="0.01" className={adminInputClass} value={basePriceUSD} onChange={(e) => setBasePriceUSD(e.target.value)} />
+                <input type="text" inputMode="decimal" className={adminInputClass} value={basePriceUSD} onChange={(e) => setBasePriceUSD(e.target.value)} />
               </AdminFormField>
               <AdminFormField label="Base Price (EUR)">
-                <input type="number" min="0" step="0.01" className={adminInputClass} value={basePriceEUR} onChange={(e) => setBasePriceEUR(e.target.value)} />
+                <input type="text" inputMode="decimal" className={adminInputClass} value={basePriceEUR} onChange={(e) => setBasePriceEUR(e.target.value)} />
               </AdminFormField>
             </div>
           </section>
@@ -679,8 +694,8 @@ export function ServiceForm({
                         {(option.options ?? []).map((choice, choiceIndex) => (
                           <div key={choiceIndex} className="grid gap-3 md:grid-cols-[1fr_140px_140px_auto] md:items-center">
                             <input className={adminInputClass} value={choice.label} onChange={(e) => updateChoice(optionIndex, choiceIndex, { label: e.target.value })} placeholder="Choice label" />
-                            <input type="number" min="0" step="0.01" className={adminInputClass} value={choice.priceUSD} onChange={(e) => updateChoice(optionIndex, choiceIndex, { priceUSD: Number(e.target.value) })} placeholder="USD" />
-                            <input type="number" min="0" step="0.01" className={adminInputClass} value={choice.priceEUR} onChange={(e) => updateChoice(optionIndex, choiceIndex, { priceEUR: Number(e.target.value) })} placeholder="EUR" />
+                            <input type="text" inputMode="decimal" className={adminInputClass} value={choice.priceUSD} onChange={(e) => updateChoice(optionIndex, choiceIndex, { priceUSD: Number(e.target.value) })} placeholder="USD" />
+                            <input type="text" inputMode="decimal" className={adminInputClass} value={choice.priceEUR} onChange={(e) => updateChoice(optionIndex, choiceIndex, { priceEUR: Number(e.target.value) })} placeholder="EUR" />
                             <button
                               type="button"
                               onClick={() =>
@@ -705,16 +720,16 @@ export function ServiceForm({
                     {isUnitType(option.type) ? (
                       <div className="mt-4 grid gap-3 md:grid-cols-4">
                         <AdminFormField label="Minimum">
-                          <input type="number" min="0" className={adminInputClass} value={option.min ?? 1} onChange={(e) => updateOption(optionIndex, { min: Number(e.target.value) })} />
+                          <input type="text" inputMode="numeric" className={adminInputClass} value={option.min ?? 1} onChange={(e) => updateOption(optionIndex, { min: Number(e.target.value) })} />
                         </AdminFormField>
                         <AdminFormField label="Maximum">
-                          <input type="number" min="0" className={adminInputClass} value={option.max ?? 10} onChange={(e) => updateOption(optionIndex, { max: Number(e.target.value) })} />
+                          <input type="text" inputMode="numeric" className={adminInputClass} value={option.max ?? 10} onChange={(e) => updateOption(optionIndex, { max: Number(e.target.value) })} />
                         </AdminFormField>
                         <AdminFormField label={option.type === "range" ? "USD / Value" : "USD / Count"}>
-                          <input type="number" min="0" step="0.01" className={adminInputClass} value={option.pricePerUnitUSD ?? 0} onChange={(e) => updateOption(optionIndex, { pricePerUnitUSD: Number(e.target.value) })} />
+                          <input type="text" inputMode="decimal" className={adminInputClass} value={option.pricePerUnitUSD ?? 0} onChange={(e) => updateOption(optionIndex, { pricePerUnitUSD: Number(e.target.value) })} />
                         </AdminFormField>
                         <AdminFormField label={option.type === "range" ? "EUR / Value" : "EUR / Count"}>
-                          <input type="number" min="0" step="0.01" className={adminInputClass} value={option.pricePerUnitEUR ?? 0} onChange={(e) => updateOption(optionIndex, { pricePerUnitEUR: Number(e.target.value) })} />
+                          <input type="text" inputMode="decimal" className={adminInputClass} value={option.pricePerUnitEUR ?? 0} onChange={(e) => updateOption(optionIndex, { pricePerUnitEUR: Number(e.target.value) })} />
                         </AdminFormField>
                         {option.type === "number_stepper" ? (
                           <p className="text-xs leading-5 text-[#94A3B8] md:col-span-4">
@@ -731,10 +746,10 @@ export function ServiceForm({
                     {isQuantityType(option.type) ? (
                       <div className="mt-4 grid gap-3 md:grid-cols-2">
                         <AdminFormField label="Minimum Quantity">
-                          <input type="number" min="1" className={adminInputClass} value={option.min ?? 1} onChange={(e) => updateOption(optionIndex, { min: Number(e.target.value) })} />
+                          <input type="text" inputMode="numeric" className={adminInputClass} value={option.min ?? 1} onChange={(e) => updateOption(optionIndex, { min: Number(e.target.value) })} />
                         </AdminFormField>
                         <AdminFormField label="Maximum Quantity">
-                          <input type="number" min="1" className={adminInputClass} value={option.max ?? 99} onChange={(e) => updateOption(optionIndex, { max: Number(e.target.value) })} />
+                          <input type="text" inputMode="numeric" className={adminInputClass} value={option.max ?? 99} onChange={(e) => updateOption(optionIndex, { max: Number(e.target.value) })} />
                         </AdminFormField>
                         <p className="text-xs leading-5 text-[#94A3B8] md:col-span-2">
                           Quantity multiplies the configured service total. Add this only for services that can be bought more than once.
@@ -751,10 +766,10 @@ export function ServiceForm({
                           <input className={adminInputClass} value={option.enabledLabel ?? "Yes"} onChange={(e) => updateOption(optionIndex, { enabledLabel: e.target.value })} placeholder="Yes" />
                         </AdminFormField>
                         <AdminFormField label="USD if enabled">
-                          <input type="number" min="0" step="0.01" className={adminInputClass} value={option.priceUSD ?? 0} onChange={(e) => updateOption(optionIndex, { priceUSD: Number(e.target.value) })} />
+                          <input type="text" inputMode="decimal" className={adminInputClass} value={option.priceUSD ?? 0} onChange={(e) => updateOption(optionIndex, { priceUSD: Number(e.target.value) })} />
                         </AdminFormField>
                         <AdminFormField label="EUR if enabled">
-                          <input type="number" min="0" step="0.01" className={adminInputClass} value={option.priceEUR ?? 0} onChange={(e) => updateOption(optionIndex, { priceEUR: Number(e.target.value) })} />
+                          <input type="text" inputMode="decimal" className={adminInputClass} value={option.priceEUR ?? 0} onChange={(e) => updateOption(optionIndex, { priceEUR: Number(e.target.value) })} />
                         </AdminFormField>
                       </div>
                     ) : null}

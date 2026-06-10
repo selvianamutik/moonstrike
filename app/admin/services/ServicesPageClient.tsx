@@ -1,14 +1,16 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, CheckCircle2, Flame, Layers3, Pencil, Plus, Trash2 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { AdminFilterBar } from "@/components/admin/AdminFilterBar";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
 import { AdminPagination } from "@/components/admin/AdminPagination";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { ActionIcons } from "@/components/admin/ActionIcons";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import type { GameRow } from "@/lib/cms/games";
 import type { ServiceCategoryRow } from "@/lib/cms/service-categories";
 import type { ServiceRow } from "@/lib/cms/services";
@@ -20,7 +22,6 @@ type CategoryFilterOption = {
   sortOrder: number;
 };
 
-const SERVICES_PER_PAGE = 20;
 const HOT_OFFER_FILTER = "hot-offers";
 
 function slugify(value: string) {
@@ -85,11 +86,12 @@ export function ServicesPageClient({
 }) {
   const [serviceRows, setServiceRows] = useState(services);
   const [categoryRows, setCategoryRows] = useState(categories);
-  const [activeTab, setActiveTab] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [gameFilter, setGameFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [error, setError] = useState("");
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [categoryGameId, setCategoryGameId] = useState(games[0]?.id ?? "");
@@ -101,6 +103,8 @@ export function ServicesPageClient({
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [deletingCategoryId, setDeletingCategoryId] = useState("");
   const [deletingServiceId, setDeletingServiceId] = useState("");
+  const [pendingDeleteCategory, setPendingDeleteCategory] = useState<ServiceCategoryRow | null>(null);
+  const [pendingDeleteService, setPendingDeleteService] = useState<ServiceRow | null>(null);
 
   const availableCategories = useMemo(
     () => getCategoryFilterOptions(categoryRows, gameFilter),
@@ -114,10 +118,10 @@ export function ServicesPageClient({
   const filtered = useMemo(() => {
     return serviceRows.filter((service) => {
       const matchTab =
-        activeTab === "all" ||
-        (activeTab === "active" && service.status === "active") ||
-        (activeTab === "draft" && service.status === "draft") ||
-        (activeTab === "archived" && service.status === "archived");
+        statusFilter === "all" ||
+        (statusFilter === "active" && service.status === "active") ||
+        (statusFilter === "draft" && service.status === "draft") ||
+        (statusFilter === "archived" && service.status === "archived");
       const matchSearch =
         !search ||
         service.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -138,12 +142,21 @@ export function ServicesPageClient({
         (a.service_category_name ?? "").localeCompare(b.service_category_name ?? "") ||
         a.title.localeCompare(b.title),
     );
-  }, [activeTab, categoryFilter, gameFilter, search, serviceRows]);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / SERVICES_PER_PAGE));
+  }, [categoryFilter, gameFilter, search, serviceRows, statusFilter]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const pagedServices = filtered.slice((currentPage - 1) * SERVICES_PER_PAGE, currentPage * SERVICES_PER_PAGE);
-  const showingFrom = filtered.length > 0 ? (currentPage - 1) * SERVICES_PER_PAGE + 1 : 0;
+  const pagedServices = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const showingFrom = filtered.length > 0 ? (currentPage - 1) * pageSize + 1 : 0;
   const showingTo = filtered.length > 0 ? showingFrom + pagedServices.length - 1 : 0;
+  const stats = useMemo(() => {
+    const active = serviceRows.filter((service) => service.status === "active").length;
+    const draft = serviceRows.filter((service) => service.status === "draft").length;
+    const archived = serviceRows.filter((service) => service.status === "archived").length;
+    const hotOffers = serviceRows.filter((service) => service.is_hot_offer).length;
+    const activeProgress = serviceRows.length > 0 ? Math.round((active / serviceRows.length) * 100) : 0;
+
+    return { active, archived, draft, hotOffers, activeProgress };
+  }, [serviceRows]);
 
   function resetPage() {
     setPage(1);
@@ -229,11 +242,6 @@ export function ServicesPageClient({
 
   async function deleteCategory(category: ServiceCategoryRow) {
     if (deletingCategoryId) return;
-    const confirmed = window.confirm(
-      `Delete ${category.name}? Services assigned to this category will have their category cleared.`
-    );
-
-    if (!confirmed) return;
 
     setError("");
     setDeletingCategoryId(category.id);
@@ -266,14 +274,12 @@ export function ServicesPageClient({
       setError("Unable to reach the service category endpoint.");
     } finally {
       setDeletingCategoryId("");
+      setPendingDeleteCategory(null);
     }
   }
 
   async function deleteService(service: ServiceRow) {
     if (deletingServiceId) return;
-    const confirmed = window.confirm(`Delete ${service.title}?`);
-
-    if (!confirmed) return;
 
     setError("");
     setDeletingServiceId(service.id);
@@ -292,6 +298,7 @@ export function ServicesPageClient({
       setError("Unable to reach the services endpoint.");
     } finally {
       setDeletingServiceId("");
+      setPendingDeleteService(null);
     }
   }
 
@@ -315,18 +322,14 @@ export function ServicesPageClient({
         }
       />
 
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <AdminStatCard title="ACTIVE SERVICES" value={String(stats.active)} icon={<CheckCircle2 size={18} className="text-green-500" />} progressColor="bg-green-500" progressPercent={stats.activeProgress} />
+        <AdminStatCard title="DRAFT SERVICES" value={String(stats.draft)} subtitle="Hidden from storefront" icon={<Layers3 size={18} className="text-[#22D3EE]" />} progressColor="bg-[#22D3EE]" progressWidth="w-[35%]" />
+        <AdminStatCard title="ARCHIVED" value={String(stats.archived)} subtitle="Retired services" icon={<Archive size={18} className="text-[#94A3B8]" />} progressColor="bg-[#94A3B8]" progressWidth="w-[25%]" />
+        <AdminStatCard title="HOT OFFERS" value={String(stats.hotOffers)} subtitle="Featured storefront picks" icon={<Flame size={18} className="text-amber-500" />} progressColor="bg-amber-500" progressWidth="w-[45%]" />
+      </div>
+
       <AdminFilterBar
-        tabs={[
-          { id: "all", label: "All Services" },
-          { id: "active", label: "Active" },
-          { id: "draft", label: "Draft" },
-          { id: "archived", label: "Archived" },
-        ]}
-        activeTab={activeTab}
-        onTabChange={(nextTab) => {
-          setActiveTab(nextTab);
-          resetPage();
-        }}
         searchPlaceholder="Search services..."
         searchValue={search}
         onSearchChange={(value) => {
@@ -335,6 +338,19 @@ export function ServicesPageClient({
         }}
         extra={
           <>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                resetPage();
+              }}
+              className="bg-[var(--ms-secondary)] border border-[var(--ms-accent)] text-white text-sm rounded-lg px-4 py-2.5"
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="draft">Draft</option>
+              <option value="archived">Archived</option>
+            </select>
             <select
               value={gameFilter}
               onChange={(e) => {
@@ -381,35 +397,19 @@ export function ServicesPageClient({
       <AdminDataTable
         columns={["SERVICE", "GAME", "SERVICE CATEGORY", "BASE PRICE", "STATUS", "ACTIONS"]}
         footer={
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <AdminPagination
-              showingFrom={showingFrom}
-              showingTo={showingTo}
-              total={filtered.length}
-              totalPages={totalPages}
-            />
-            <div className="flex items-center justify-end gap-2">
-              <button
-                type="button"
-                disabled={currentPage <= 1}
-                onClick={() => setPage((value) => Math.max(1, value - 1))}
-                className="rounded-lg border border-[#172554] px-3 py-2 text-xs font-semibold text-[#94A3B8] transition-colors hover:border-[#22D3EE] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Previous
-              </button>
-              <span className="text-xs text-[#64748B]">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={currentPage >= totalPages}
-                onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                className="rounded-lg border border-[#172554] px-3 py-2 text-xs font-semibold text-[#94A3B8] transition-colors hover:border-[#22D3EE] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          <AdminPagination
+            showingFrom={showingFrom}
+            showingTo={showingTo}
+            total={filtered.length}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(nextSize) => {
+              setPageSize(nextSize);
+              setPage(1);
+            }}
+          />
         }
       >
         {pagedServices.map((service) => (
@@ -439,7 +439,7 @@ export function ServicesPageClient({
               <ActionIcons
                 editHref={`/admin/services/${service.game_slug}/${service.slug}/edit`}
                 previewHref={`/admin/services/${service.game_slug}/${service.slug}/preview`}
-                onDelete={() => deleteService(service)}
+                onDelete={() => setPendingDeleteService(service)}
               />
               {deletingServiceId === service.id && <span className="ml-2 text-xs text-[#94A3B8]">Deleting...</span>}
             </td>
@@ -488,7 +488,8 @@ export function ServicesPageClient({
               <label className="block text-sm font-medium text-[#94A3B8]">
                 <span className="mb-2 block">Sort Order</span>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value)}
                   className="w-full rounded-lg border border-[#172554] bg-[#111827] px-4 py-3 text-sm text-white outline-none focus:border-[#8B5CF6]"
@@ -564,7 +565,7 @@ export function ServicesPageClient({
                         <button
                           type="button"
                           disabled={deletingCategoryId === category.id}
-                          onClick={() => deleteCategory(category)}
+                          onClick={() => setPendingDeleteCategory(category)}
                           className="rounded-lg p-2 text-[#94A3B8] transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-40"
                           aria-label={`Delete ${category.name}`}
                         >
@@ -583,6 +584,40 @@ export function ServicesPageClient({
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteService)}
+        title="Delete service?"
+        description={pendingDeleteService ? `This removes ${pendingDeleteService.title} from the service catalog.` : ""}
+        confirmLabel="Delete Service"
+        variant="danger"
+        isLoading={Boolean(pendingDeleteService && deletingServiceId === pendingDeleteService.id)}
+        onClose={() => {
+          if (!deletingServiceId) setPendingDeleteService(null);
+        }}
+        onConfirm={() => {
+          if (pendingDeleteService) deleteService(pendingDeleteService);
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteCategory)}
+        title="Delete service category?"
+        description={
+          pendingDeleteCategory
+            ? `This removes ${pendingDeleteCategory.name}. Services assigned to it will keep existing but their category will be cleared.`
+            : ""
+        }
+        confirmLabel="Delete Category"
+        variant="danger"
+        isLoading={Boolean(pendingDeleteCategory && deletingCategoryId === pendingDeleteCategory.id)}
+        onClose={() => {
+          if (!deletingCategoryId) setPendingDeleteCategory(null);
+        }}
+        onConfirm={() => {
+          if (pendingDeleteCategory) deleteCategory(pendingDeleteCategory);
+        }}
+      />
     </div>
   );
 }

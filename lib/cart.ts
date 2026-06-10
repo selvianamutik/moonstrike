@@ -87,7 +87,10 @@ export async function getOrCreateCartId() {
 }
 
 export async function getCurrentCartId() {
-  const sessionId = await getCartSessionId()
+  const cookieStore = await cookies()
+  const sessionId = cookieStore.get(CART_COOKIE)?.value
+  if (!sessionId) return null
+
   const supabase = createAdminClient()
   const { data, error } = await supabase.from('carts').select('id').eq('session_id', sessionId).maybeSingle()
   if (error) throw error

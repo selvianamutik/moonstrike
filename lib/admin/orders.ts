@@ -1,5 +1,5 @@
 import type { AdminOrderStatus } from "@/lib/admin-constants";
-import type { OrderOptionSnapshot, OrderOptionValue } from "@/lib/orders";
+import { autoCompleteDeliveredOrders, type OrderOptionSnapshot, type OrderOptionValue } from "@/lib/orders";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type AdminCustomer = { email?: string; user_metadata?: Record<string, unknown> } | null;
@@ -25,29 +25,30 @@ type AdminOrderItemRow = {
   selected_options_snapshot: OrderOptionSnapshot;
   total: number | string;
   currency: "USD" | "EUR";
-  region: string;
   services: ServiceRelation;
 };
 
 type AdminOrderRow = {
   id: string;
+  order_ref: string;
   user_id: string;
-  service_id: string | null;
   checkout_session_id: string;
-  selected_options_snapshot: OrderOptionSnapshot;
-  total: number | string;
-  currency: "USD" | "EUR";
-  region: string;
-  payment_provider: "stripe" | "nowpayments";
-  stripe_payment_intent_id: string | null;
-  nowpayments_payment_id: string | null;
-  crypto_refund_address: string | null;
   status: AdminOrderStatus;
   refund_previous_status: AdminOrderStatus | null;
   created_at: string;
   updated_at: string;
   order_items: AdminOrderItemRow[] | null;
-  services: ServiceRelation;
+};
+
+type AdminOrderTransactionRow = {
+  checkout_session_id: string;
+  transaction_ref: string;
+  provider: "stripe" | "nowpayments";
+  provider_payment_id: string;
+  amount: number | string;
+  currency: "USD" | "EUR";
+  status: string;
+  refund_status: string;
 };
 
 export type AdminOrderItemRecord = {
@@ -74,6 +75,7 @@ export type AdminOrderRecord = {
   categoryName: string;
   optionsSummary: string;
   createdAt: string;
+  createdAtIso: string;
   updatedAt: string;
   amount: string;
   total: number;
@@ -84,7 +86,6 @@ export type AdminOrderRecord = {
   checkoutSessionId: string;
   orderReference: string;
   cryptoRefundAddress?: string;
-  region: string;
   itemCount: number;
   selectedOptions: Array<{ group: string; value: string; priceModifier: number }>;
   items: AdminOrderItemRecord[];
@@ -188,22 +189,12 @@ function mapItem(row: AdminOrderItemRow): AdminOrderItemRecord {
   };
 }
 
-function legacyItemFromOrder(row: AdminOrderRow): AdminOrderItemRecord {
-  return mapItem({
-    id: row.id,
-    service_id: row.service_id ?? "",
-    selected_options_snapshot: row.selected_options_snapshot ?? {},
-    total: row.total,
-    currency: row.currency,
-    region: row.region,
-    services: row.services,
-  });
-}
-
-function mapOrder(row: AdminOrderRow, user: AdminCustomer | undefined): AdminOrderRecord {
-  const items = row.order_items?.length ? row.order_items.map(mapItem) : [legacyItemFromOrder(row)];
-  const selectedOptions = selectedOptionsFromSnapshot(row.selected_options_snapshot ?? {}, row.currency);
-  const transactionId = row.stripe_payment_intent_id ?? row.nowpayments_payment_id ?? row.checkout_session_id;
+function mapOrder(row: AdminOrderRow, user: AdminCustomer | undefined, transaction?: AdminOrderTransactionRow): AdminOrderRecord {
+  const items = row.order_items?.map(mapItem) ?? [];
+  const currency = transaction?.currency ?? items[0]?.currency ?? "USD";
+  const total = transaction ? Number(transaction.amount) : items.reduce((sum, item) => sum + item.total, 0);
+  const selectedOptions = items.length === 1 ? items[0].selectedOptions : [];
+  const transactionId = transaction?.transaction_ref ?? row.checkout_session_id;
   const serviceName = items.length === 1 ? items[0].serviceName : `${items.length} services`;
   const gameName = items.length === 1 ? items[0].gameName : Array.from(new Set(items.map((item) => item.gameName))).join(", ");
   const optionsSummary = items.length === 1 ? items[0].optionsSummary : items.map((item) => `${item.serviceName}: ${item.optionsSummary}`).join(" / ");
@@ -219,17 +210,17 @@ function mapOrder(row: AdminOrderRow, user: AdminCustomer | undefined): AdminOrd
     categoryName: items.length === 1 ? items[0].categoryName : "Multiple services",
     optionsSummary,
     createdAt: formatDate(row.created_at),
+    createdAtIso: row.created_at,
     updatedAt: formatDate(row.updated_at),
-    amount: formatMoney(row.total, row.currency),
-    total: Number(row.total),
-    currency: row.currency,
+    amount: formatMoney(total, currency),
+    total,
+    currency,
     status: row.status,
-    paymentProvider: row.payment_provider,
+    paymentProvider: transaction?.provider ?? "stripe",
     transactionId,
     checkoutSessionId: row.checkout_session_id,
-    orderReference: row.checkout_session_id,
-    cryptoRefundAddress: row.crypto_refund_address ?? undefined,
-    region: row.region,
+    orderReference: row.order_ref,
+    cryptoRefundAddress: undefined,
     itemCount: items.length,
     selectedOptions,
     items,
@@ -241,9 +232,25 @@ function mapOrder(row: AdminOrderRow, user: AdminCustomer | undefined): AdminOrd
 }
 
 const orderSelect =
-  "id, user_id, service_id, checkout_session_id, selected_options_snapshot, total, currency, region, payment_provider, stripe_payment_intent_id, nowpayments_payment_id, crypto_refund_address, status, refund_previous_status, created_at, updated_at, services(title, image, games(name), service_categories(name)), order_items(id, service_id, selected_options_snapshot, total, currency, region, services(title, image, games(name), service_categories(name)))";
+  "id, order_ref, user_id, checkout_session_id, status, refund_previous_status, created_at, updated_at, order_items(id, service_id, selected_options_snapshot, total, currency, services(title, image, games(name), service_categories(name)))";
+
+async function getTransactionsByCheckoutSession(checkoutSessionIds: string[]) {
+  if (checkoutSessionIds.length === 0) return new Map<string, AdminOrderTransactionRow>();
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("checkout_session_id, transaction_ref, provider, provider_payment_id, amount, currency, status, refund_status")
+    .in("checkout_session_id", checkoutSessionIds)
+    .returns<AdminOrderTransactionRow[]>();
+
+  if (error) throw error;
+  return new Map((data ?? []).map((transaction) => [transaction.checkout_session_id, transaction]));
+}
 
 export async function listAdminOrders() {
+  await autoCompleteDeliveredOrders();
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("orders")
@@ -254,20 +261,26 @@ export async function listAdminOrders() {
   if (error) throw error;
 
   const customers = await getCustomersById((data ?? []).map((order) => order.user_id));
-  return (data ?? []).map((order) => mapOrder(order, customers.get(order.user_id)));
+  const transactions = await getTransactionsByCheckoutSession((data ?? []).map((order) => order.checkout_session_id));
+  return (data ?? []).map((order) => mapOrder(order, customers.get(order.user_id), transactions.get(order.checkout_session_id)));
 }
 
 export async function getAdminOrder(id: string) {
+  await autoCompleteDeliveredOrders();
+
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+  const query = supabase
     .from("orders")
     .select(orderSelect)
-    .eq("id", id)
-    .maybeSingle<AdminOrderRow>();
+    .limit(1);
+
+  const { data, error } = await (isUuid ? query.eq("id", id) : query.eq("order_ref", id)).maybeSingle<AdminOrderRow>();
 
   if (error) throw error;
   if (!data) return null;
 
   const customers = await getCustomersById([data.user_id]);
-  return mapOrder(data, customers.get(data.user_id));
+  const transactions = await getTransactionsByCheckoutSession([data.checkout_session_id]);
+  return mapOrder(data, customers.get(data.user_id), transactions.get(data.checkout_session_id));
 }

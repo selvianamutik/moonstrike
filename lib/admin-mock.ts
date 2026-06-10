@@ -34,7 +34,6 @@ export type AdminService = GameService & {
   basePriceUsd: number;
   basePriceEur: number;
   isHotOffer: boolean;
-  regions: ("USA" | "EUROPE")[];
   badges: string[];
 };
 
@@ -88,7 +87,6 @@ export type AdminOrder = {
   status: AdminOrderStatus;
   paymentProvider: "stripe" | "nowpayments";
   cryptoRefundAddress?: string;
-  region: string;
   selectedOptions: Array<{ group: string; value: string; priceModifier: number }>;
   timeline: Array<{ status: AdminOrderStatus; at: string; note?: string }>;
 };
@@ -171,7 +169,6 @@ export const adminServices: AdminService[] = gameServices.map((service, i) => ({
   basePriceUsd: service.startingPrice,
   basePriceEur: Math.round(service.startingPrice * 0.92),
   isHotOffer: service.isHotOffer,
-  regions: ["USA", "EUROPE"],
   badges: service.isHotOffer ? ["Starts in < 15 mins", "100% Completion"] : ["Safe & Secure"],
 }));
 
@@ -200,7 +197,6 @@ export const adminOrders: AdminOrder[] = [
     amount: "$69.00",
     status: "in_progress",
     paymentProvider: "stripe",
-    region: "USA",
     selectedOptions: [
       { group: "Key Level", value: "+15", priceModifier: 21 },
       { group: "Runs", value: "1", priceModifier: 0 },
@@ -222,7 +218,6 @@ export const adminOrders: AdminOrder[] = [
     amount: "$107.00",
     status: "pending",
     paymentProvider: "stripe",
-    region: "Europe",
     selectedOptions: [],
     timeline: [{ status: "pending", at: "May 20, 14:22" }],
   },
@@ -237,7 +232,6 @@ export const adminOrders: AdminOrder[] = [
     amount: "$39.00",
     status: "delivered",
     paymentProvider: "nowpayments",
-    region: "USA",
     selectedOptions: [],
     timeline: [
       { status: "pending", at: "May 22, 09:00" },
@@ -258,7 +252,6 @@ export const adminOrders: AdminOrder[] = [
     status: "refund_requested",
     paymentProvider: "nowpayments",
     cryptoRefundAddress: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-    region: "USA",
     selectedOptions: [],
     timeline: [
       { status: "pending", at: "May 21, 08:00" },
@@ -279,7 +272,6 @@ export const adminOrders: AdminOrder[] = [
     amount: "$70.00",
     status: "completed",
     paymentProvider: "stripe",
-    region: "USA",
     selectedOptions: [],
     timeline: [
       { status: "pending", at: "May 10, 12:00" },
@@ -300,7 +292,6 @@ export const adminOrders: AdminOrder[] = [
     amount: "$45.00",
     status: "refunded",
     paymentProvider: "stripe",
-    region: "Europe",
     selectedOptions: [],
     timeline: [
       { status: "pending", at: "May 8, 11:00" },

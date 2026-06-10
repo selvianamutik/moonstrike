@@ -4,6 +4,7 @@ type AdminCustomer = { email?: string; user_metadata?: Record<string, unknown> }
 
 type TransactionRow = {
   id: string;
+  transaction_ref: string;
   checkout_session_id: string;
   user_id: string;
   provider: "stripe" | "nowpayments";
@@ -11,23 +12,24 @@ type TransactionRow = {
   provider_session_id: string | null;
   amount: number | string;
   currency: "USD" | "EUR";
-  method: string;
   status: "success" | "pending" | "disputed" | "refunded" | "failed";
   refund_status: string;
   created_at: string;
 };
 
-type OrderForTransactionRow = {
-  checkout_session_id: string;
-  order_items:
-    | {
-        services: { title: string } | { title: string }[] | null;
-      }[]
-    | null;
-  services:
-    | { title: string }
-    | { title: string }[]
-    | null;
+type TransactionDetailRow = TransactionRow & {
+  refunded_at: string | null;
+  provider_refund_id: string | null;
+  refund_amount: number | string | null;
+  refund_currency: "USD" | "EUR" | null;
+  raw_provider_payload: Record<string, unknown>;
+  updated_at: string;
+};
+
+type TransactionOrderRow = {
+  id: string;
+  order_ref: string;
+  status: string;
 };
 
 export type AdminTransactionRecord = {
@@ -35,10 +37,11 @@ export type AdminTransactionRecord = {
   checkoutSessionId: string;
   customerName: string;
   customerEmail: string;
-  customerInitials: string;
-  services: string[];
   date: string;
+  dateIso: string;
   amount: string;
+  amountValue: number;
+  currency: "USD" | "EUR";
   method: string;
   paymentProvider: "stripe" | "nowpayments";
   status: TransactionRow["status"];
@@ -46,31 +49,32 @@ export type AdminTransactionRecord = {
   refundBlockedReason?: string;
 };
 
-export type AdminTransactionStats = {
-  totalRevenue: string;
-  pendingPayouts: string;
-  successRate: string;
-  newDisputes: number;
+export type AdminTransactionDetail = AdminTransactionRecord & {
+  databaseId: string;
+  providerPaymentId: string;
+  providerSessionId: string | null;
+  orderId: string | null;
+  orderReference: string | null;
+  orderStatus: string | null;
+  refundStatus: string;
+  refundedAt: string | null;
+  providerRefundId: string | null;
+  refundAmount: string | null;
+  rawProviderPayload: Record<string, unknown>;
+  updatedAt: string;
 };
 
-function relationOne<T>(value: T | T[] | null | undefined) {
-  return Array.isArray(value) ? value[0] : value;
-}
+export type AdminTransactionStats = {
+  totalCollected: string;
+  successfulCount: number;
+  refundedCount: number;
+  totalRefunded: string;
+};
 
 function customerName(user: AdminCustomer | undefined) {
   const metadata = user?.user_metadata ?? {};
   const displayName = metadata.username ?? metadata.full_name ?? metadata.name;
   return typeof displayName === "string" && displayName.trim() ? displayName.trim() : user?.email ?? "Customer";
-}
-
-function initials(name: string, email: string) {
-  const source = name !== "Customer" ? name : email;
-  return source
-    .split(/[\s@._-]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("") || "CU";
 }
 
 function formatMoney(value: number | string, currency: "USD" | "EUR") {
@@ -91,6 +95,12 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function mapProviderName(provider: string) {
+  if (provider === "stripe") return "stripe";
+  if (provider === "nowpayments") return "nowpayments";
+  return provider;
+}
+
 async function getCustomersById(userIds: string[]) {
   const supabase = createAdminClient();
   const uniqueIds = Array.from(new Set(userIds));
@@ -108,7 +118,7 @@ export async function listAdminTransactions() {
   const supabase = createAdminClient();
   const { data: transactions, error } = await supabase
     .from("transactions")
-    .select("id, checkout_session_id, user_id, provider, provider_payment_id, provider_session_id, amount, currency, method, status, refund_status, created_at")
+    .select("id, transaction_ref, checkout_session_id, user_id, provider, provider_payment_id, provider_session_id, amount, currency, status, refund_status, created_at")
     .order("created_at", { ascending: false })
     .returns<TransactionRow[]>();
 
@@ -116,29 +126,6 @@ export async function listAdminTransactions() {
 
   const rows = transactions ?? [];
   const customers = await getCustomersById(rows.map((transaction) => transaction.user_id));
-  const checkoutIds = rows.map((transaction) => transaction.checkout_session_id);
-  const serviceNamesByCheckout = new Map<string, string[]>();
-
-  if (checkoutIds.length > 0) {
-    const { data: orders, error: ordersError } = await supabase
-      .from("orders")
-      .select("checkout_session_id, services(title), order_items(services(title))")
-      .in("checkout_session_id", checkoutIds)
-      .returns<OrderForTransactionRow[]>();
-
-    if (ordersError) throw ordersError;
-
-    for (const order of orders ?? []) {
-      const itemNames =
-        order.order_items
-          ?.map((item) => relationOne(item.services)?.title)
-          .filter((name): name is string => Boolean(name)) ?? [];
-      const legacyService = relationOne(order.services);
-      const names = itemNames.length > 0 ? itemNames : [legacyService?.title ?? "Service"];
-      const current = serviceNamesByCheckout.get(order.checkout_session_id) ?? [];
-      serviceNamesByCheckout.set(order.checkout_session_id, [...current, ...names]);
-    }
-  }
 
   const records = rows.map((transaction) => {
     const customer = customers.get(transaction.user_id);
@@ -147,42 +134,115 @@ export async function listAdminTransactions() {
     const canRefund = transaction.status === "success" && transaction.refund_status === "none";
 
     return {
-      id: transaction.provider_payment_id,
+      id: transaction.transaction_ref,
       checkoutSessionId: transaction.checkout_session_id,
       customerName: name,
       customerEmail: email,
-      customerInitials: initials(name, email),
-      services: serviceNamesByCheckout.get(transaction.checkout_session_id) ?? ["Checkout"],
       date: formatDate(transaction.created_at),
+      dateIso: transaction.created_at,
       amount: formatMoney(transaction.amount, transaction.currency),
-      method: transaction.method,
+      amountValue: Number(transaction.amount),
+      currency: transaction.currency,
+      method: transaction.provider,
       paymentProvider: transaction.provider,
       status: transaction.status,
       canRefund,
       refundBlockedReason: canRefund ? undefined : "Refund flow is not wired yet or transaction is not successful.",
     } satisfies AdminTransactionRecord;
   });
-
-  const successCount = rows.filter((transaction) => transaction.status === "success").length;
-  const totalCount = rows.length || 1;
-  const totals = rows.reduce(
+  const collectedTotals = rows.reduce(
     (sum, transaction) => {
       if (transaction.status === "success") sum[transaction.currency] += Number(transaction.amount);
       return sum;
     },
-    { USD: 0, EUR: 0 },
+    { EUR: 0, USD: 0 },
   );
-  const revenueParts = [];
-  if (totals.USD > 0) revenueParts.push(formatMoney(totals.USD, "USD"));
-  if (totals.EUR > 0) revenueParts.push(formatMoney(totals.EUR, "EUR"));
+  const refundedTotals = rows.reduce(
+    (sum, transaction) => {
+      if (transaction.status === "refunded") sum[transaction.currency] += Number(transaction.amount);
+      return sum;
+    },
+    { EUR: 0, USD: 0 },
+  );
+  const collectedParts = [];
+  const refundedParts = [];
+
+  if (collectedTotals.USD > 0) collectedParts.push(formatMoney(collectedTotals.USD, "USD"));
+  if (collectedTotals.EUR > 0) collectedParts.push(formatMoney(collectedTotals.EUR, "EUR"));
+  if (refundedTotals.USD > 0) refundedParts.push(formatMoney(refundedTotals.USD, "USD"));
+  if (refundedTotals.EUR > 0) refundedParts.push(formatMoney(refundedTotals.EUR, "EUR"));
 
   return {
     records,
     stats: {
-      totalRevenue: revenueParts.join(" / ") || "$0.00",
-      pendingPayouts: "$0.00",
-      successRate: `${((successCount / totalCount) * 100).toFixed(1)}%`,
-      newDisputes: rows.filter((transaction) => transaction.status === "disputed").length,
+      totalCollected: collectedParts.join(" / ") || "$0.00",
+      successfulCount: rows.filter((transaction) => transaction.status === "success").length,
+      refundedCount: rows.filter((transaction) => transaction.status === "refunded").length,
+      totalRefunded: refundedParts.join(" / ") || "$0.00",
     } satisfies AdminTransactionStats,
   };
+}
+
+export async function getAdminTransaction(transactionId: string) {
+  const supabase = createAdminClient();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(transactionId);
+  const query = supabase
+    .from("transactions")
+    .select(
+      "id, transaction_ref, checkout_session_id, user_id, provider, provider_payment_id, provider_session_id, amount, currency, status, refund_status, refunded_at, provider_refund_id, refund_amount, refund_currency, raw_provider_payload, created_at, updated_at",
+    );
+
+  const { data, error } = await (isUuid ? query.eq("id", transactionId) : query.eq("transaction_ref", transactionId)).maybeSingle<TransactionDetailRow>();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const [customers, orderResult] = await Promise.all([
+    getCustomersById([data.user_id]),
+    supabase
+      .from("orders")
+      .select("id, order_ref, status")
+      .eq("checkout_session_id", data.checkout_session_id)
+      .maybeSingle<TransactionOrderRow>(),
+  ]);
+
+  if (orderResult.error) throw orderResult.error;
+
+  const customer = customers.get(data.user_id);
+  const name = customerName(customer);
+  const email = customer?.email ?? data.user_id;
+  const canRefund = data.status === "success" && data.refund_status === "none";
+  const refundAmount =
+    data.refund_amount === null || data.refund_currency === null
+      ? null
+      : formatMoney(data.refund_amount, data.refund_currency);
+
+  return {
+    id: data.transaction_ref,
+    databaseId: data.id,
+    checkoutSessionId: data.checkout_session_id,
+    customerName: name,
+    customerEmail: email,
+    date: formatDate(data.created_at),
+    dateIso: data.created_at,
+    amount: formatMoney(data.amount, data.currency),
+    amountValue: Number(data.amount),
+    currency: data.currency,
+    method: mapProviderName(data.provider),
+    paymentProvider: data.provider,
+    status: data.status,
+    canRefund,
+    refundBlockedReason: canRefund ? undefined : "Refund flow is not wired yet or transaction is not successful.",
+    providerPaymentId: data.provider_payment_id,
+    providerSessionId: data.provider_session_id,
+    orderId: orderResult.data?.id ?? null,
+    orderReference: orderResult.data?.order_ref ?? null,
+    orderStatus: orderResult.data?.status ?? null,
+    refundStatus: data.refund_status,
+    refundedAt: data.refunded_at ? formatDate(data.refunded_at) : null,
+    providerRefundId: data.provider_refund_id,
+    refundAmount,
+    rawProviderPayload: data.raw_provider_payload ?? {},
+    updatedAt: formatDate(data.updated_at),
+  } satisfies AdminTransactionDetail;
 }

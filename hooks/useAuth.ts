@@ -10,18 +10,51 @@ export function useAuth() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let isMounted = true
+
+    async function checkSessionStatus() {
+      const response = await fetch('/api/auth/session-status', {
+        cache: 'no-store',
+      }).catch(() => null)
+      const payload = (await response?.json().catch(() => null)) as {
+        banned?: boolean
+      } | null
+
+      if (!isMounted || !payload?.banned) return
+
+      await supabase.auth.signOut()
+      setUser(null)
+      setLoading(false)
+      window.location.replace('/login?banned=1')
+    }
+
     supabase.auth.getUser().then(({ data }) => {
+      if (!isMounted) return
       setUser(data.user)
       setLoading(false)
+      if (data.user) void checkSessionStatus()
     })
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
+      if (session?.user) void checkSessionStatus()
     })
 
-    return () => subscription.unsubscribe()
+    function handleSessionRefresh() {
+      void checkSessionStatus()
+    }
+
+    window.addEventListener('focus', handleSessionRefresh)
+    document.addEventListener('visibilitychange', handleSessionRefresh)
+
+    return () => {
+      isMounted = false
+      window.removeEventListener('focus', handleSessionRefresh)
+      document.removeEventListener('visibilitychange', handleSessionRefresh)
+      subscription.unsubscribe()
+    }
   }, [supabase])
 
   const signIn = useCallback(
@@ -77,9 +110,10 @@ export function useAuth() {
   )
 
   const signInWithGoogle = useCallback(
-    async (next?: string) => {
+    async (next?: string, intent: 'login' | 'register' = 'login') => {
       const redirectTo = new URL('/auth/callback', window.location.origin)
       if (next) redirectTo.searchParams.set('next', next)
+      if (intent === 'register') redirectTo.searchParams.set('intent', 'register')
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { EmailOtpType } from '@supabase/supabase-js'
+import { authProviders, hasEmailPassword } from '@/lib/auth/providers'
 
 function getSafeNext(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/profile'
@@ -14,6 +15,7 @@ export async function GET(request: NextRequest) {
   const tokenHash = searchParams.get('token_hash')
   const type = searchParams.get('type') as EmailOtpType | null
   const next = getSafeNext(searchParams.get('next'))
+  const intent = searchParams.get('intent')
   const error = searchParams.get('error')
   const errorCode = searchParams.get('error_code')
   const errorDescription = searchParams.get('error_description')
@@ -33,6 +35,18 @@ export async function GET(request: NextRequest) {
     const { error: sessionError } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!sessionError) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      const providers = user ? authProviders(user) : []
+
+      if (user && providers.includes('google') && !hasEmailPassword(user)) {
+        const completeUrl = new URL('/register/complete', origin)
+        completeUrl.searchParams.set('next', next)
+        if (intent === 'login') completeUrl.searchParams.set('from', 'login')
+        return NextResponse.redirect(completeUrl)
+      }
+
       const redirectUrl = new URL(next, origin)
       return NextResponse.redirect(redirectUrl)
     }

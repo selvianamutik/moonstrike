@@ -4,7 +4,7 @@ const path = require('path');
 const pages = [
   'app/admin/users/page.tsx',
   'app/admin/users/new/page.tsx',
-  'app/admin/users/[id]/page.tsx',
+  'app/admin/users/[userName]/page.tsx',
   'app/admin/games/page.tsx',
   'app/admin/games/new/page.tsx',
   'app/admin/games/[id]/edit/page.tsx',
@@ -25,7 +25,7 @@ const pages = [
 ];
 
 function getTemplate(pagePath) {
-  const isDynamic = pagePath.includes('[id]') || pagePath.includes('[ticketId]');
+  const isDynamic = pagePath.includes('[id]') || pagePath.includes('[ticketId]') || pagePath.includes('[userName]');
   const isLogin = pagePath.includes('login');
   
   const componentName = pagePath
@@ -61,7 +61,7 @@ export default function AdminLogin() {
   if (isDynamic) {
     return `import React from "react";
 
-export default async function ${componentName}Page({ params }: { params: Promise<{ id?: string, ticketId?: string }> }) {
+export default async function ${componentName}Page({ params }: { params: Promise<{ id?: string, ticketId?: string, userName?: string }> }) {
   const resolvedParams = await params;
   return (
     <div className="max-w-7xl mx-auto">
@@ -69,7 +69,7 @@ export default async function ${componentName}Page({ params }: { params: Promise
       <h1 className="text-3xl font-bold text-white mb-6 font-display">${componentName} Page</h1>
       <div className="bg-[#0F172A] border border-[#172554] rounded-xl p-6 text-[#94A3B8]">
         <p>This is a placeholder for the ${componentName} page.</p>
-        <p>Dynamic Param ID: {resolvedParams.id || resolvedParams.ticketId}</p>
+        <p>Dynamic Param ID: {resolvedParams.id || resolvedParams.ticketId || resolvedParams.userName}</p>
       </div>
     </div>
   );

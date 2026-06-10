@@ -1,4 +1,5 @@
 import { isCheckoutSnapshotItems, type CheckoutSnapshotItem } from "@/lib/checkout/snapshot";
+import { createOrderReference, createTransactionReference } from "@/lib/order-ref";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type NowPaymentsIpnPayload = {
@@ -61,7 +62,7 @@ export async function fulfillNowPaymentsCheckout(payload: NowPaymentsIpnPayload)
 
   const { data: checkoutSession, error: checkoutError } = await supabase
     .from("checkout_sessions")
-    .select("id, cart_id, user_id, currency, items")
+    .select("id, cart_id, user_id, currency, items, created_at")
     .eq("id", checkoutSessionId)
     .eq("provider", "nowpayments")
     .maybeSingle<{
@@ -70,6 +71,7 @@ export async function fulfillNowPaymentsCheckout(payload: NowPaymentsIpnPayload)
       user_id: string;
       currency: "USD" | "EUR";
       items: unknown;
+      created_at: string;
     }>();
 
   if (checkoutError) throw checkoutError;
@@ -85,13 +87,14 @@ export async function fulfillNowPaymentsCheckout(payload: NowPaymentsIpnPayload)
   }
 
   const currency = checkoutSession.currency;
+  const referenceDate = new Date(checkoutSession.created_at);
   const orderTotal = checkoutSession.items.reduce((total, item) => total + (currency === "EUR" ? item.priceEUR : item.priceUSD), 0);
-  const firstItem = checkoutSession.items[0];
   const completedAt = new Date().toISOString();
 
   const { error: transactionError } = await supabase.from("transactions").upsert(
     {
       checkout_session_id: checkoutSession.id,
+      transaction_ref: createTransactionReference(referenceDate, checkoutSession.id),
       user_id: checkoutSession.user_id,
       provider: "nowpayments",
       provider_payment_id: providerPaymentId,
@@ -112,16 +115,9 @@ export async function fulfillNowPaymentsCheckout(payload: NowPaymentsIpnPayload)
     .from("orders")
     .upsert(
       {
-        cart_item_id: firstItem.cartItemId,
-        service_id: firstItem.serviceId,
+        order_ref: createOrderReference(referenceDate, checkoutSession.id),
         user_id: checkoutSession.user_id,
         checkout_session_id: checkoutSession.id,
-        selected_options_snapshot: {},
-        total: orderTotal,
-        currency,
-        region: "USA",
-        payment_provider: "nowpayments",
-        nowpayments_payment_id: providerPaymentId,
         status: "pending",
       },
       {
@@ -140,7 +136,6 @@ export async function fulfillNowPaymentsCheckout(payload: NowPaymentsIpnPayload)
     selected_options_snapshot: item.selectedOptionsSnapshot,
     total: currency === "EUR" ? item.priceEUR : item.priceUSD,
     currency,
-    region: "USA",
   }));
 
   const { error: insertError } = await supabase

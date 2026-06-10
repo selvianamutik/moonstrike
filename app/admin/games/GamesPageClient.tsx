@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { Plus, Gamepad2, Trash2 } from "lucide-react";
+import { Archive, CheckCircle2, FileText, Gamepad2, Plus, Tags, Trash2 } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { AdminFilterBar } from "@/components/admin/AdminFilterBar";
@@ -10,6 +10,7 @@ import { AdminPagination } from "@/components/admin/AdminPagination";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { ActionIcons } from "@/components/admin/ActionIcons";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import type { GenreRow } from "@/lib/cms/genres";
 import type { GameRow } from "@/lib/cms/games";
 
@@ -32,9 +33,11 @@ function slugifyGenre(value: string) {
 export function GamesPageClient({ games, genres }: { games: GameRow[]; genres: GenreRow[] }) {
   const [gameRows, setGameRows] = useState(games);
   const [genreRows, setGenreRows] = useState(genres);
-  const [activeTab, setActiveTab] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [genreFilter, setGenreFilter] = useState("All Genres");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [deleteError, setDeleteError] = useState("");
   const [deletingId, setDeletingId] = useState("");
   const [isGenreModalOpen, setIsGenreModalOpen] = useState(false);
@@ -44,14 +47,16 @@ export function GamesPageClient({ games, genres }: { games: GameRow[]; genres: G
   const [genreError, setGenreError] = useState("");
   const [isCreatingGenre, setIsCreatingGenre] = useState(false);
   const [deletingGenreId, setDeletingGenreId] = useState("");
+  const [pendingDeleteGenre, setPendingDeleteGenre] = useState<GenreRow | null>(null);
+  const [pendingDeleteGame, setPendingDeleteGame] = useState<GameRow | null>(null);
 
   const filtered = useMemo(() => {
     return gameRows.filter((game) => {
       const matchTab =
-        activeTab === "all" ||
-        (activeTab === "active" && game.status === "active") ||
-        (activeTab === "draft" && game.status === "draft") ||
-        (activeTab === "archived" && game.status === "archived");
+        statusFilter === "all" ||
+        (statusFilter === "active" && game.status === "active") ||
+        (statusFilter === "draft" && game.status === "draft") ||
+        (statusFilter === "archived" && game.status === "archived");
       const matchSearch =
         !search ||
         game.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -59,9 +64,16 @@ export function GamesPageClient({ games, genres }: { games: GameRow[]; genres: G
       const matchGenre = genreFilter === "All Genres" || game.genre === genreFilter;
       return matchTab && matchSearch && matchGenre;
     });
-  }, [activeTab, gameRows, search, genreFilter]);
+  }, [gameRows, genreFilter, search, statusFilter]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedGames = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const showingFrom = filtered.length > 0 ? (currentPage - 1) * pageSize + 1 : 0;
+  const showingTo = filtered.length > 0 ? showingFrom + pagedGames.length - 1 : 0;
 
   const activeCount = gameRows.filter((game) => game.status === "active").length;
+  const draftCount = gameRows.filter((game) => game.status === "draft").length;
+  const archivedCount = gameRows.filter((game) => game.status === "archived").length;
   const totalGenres = new Set(gameRows.map((game) => game.genre)).size;
   const activeProgress = gameRows.length > 0 ? Math.round((activeCount / gameRows.length) * 100) : 0;
   const genreOptions = useMemo(
@@ -147,10 +159,6 @@ export function GamesPageClient({ games, genres }: { games: GameRow[]; genres: G
       return;
     }
 
-    const confirmed = window.confirm(`Delete ${genre.name}?`);
-
-    if (!confirmed) return;
-
     setGenreError("");
     setDeletingGenreId(genre.id);
 
@@ -172,15 +180,12 @@ export function GamesPageClient({ games, genres }: { games: GameRow[]; genres: G
       setGenreError("Unable to reach the genre CMS endpoint.");
     } finally {
       setDeletingGenreId("");
+      setPendingDeleteGenre(null);
     }
   }
 
   async function deleteGame(game: GameRow) {
     if (deletingId) return;
-
-    const confirmed = window.confirm(`Delete ${game.name}? This removes it from the CMS game list.`);
-
-    if (!confirmed) return;
 
     setDeleteError("");
     setDeletingId(game.id);
@@ -199,6 +204,7 @@ export function GamesPageClient({ games, genres }: { games: GameRow[]; genres: G
       setDeleteError("Unable to reach the games CMS endpoint.");
     } finally {
       setDeletingId("");
+      setPendingDeleteGame(null);
     }
   }
 
@@ -222,27 +228,54 @@ export function GamesPageClient({ games, genres }: { games: GameRow[]; genres: G
         }
       />
 
-      <div className="grid grid-cols-2 gap-6 max-w-xl">
-        <AdminStatCard title="ACTIVE GAMES" value={String(activeCount)} icon={<Gamepad2 size={18} className="text-[#22D3EE]" />} progressColor="bg-[#22D3EE]" progressPercent={activeProgress} />
-        <AdminStatCard title="TOTAL GENRES" value={String(totalGenres)} subtitle="Used by listed games" icon={<Gamepad2 size={18} className="text-[#8B5CF6]" />} progressColor="bg-[#8B5CF6]" progressWidth="w-[50%]" />
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
+        <AdminStatCard title="TOTAL GAMES" value={String(gameRows.length)} icon={<Gamepad2 size={18} className="text-[#8B5CF6]" />} progressColor="bg-[#8B5CF6]" progressWidth="w-[65%]" />
+        <AdminStatCard title="ACTIVE GAMES" value={String(activeCount)} icon={<CheckCircle2 size={18} className="text-[#22D3EE]" />} progressColor="bg-[#22D3EE]" progressPercent={activeProgress} />
+        <AdminStatCard title="DRAFT GAMES" value={String(draftCount)} subtitle="Not visible yet" icon={<FileText size={18} className="text-amber-500" />} progressColor="bg-amber-500" progressWidth="w-[35%]" />
+        <AdminStatCard title="ARCHIVED" value={String(archivedCount)} subtitle="Hidden titles" icon={<Archive size={18} className="text-[#94A3B8]" />} progressColor="bg-[#94A3B8]" progressWidth="w-[25%]" />
+        <AdminStatCard title="TOTAL GENRES" value={String(totalGenres)} subtitle="Used by listed games" icon={<Tags size={18} className="text-green-500" />} progressColor="bg-green-500" progressWidth="w-[50%]" />
       </div>
 
       <AdminFilterBar
-        tabs={[
-          { id: "all", label: "All Games" },
-          { id: "active", label: "Active" },
-          { id: "draft", label: "Draft" },
-          { id: "archived", label: "Archived" },
-        ]}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
         searchPlaceholder="Search games..."
         searchValue={search}
-        onSearchChange={setSearch}
-        statusOptions={["All Genres", ...genreOptions]}
-        statusValue={genreFilter}
-        onStatusChange={setGenreFilter}
-        counter={`Showing ${filtered.length > 0 ? 1 : 0}-${filtered.length} of ${gameRows.length}`}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
+        extra={
+          <>
+            <select
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                setPage(1);
+              }}
+              className="rounded-lg border border-[#172554] bg-[#0F172A] px-4 py-2.5 text-sm text-white outline-none focus:border-[#8B5CF6] focus:ring-1 focus:ring-[#8B5CF6]"
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="draft">Draft</option>
+              <option value="archived">Archived</option>
+            </select>
+            <select
+              value={genreFilter}
+              onChange={(event) => {
+                setGenreFilter(event.target.value);
+                setPage(1);
+              }}
+              className="rounded-lg border border-[#172554] bg-[#0F172A] px-4 py-2.5 text-sm text-white outline-none focus:border-[#8B5CF6] focus:ring-1 focus:ring-[#8B5CF6]"
+            >
+              <option>All Genres</option>
+              {genreOptions.map((genre) => (
+                <option key={genre} value={genre}>
+                  {genre}
+                </option>
+              ))}
+            </select>
+          </>
+        }
+        counter={`Showing ${showingFrom}-${showingTo} of ${filtered.length}`}
       />
 
       {deleteError && (
@@ -253,9 +286,23 @@ export function GamesPageClient({ games, genres }: { games: GameRow[]; genres: G
 
       <AdminDataTable
         columns={["GAME NAME", "GENRE/TYPE", "PLATFORM", "STATUS", "ACTIONS"]}
-        footer={<AdminPagination showingFrom={filtered.length > 0 ? 1 : 0} showingTo={filtered.length} total={gameRows.length} totalPages={1} />}
+        footer={
+          <AdminPagination
+            showingFrom={showingFrom}
+            showingTo={showingTo}
+            total={filtered.length}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(nextSize) => {
+              setPageSize(nextSize);
+              setPage(1);
+            }}
+          />
+        }
       >
-        {filtered.map((game) => (
+        {pagedGames.map((game) => (
           <tr key={game.id} className="hover:bg-[#111827] transition-colors">
             <td className="px-6 py-4">
               <div className="flex items-center gap-3">
@@ -278,7 +325,7 @@ export function GamesPageClient({ games, genres }: { games: GameRow[]; genres: G
               <StatusBadge status={game.status} />
             </td>
             <td className="px-6 py-4">
-              <ActionIcons editHref={`/admin/games/${game.slug}/edit`} onDelete={() => deleteGame(game)} />
+              <ActionIcons editHref={`/admin/games/${game.slug}/edit`} onDelete={() => setPendingDeleteGame(game)} />
               {deletingId === game.id && <span className="ml-2 text-xs text-[#94A3B8]">Deleting...</span>}
             </td>
           </tr>
@@ -399,7 +446,7 @@ export function GamesPageClient({ games, genres }: { games: GameRow[]; genres: G
                         type="button"
                         disabled={isDeleteDisabled}
                         title={usedByGames > 0 ? `Cannot delete - ${usedByGames} games use this genre.` : "Delete genre"}
-                        onClick={() => deleteGenre(genre)}
+                        onClick={() => setPendingDeleteGenre(genre)}
                         className="rounded-lg p-2 text-[#94A3B8] transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#94A3B8]"
                         aria-label={`Delete ${genre.name}`}
                       >
@@ -413,6 +460,40 @@ export function GamesPageClient({ games, genres }: { games: GameRow[]; genres: G
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteGame)}
+        title="Delete game?"
+        description={
+          pendingDeleteGame
+            ? `This removes ${pendingDeleteGame.name} from the CMS game list. Related storefront links may stop resolving.`
+            : ""
+        }
+        confirmLabel="Delete Game"
+        variant="danger"
+        isLoading={Boolean(pendingDeleteGame && deletingId === pendingDeleteGame.id)}
+        onClose={() => {
+          if (!deletingId) setPendingDeleteGame(null);
+        }}
+        onConfirm={() => {
+          if (pendingDeleteGame) deleteGame(pendingDeleteGame);
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteGenre)}
+        title="Delete genre?"
+        description={pendingDeleteGenre ? `This permanently removes ${pendingDeleteGenre.name} from the genre list.` : ""}
+        confirmLabel="Delete Genre"
+        variant="danger"
+        isLoading={Boolean(pendingDeleteGenre && deletingGenreId === pendingDeleteGenre.id)}
+        onClose={() => {
+          if (!deletingGenreId) setPendingDeleteGenre(null);
+        }}
+        onConfirm={() => {
+          if (pendingDeleteGenre) deleteGenre(pendingDeleteGenre);
+        }}
+      />
     </div>
   );
 }
