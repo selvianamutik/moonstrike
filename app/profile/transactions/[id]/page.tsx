@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft, Eye } from "lucide-react";
 import { ProfileSidebar } from "@/components/profile/ProfileSidebar";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -28,6 +29,7 @@ export default async function ProfileTransactionDetailPage({ params }: ProfileTr
     transaction.refundAmount !== null && transaction.refundCurrency
       ? formatTransactionMoney(transaction.refundAmount, transaction.refundCurrency)
       : null;
+  const hasRefund = transaction.refundStatus !== "none" || Boolean(transaction.providerRefundId || refundAmount || transaction.refundedAt);
 
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
@@ -55,32 +57,34 @@ export default async function ProfileTransactionDetailPage({ params }: ProfileTr
               <InfoRow label="Transaction ID" value={transaction.id} />
               <InfoRow label="Order ID" value={transaction.orderReference ?? "Not created yet"} href={transaction.orderReference ? `/profile/orders/${transaction.orderReference}` : undefined} />
               <InfoRow label="Provider" value={formatPaymentProvider(transaction.provider)} />
+              <InfoRow label="Amount" value={formatTransactionMoney(transaction.amount, transaction.currency)} />
               <InfoRow label="Payment Status" value={transaction.status.replace("_", " ")} />
               <InfoRow label="Refund Status" value={transaction.refundStatus.replace("_", " ")} />
-              <InfoRow label="Amount" value={formatTransactionMoney(transaction.amount, transaction.currency)} />
               <InfoRow label="Created" value={formatOrderDateTime(transaction.createdAt)} />
-              <InfoRow label="Updated" value={formatOrderDateTime(transaction.updatedAt)} />
+              <InfoRow label="Payment Reference" value={transaction.providerPaymentId} />
             </div>
           </section>
 
-          <section className="mt-8 rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-6">
-            <h2 className="text-xl font-black">Provider References</h2>
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <InfoRow label="Provider Payment ID" value={transaction.providerPaymentId} />
-              <InfoRow label="Provider Session ID" value={transaction.providerSessionId ?? "Not provided"} />
-              <InfoRow label="Checkout Session" value={transaction.checkoutSessionId} />
-              <InfoRow label="Provider Refund ID" value={transaction.providerRefundId ?? "No refund recorded"} />
-              <InfoRow label="Refund Amount" value={refundAmount ?? "No refund recorded"} />
-              <InfoRow label="Refunded At" value={transaction.refundedAt ? formatOrderDateTime(transaction.refundedAt) : "No refund recorded"} />
-            </div>
-          </section>
+          {hasRefund ? (
+            <section className="mt-8 rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-6">
+              <h2 className="text-xl font-black">Refund Information</h2>
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <InfoRow label="Refund Status" value={transaction.refundStatus.replace("_", " ")} />
+                <InfoRow label="Refund Amount" value={refundAmount ?? "Pending"} />
+                <InfoRow label="Refunded At" value={transaction.refundedAt ? formatOrderDateTime(transaction.refundedAt) : "Pending"} />
+                <InfoRow label="Refund Reference" value={transaction.providerRefundId ?? "Pending"} />
+              </div>
+            </section>
+          ) : null}
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/profile/transactions" className="inline-flex h-11 items-center rounded-md border border-[var(--ms-border)] px-5 text-sm text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
+            <Link href="/profile/transactions" className="ms-action-button inline-flex h-11 items-center rounded-md border border-[var(--ms-border)] px-5 text-sm text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
+              <ArrowLeft size={16} />
               Back to Transactions
             </Link>
             {transaction.orderReference ? (
               <Link href={`/profile/orders/${transaction.orderReference}`} className="ms-button inline-flex h-11 items-center px-5 mono text-xs uppercase tracking-[0.14em]">
+                <Eye size={16} />
                 View Order
               </Link>
             ) : null}

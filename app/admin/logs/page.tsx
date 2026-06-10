@@ -13,9 +13,12 @@ export default async function LogsPage() {
 
   const logs = await listAuditLogs();
   const stats = {
-    uptime: "99.998%",
-    blockedThreats: String(logs.filter((log) => log.status === "blocked").length),
-    activeAnomalies: String(logs.filter((log) => log.status === "critical").length),
+    totalEvents: logs.length,
+    successfulActions: logs.filter((log) => log.status === "success").length,
+    blockedOrRateLimited: logs.filter(
+      (log) => log.status === "blocked" || log.action.toLowerCase().includes("rate limit"),
+    ).length,
+    criticalEvents: logs.filter((log) => log.status === "critical").length,
   };
 
   return <LogsPageClient logs={logs} stats={stats} />;

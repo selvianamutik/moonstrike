@@ -38,7 +38,10 @@ export type AdminTransactionRecord = {
   customerName: string;
   customerEmail: string;
   date: string;
+  dateIso: string;
   amount: string;
+  amountValue: number;
+  currency: "USD" | "EUR";
   method: string;
   paymentProvider: "stripe" | "nowpayments";
   status: TransactionRow["status"];
@@ -62,10 +65,10 @@ export type AdminTransactionDetail = AdminTransactionRecord & {
 };
 
 export type AdminTransactionStats = {
-  totalRevenue: string;
-  pendingPayouts: string;
-  successRate: string;
-  newDisputes: number;
+  totalCollected: string;
+  successfulCount: number;
+  refundedCount: number;
+  totalRefunded: string;
 };
 
 function customerName(user: AdminCustomer | undefined) {
@@ -136,7 +139,10 @@ export async function listAdminTransactions() {
       customerName: name,
       customerEmail: email,
       date: formatDate(transaction.created_at),
+      dateIso: transaction.created_at,
       amount: formatMoney(transaction.amount, transaction.currency),
+      amountValue: Number(transaction.amount),
+      currency: transaction.currency,
       method: transaction.provider,
       paymentProvider: transaction.provider,
       status: transaction.status,
@@ -144,27 +150,35 @@ export async function listAdminTransactions() {
       refundBlockedReason: canRefund ? undefined : "Refund flow is not wired yet or transaction is not successful.",
     } satisfies AdminTransactionRecord;
   });
-
-  const successCount = rows.filter((transaction) => transaction.status === "success").length;
-  const totalCount = rows.length || 1;
-  const totals = rows.reduce(
+  const collectedTotals = rows.reduce(
     (sum, transaction) => {
       if (transaction.status === "success") sum[transaction.currency] += Number(transaction.amount);
       return sum;
     },
-    { USD: 0, EUR: 0 },
+    { EUR: 0, USD: 0 },
   );
-  const revenueParts = [];
-  if (totals.USD > 0) revenueParts.push(formatMoney(totals.USD, "USD"));
-  if (totals.EUR > 0) revenueParts.push(formatMoney(totals.EUR, "EUR"));
+  const refundedTotals = rows.reduce(
+    (sum, transaction) => {
+      if (transaction.status === "refunded") sum[transaction.currency] += Number(transaction.amount);
+      return sum;
+    },
+    { EUR: 0, USD: 0 },
+  );
+  const collectedParts = [];
+  const refundedParts = [];
+
+  if (collectedTotals.USD > 0) collectedParts.push(formatMoney(collectedTotals.USD, "USD"));
+  if (collectedTotals.EUR > 0) collectedParts.push(formatMoney(collectedTotals.EUR, "EUR"));
+  if (refundedTotals.USD > 0) refundedParts.push(formatMoney(refundedTotals.USD, "USD"));
+  if (refundedTotals.EUR > 0) refundedParts.push(formatMoney(refundedTotals.EUR, "EUR"));
 
   return {
     records,
     stats: {
-      totalRevenue: revenueParts.join(" / ") || "$0.00",
-      pendingPayouts: "$0.00",
-      successRate: `${((successCount / totalCount) * 100).toFixed(1)}%`,
-      newDisputes: rows.filter((transaction) => transaction.status === "disputed").length,
+      totalCollected: collectedParts.join(" / ") || "$0.00",
+      successfulCount: rows.filter((transaction) => transaction.status === "success").length,
+      refundedCount: rows.filter((transaction) => transaction.status === "refunded").length,
+      totalRefunded: refundedParts.join(" / ") || "$0.00",
     } satisfies AdminTransactionStats,
   };
 }
@@ -210,7 +224,10 @@ export async function getAdminTransaction(transactionId: string) {
     customerName: name,
     customerEmail: email,
     date: formatDate(data.created_at),
+    dateIso: data.created_at,
     amount: formatMoney(data.amount, data.currency),
+    amountValue: Number(data.amount),
+    currency: data.currency,
     method: mapProviderName(data.provider),
     paymentProvider: data.provider,
     status: data.status,

@@ -1,7 +1,10 @@
-import Link from "next/link";
+"use client";
+
+import { useState } from "react";
 import { PlaceholderAsset } from "@/components/asset-image";
 import { ScrollingTabList, type ScrollingTabItem } from "@/components/scrolling-tab-list";
 import { ServiceCard } from "@/components/service-card";
+import { useCurrency } from "@/hooks/useCurrency";
 import type { GameService } from "@/lib/catalog";
 
 type ServiceTab = {
@@ -9,6 +12,9 @@ type ServiceTab = {
   value: string;
   sortOrder: number;
 };
+
+const initialVisibleCount = 12;
+const visibleIncrement = 12;
 
 function matchesCategory(service: GameService, category: string) {
   if (category === "all") return true;
@@ -75,18 +81,24 @@ export function ServicesCatalog({
   query: string;
   services: GameService[];
 }) {
+  const [search, setSearch] = useState(query);
+  const [visible, setVisible] = useState(initialVisibleCount);
+  const { currency, setCurrency } = useCurrency();
   const serviceTabs = getServiceTabs(services);
   const filteredServices = services.filter(
-    (service) => matchesCategory(service, activeCategory) && matchesQuery(service, query),
+    (service) => matchesCategory(service, activeCategory) && matchesQuery(service, search),
   );
+  const visibleServices = filteredServices.slice(0, visible);
+  const showingFrom = filteredServices.length > 0 ? 1 : 0;
+  const showingTo = visibleServices.length;
   const activeLabel = serviceTabs.find((tab) => tab.value === activeCategory)?.label ?? "Services";
   const fixedTabs: ScrollingTabItem[] = serviceTabs.slice(0, 2).map((tab) => ({
-    href: servicesHref(tab.value, query),
+    href: servicesHref(tab.value, search),
     key: tab.value,
     label: tab.label,
   }));
   const scrollingTabs: ScrollingTabItem[] = serviceTabs.slice(2).map((tab) => ({
-    href: servicesHref(tab.value, query),
+    href: servicesHref(tab.value, search),
     key: tab.value,
     label: tab.label,
   }));
@@ -98,23 +110,6 @@ export function ServicesCatalog({
           <p className="mono text-xs uppercase tracking-[0.24em] text-[var(--ms-gradient-end)]">Service catalog</p>
           <h1 className="font-display mt-3 text-3xl font-black tracking-[-0.04em]">All Services</h1>
         </div>
-        <form
-          action="/services"
-          className="flex h-12 w-full items-center rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-card)] px-4 text-[var(--ms-body)] md:w-96"
-        >
-          <input type="hidden" name="category" value={activeCategory} />
-          <label htmlFor="services-search" className="sr-only">
-            Search services
-          </label>
-          <input
-            id="services-search"
-            name="q"
-            type="search"
-            defaultValue={query}
-            placeholder="Search games, services..."
-            className="w-full bg-transparent mono text-sm outline-none"
-          />
-        </form>
       </div>
 
       <PlaceholderAsset
@@ -134,14 +129,30 @@ export function ServicesCatalog({
         </div>
         <div className="relative z-10 text-left md:text-center">
           <div className="inline-flex rounded-full border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-1">
-            <span className="h-9 rounded-full bg-[var(--primary)] px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]">
+            <button
+              type="button"
+              onClick={() => setCurrency("USD")}
+              className={`h-9 rounded-full px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] transition ${
+                currency === "USD"
+                  ? "bg-[var(--primary)] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]"
+                  : "text-[var(--ms-body)] hover:text-[var(--ms-heading)]"
+              }`}
+            >
               USD
-            </span>
-            <span className="h-9 rounded-full px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] text-[var(--ms-body)]">
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrency("EUR")}
+              className={`h-9 rounded-full px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] transition ${
+                currency === "EUR"
+                  ? "bg-[var(--primary)] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]"
+                  : "text-[var(--ms-body)] hover:text-[var(--ms-heading)]"
+              }`}
+            >
               EUR
-            </span>
+            </button>
           </div>
-          <p className="mt-3 text-sm text-[var(--ms-gradient-end)]">USD / EUR pricing view</p>
+          <p className="mt-3 text-sm text-[var(--ms-gradient-end)]">{currency} pricing view</p>
         </div>
       </PlaceholderAsset>
 
@@ -154,21 +165,52 @@ export function ServicesCatalog({
         />
       </div>
 
-      <div className="mt-6 flex flex-col justify-between gap-3 text-sm text-[var(--ms-body)] md:flex-row md:items-center">
-        <p>
-          Showing <span className="mono text-[var(--ms-heading)]">{filteredServices.length}</span> services in{" "}
-          <span className="text-[var(--ms-gradient-end)]">{activeLabel}</span>
-        </p>
-        {query ? (
-          <Link href={`/services?category=${activeCategory}`} className="w-fit text-[var(--ms-gradient-end)] hover:underline">
-            Clear search
-          </Link>
-        ) : null}
+      <div className="mt-6 flex flex-col gap-3 text-sm text-[var(--ms-body)] md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <p className="whitespace-nowrap">
+            Showing{" "}
+            <span className="mono text-[var(--ms-heading)]">
+              {showingFrom}-{showingTo}
+            </span>{" "}
+            services in{" "}
+            <span className="text-[var(--ms-gradient-end)]">{activeLabel}</span>
+          </p>
+          {search ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                setVisible(initialVisibleCount);
+              }}
+              className="w-fit text-[var(--ms-gradient-end)] hover:underline"
+            >
+              Clear search
+            </button>
+          ) : null}
+        </div>
+        <div
+          className="flex h-12 w-full shrink-0 items-center rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-card)] px-4 text-[var(--ms-body)] md:w-96"
+        >
+          <label htmlFor="services-search" className="sr-only">
+            Search services
+          </label>
+          <input
+            id="services-search"
+            type="search"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setVisible(initialVisibleCount);
+            }}
+            placeholder="Search games, services..."
+            className="w-full bg-transparent mono text-sm outline-none"
+          />
+        </div>
       </div>
 
       {filteredServices.length > 0 ? (
         <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-          {filteredServices.map((service) => (
+          {visibleServices.map((service) => (
             <ServiceCard key={`${service.gameSlug}-${service.slug}`} service={service} />
           ))}
         </div>
@@ -180,6 +222,17 @@ export function ServicesCatalog({
           </p>
         </div>
       )}
+      {visible < filteredServices.length ? (
+        <div className="mt-10 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setVisible((current) => current + visibleIncrement)}
+            className="ms-button h-12 px-8 mono text-sm uppercase tracking-[0.18em]"
+          >
+            Load More
+          </button>
+        </div>
+      ) : null}
     </>
   );
 }

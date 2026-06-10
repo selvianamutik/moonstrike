@@ -5,6 +5,10 @@ import { getSupabasePublishableKey, getSupabaseUrl } from './lib/supabase/env'
 const PROTECTED_ROUTES = ['/profile', '/checkout']
 const ADMIN_SESSION_COOKIE = 'ms_admin_session'
 
+function isBanActive(bannedUntil: string | null | undefined) {
+  return Boolean(bannedUntil && new Date(bannedUntil).getTime() > Date.now())
+}
+
 function base64UrlToBytes(value: string) {
   const base64 = value.replaceAll('-', '+').replaceAll('_', '/')
   const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=')
@@ -140,6 +144,15 @@ export async function proxy(request: NextRequest) {
   if (isProtected && !user) {
     const loginUrl = request.nextUrl.clone()
     loginUrl.pathname = '/login'
+    loginUrl.searchParams.set('next', returnTo)
+    return NextResponse.redirect(loginUrl)
+  }
+
+  if (isProtected && user && isBanActive(user.banned_until)) {
+    await supabase.auth.signOut()
+    const loginUrl = request.nextUrl.clone()
+    loginUrl.pathname = '/login'
+    loginUrl.searchParams.set('banned', '1')
     loginUrl.searchParams.set('next', returnTo)
     return NextResponse.redirect(loginUrl)
   }

@@ -3,11 +3,11 @@ import { NextResponse, type NextRequest } from 'next/server'
 import {
   ADMIN_REMEMBER_SECONDS,
   ADMIN_SESSION_COOKIE,
-  ADMIN_SESSION_SECONDS,
   signAdminToken,
   verifyAdminPassword,
 } from '@/lib/admin/auth'
 import { writeAuditLog } from '@/lib/admin/audit'
+import { getAdminSessionTimeoutSeconds } from '@/lib/admin/settings'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const WINDOW_MS = 15 * 60 * 1000
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const maxAge = remember ? ADMIN_REMEMBER_SECONDS : ADMIN_SESSION_SECONDS
+  const maxAge = remember ? ADMIN_REMEMBER_SECONDS : await getAdminSessionTimeoutSeconds()
   let token: string
 
   try {

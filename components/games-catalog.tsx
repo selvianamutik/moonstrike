@@ -96,7 +96,21 @@ export function GamesCatalog({
             <p className="mono text-xs uppercase tracking-[0.24em] text-[var(--ms-gradient-end)]">Games Library</p>
             <h1 className="font-display mt-3 text-3xl font-black tracking-[-0.04em]">All games</h1>
           </div>
-          <div className="flex h-12 w-full items-center rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-card)] px-4 text-[var(--ms-body)] md:w-96">
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3 text-sm text-[var(--ms-body)] md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <p className="whitespace-nowrap">
+              Showing <span className="mono text-[var(--ms-heading)]">{visibleGames.length}</span> of{" "}
+              <span className="mono text-[var(--ms-heading)]">{filteredGames.length}</span> games
+            </p>
+            {search || selectedGenres.length > 0 ? (
+              <button type="button" onClick={clearFilters} className="w-fit text-[var(--ms-gradient-end)] hover:underline">
+                Clear filters
+              </button>
+            ) : null}
+          </div>
+          <div className="flex h-12 w-full shrink-0 items-center rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-card)] px-4 text-[var(--ms-body)] md:w-96">
             <label htmlFor="games-search" className="sr-only">
               Search games
             </label>
@@ -112,18 +126,6 @@ export function GamesCatalog({
               className="w-full bg-transparent mono text-sm outline-none"
             />
           </div>
-        </div>
-
-        <div className="mt-6 flex flex-col justify-between gap-3 text-sm text-[var(--ms-body)] md:flex-row md:items-center">
-          <p>
-            Showing <span className="mono text-[var(--ms-heading)]">{visibleGames.length}</span> of{" "}
-            <span className="mono text-[var(--ms-heading)]">{filteredGames.length}</span> games
-          </p>
-          {search || selectedGenres.length > 0 ? (
-            <button type="button" onClick={clearFilters} className="w-fit text-[var(--ms-gradient-end)] hover:underline">
-              Clear filters
-            </button>
-          ) : null}
         </div>
 
         {visibleGames.length > 0 ? (

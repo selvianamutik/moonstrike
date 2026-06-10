@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Eye } from "lucide-react";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { StatusBadge, type StatusType } from "@/components/admin/StatusBadge";
@@ -17,6 +17,10 @@ export default async function AdminTransactionDetailPage({ params }: AdminTransa
   const transaction = await getAdminTransaction(id);
 
   if (!transaction) notFound();
+
+  const hasRefund =
+    transaction.refundStatus !== "none" ||
+    Boolean(transaction.providerRefundId || transaction.refundAmount || transaction.refundedAt);
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -49,28 +53,20 @@ export default async function AdminTransactionDetailPage({ params }: AdminTransa
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <InfoCell label="Provider" value={transaction.method} />
               <InfoCell label="Amount" value={transaction.amount} highlight />
+              <InfoCell label="Payment Status" value={transaction.status.replace("_", " ")} />
               <InfoCell label="Refund Status" value={transaction.refundStatus.replace("_", " ")} />
               <InfoCell label="Created" value={transaction.date} />
               <InfoCell label="Updated" value={transaction.updatedAt} />
-              <InfoCell label="Database UUID" value={transaction.databaseId} muted />
             </div>
           </section>
 
           <section className="rounded-xl border border-[var(--ms-accent)] bg-[var(--ms-secondary)] p-6">
-            <h2 className="text-lg font-bold text-white">Order References</h2>
+            <h2 className="text-lg font-bold text-white">Order & Customer</h2>
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <InfoCell label="Order ID" value={transaction.orderReference ?? "Not created yet"} />
               <InfoCell label="Order Status" value={transaction.orderStatus?.replace("_", " ") ?? "Not created yet"} />
-              <InfoCell label="Checkout Session" value={transaction.checkoutSessionId} />
-              <InfoCell label="Customer" value={transaction.customerName} />
               <InfoCell label="Customer Email" value={transaction.customerEmail} />
-            </div>
-            <div className="mt-5 flex flex-wrap gap-3">
-              {transaction.orderReference ? (
-                <AdminButton href={`/admin/orders/${transaction.orderReference}`} variant="secondary">
-                  View Order
-                </AdminButton>
-              ) : null}
+              <InfoCell label="Customer Name" value={transaction.customerName} />
             </div>
           </section>
 
@@ -79,17 +75,30 @@ export default async function AdminTransactionDetailPage({ params }: AdminTransa
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <InfoCell label="Provider Payment ID" value={transaction.providerPaymentId} />
               <InfoCell label="Provider Session ID" value={transaction.providerSessionId ?? "Not provided"} />
-              <InfoCell label="Provider Refund ID" value={transaction.providerRefundId ?? "No refund recorded"} />
-              <InfoCell label="Refund Amount" value={transaction.refundAmount ?? "No refund recorded"} />
-              <InfoCell label="Refunded At" value={transaction.refundedAt ?? "No refund recorded"} />
+              <InfoCell label="Checkout Session" value={transaction.checkoutSessionId} />
             </div>
           </section>
 
+          {hasRefund ? (
+            <section className="rounded-xl border border-[var(--ms-accent)] bg-[var(--ms-secondary)] p-6">
+              <h2 className="text-lg font-bold text-white">Refund Information</h2>
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <InfoCell label="Refund Status" value={transaction.refundStatus.replace("_", " ")} />
+                <InfoCell label="Refund Amount" value={transaction.refundAmount ?? "Pending"} />
+                <InfoCell label="Provider Refund ID" value={transaction.providerRefundId ?? "Pending"} />
+                <InfoCell label="Refunded At" value={transaction.refundedAt ?? "Pending"} />
+              </div>
+            </section>
+          ) : null}
+
           <details className="rounded-xl border border-[var(--ms-accent)] bg-[var(--ms-secondary)] p-6">
-            <summary className="cursor-pointer list-none text-lg font-bold text-white">Raw Provider Payload</summary>
-            <pre className="mt-5 max-h-[420px] overflow-auto rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] p-4 text-xs leading-5 text-[var(--ms-text-secondary)]">
-              {JSON.stringify(transaction.rawProviderPayload, null, 2)}
-            </pre>
+            <summary className="cursor-pointer list-none text-lg font-bold text-white">Debug Information</summary>
+            <div className="mt-5 grid gap-4">
+              <InfoCell label="Database UUID" value={transaction.databaseId} muted />
+              <pre className="max-h-[420px] overflow-auto rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] p-4 text-xs leading-5 text-[var(--ms-text-secondary)]">
+                {JSON.stringify(transaction.rawProviderPayload, null, 2)}
+              </pre>
+            </div>
           </details>
         </div>
 
@@ -102,7 +111,6 @@ export default async function AdminTransactionDetailPage({ params }: AdminTransa
             <div className="mt-6 space-y-3 text-sm">
               <SideRow label="Provider" value={transaction.method} />
               <SideRow label="Amount" value={transaction.amount} />
-              <SideRow label="Refund" value={transaction.refundStatus.replace("_", " ")} />
               <SideRow label="Order" value={transaction.orderReference ?? "Not created"} />
             </div>
           </section>
@@ -111,16 +119,13 @@ export default async function AdminTransactionDetailPage({ params }: AdminTransa
             <p className="text-xs uppercase tracking-[0.16em] text-[var(--ms-text-secondary)]">Actions</p>
             <div className="mt-4 flex flex-col gap-3">
               <AdminButton href="/admin/transactions" variant="secondary" className="w-full">
+                <ArrowLeft size={16} />
                 Back to Transactions
               </AdminButton>
               {transaction.orderReference ? (
                 <AdminButton href={`/admin/orders/${transaction.orderReference}`} className="w-full">
+                  <Eye size={16} />
                   View Related Order
-                </AdminButton>
-              ) : null}
-              {transaction.canRefund && transaction.orderReference ? (
-                <AdminButton href={`/admin/orders/${transaction.orderReference}`} variant="danger" className="w-full">
-                  Issue Refund
                 </AdminButton>
               ) : null}
             </div>

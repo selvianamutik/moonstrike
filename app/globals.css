@@ -202,6 +202,8 @@ html[data-theme="light"] select:autofill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 7px;
   background: var(--ms-cta-bg);
   box-shadow: 0 0 22px rgba(136, 82, 255, 0.45);
@@ -217,6 +219,37 @@ html[data-theme="light"] select:autofill {
 html[data-theme="light"] .ms-button {
   color: var(--ms-lm-navy-dark);
   box-shadow: 0 12px 28px rgba(243, 198, 35, 0.34);
+}
+
+.ms-button > svg,
+.admin-action-button > svg,
+.ms-action-button > svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.ms-action-icon,
+.admin-action-icon {
+  position: relative;
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ms-border);
+  border-radius: 8px;
+  color: var(--ms-body);
+  background: var(--ms-bg-card);
+}
+
+.ms-action-button,
+.admin-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border-radius: 8px;
 }
 
 .mono {

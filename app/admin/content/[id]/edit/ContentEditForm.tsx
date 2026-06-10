@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { AdminFormField, adminInputClass, adminSelectClass, adminTextareaClass } from "@/components/admin/AdminFormField";
+import { cleanupUploadedMedia } from "@/lib/cms/client-media-cleanup";
 import {
   normalizeLandingBenefitsData,
   normalizeLandingHeroData,
@@ -93,6 +94,8 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [pendingHeroPaths, setPendingHeroPaths] = useState<string[]>([]);
+  const [pendingBenefitsPaths, setPendingBenefitsPaths] = useState<string[]>([]);
 
   function updateBenefit(index: number, field: keyof LandingBenefitItem, value: string) {
     setBenefitItems((current) =>
@@ -129,16 +132,22 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
         return;
       }
 
+      const nextPaths = [result.storagePath, result.thumbnailPath].filter(Boolean);
+
       if (usage === "hero") {
+        if (pendingHeroPaths.length > 0) void cleanupUploadedMedia(pendingHeroPaths);
         setHeroImageUrl(result.imageUrl);
         setHeroThumbnailUrl(result.thumbnailUrl);
         setHeroStoragePath(result.storagePath);
         setHeroThumbnailPath(result.thumbnailPath);
+        setPendingHeroPaths(nextPaths);
       } else {
+        if (pendingBenefitsPaths.length > 0) void cleanupUploadedMedia(pendingBenefitsPaths);
         setImageUrl(result.imageUrl);
         setThumbnailUrl(result.thumbnailUrl);
         setStoragePath(result.storagePath);
         setThumbnailPath(result.thumbnailPath);
+        setPendingBenefitsPaths(nextPaths);
       }
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Unable to upload image.");
@@ -191,6 +200,8 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
         return;
       }
 
+      setPendingHeroPaths([]);
+      setPendingBenefitsPaths([]);
       router.push("/admin/content");
       router.refresh();
     } catch {
@@ -330,7 +341,14 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
           <AdminButton type="submit" disabled={isSaving || isUploading}>
             {isUploading ? "Uploading..." : isSaving ? "Saving..." : "Save Content"}
           </AdminButton>
-          <AdminButton href="/admin/content" variant="secondary">
+          <AdminButton
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              void cleanupUploadedMedia([...pendingHeroPaths, ...pendingBenefitsPaths]);
+              router.push("/admin/content");
+            }}
+          >
             Cancel
           </AdminButton>
         </div>
