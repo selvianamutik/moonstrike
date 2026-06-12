@@ -8,6 +8,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui";
 import { useCurrency, type Currency } from "@/hooks/useCurrency";
+import { notifyCartUpdated } from "@/lib/cart-events";
 import type { ServiceOption, ServiceRow } from "@/lib/cms/services";
 
 function optionLabel(option: ServiceOption) {
@@ -385,7 +386,7 @@ export function ServiceDetail({
         return;
       }
 
-      window.dispatchEvent(new Event("moonstrike:cart-updated"));
+      notifyCartUpdated();
 
       if (nextAction === "cart") {
         router.push("/cart");

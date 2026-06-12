@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { subscribeToCartUpdates } from "@/lib/cart-events";
 
 type CartPayload = {
   items?: unknown[];
@@ -24,12 +25,14 @@ export function CartCountBadge() {
   useEffect(() => {
     loadCount();
 
+    const unsubscribeCartUpdates = subscribeToCartUpdates(loadCount);
+    const intervalId = window.setInterval(loadCount, 15_000);
     window.addEventListener("focus", loadCount);
-    window.addEventListener("moonstrike:cart-updated", loadCount);
 
     return () => {
+      unsubscribeCartUpdates();
+      window.clearInterval(intervalId);
       window.removeEventListener("focus", loadCount);
-      window.removeEventListener("moonstrike:cart-updated", loadCount);
     };
   }, []);
 

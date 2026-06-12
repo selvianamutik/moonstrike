@@ -8,6 +8,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { CartListSkeleton } from "@/components/storefront-skeletons";
 import { useCurrency } from "@/hooks/useCurrency";
+import { notifyCartUpdated, subscribeToCartUpdates } from "@/lib/cart-events";
 
 type CartApiItem = {
   id: string;
@@ -47,8 +48,8 @@ export function CartPageClient() {
   const [error, setError] = useState("");
   const [removingId, setRemovingId] = useState("");
 
-  async function loadCart() {
-    setIsLoading(true);
+  async function loadCart({ showLoading = true }: { showLoading?: boolean } = {}) {
+    if (showLoading) setIsLoading(true);
     setError("");
 
     try {
@@ -64,12 +65,26 @@ export function CartPageClient() {
     } catch {
       setError("Unable to reach the cart service.");
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
     }
   }
 
   useEffect(() => {
     loadCart();
+
+    const refreshCart = () => {
+      loadCart({ showLoading: false });
+    };
+    const unsubscribeCartUpdates = subscribeToCartUpdates(refreshCart);
+    const intervalId = window.setInterval(refreshCart, 15_000);
+
+    window.addEventListener("focus", refreshCart);
+
+    return () => {
+      unsubscribeCartUpdates();
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshCart);
+    };
   }, []);
 
   async function removeItem(id: string) {
@@ -86,7 +101,7 @@ export function CartPageClient() {
       }
 
       setItems((current) => current.filter((item) => item.id !== id));
-      window.dispatchEvent(new Event("moonstrike:cart-updated"));
+      notifyCartUpdated();
     } catch {
       setError("Unable to reach the cart service.");
     } finally {

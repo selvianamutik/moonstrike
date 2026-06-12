@@ -393,10 +393,10 @@ If `orderId` doesn't belong to the logged-in user - call `notFound()` to render 
 6. Empty state: "Your cart is empty." + `Browse Services` link (- `/games`)
 
 **Rules:**
-- Anonymous users can add to cart - items stored against a `session_id` in a cookie (`ms_cart_session`, 30-day HttpOnly cookie)
+- Anonymous users can add to cart - items stored against a `session_id` in a cookie (`ms_cart_session`, 6-hour HttpOnly cookie)
 - All anonymous cart operations go through server-side API routes using the service role key - the Supabase client is never used directly for anonymous cart writes
 - Cart is browser-session based: anonymous, logged-in, and logged-out states in the same browser all use the same `ms_cart_session` cart
-- Anonymous cart cookie (`ms_cart_session`) has a **30-day expiry** - independent of the support chat session (1-hour TTL). These are two separate cookies with separate lifetimes
+- Anonymous cart cookie (`ms_cart_session`) has a **6-hour expiry** - independent of the support chat session (1-hour TTL). These are two separate cookies with separate lifetimes
 - Same service can appear multiple times as separate rows (each is a distinct CartItem)
 - Prices are locked at add-to-cart time - no live recalculation from service changes
 - Cart is emptied automatically after successful payment - all CartItems removed
@@ -753,7 +753,7 @@ Each CartItem becomes exactly one Order on checkout. Adding the same service twi
 |---|---|---|
 | id | string | |
 | userId | string \| null | `null` for anonymous carts |
-| sessionId | string \| null | Browser-session cart key (`ms_cart_session` cookie, 30-day TTL). Stays consistent across anonymous/login/logout in the same browser. |
+| sessionId | string \| null | Browser-session cart key (`ms_cart_session` cookie, 6-hour TTL). Stays consistent across anonymous/login/logout in the same browser. |
 | createdAt | Date | |
 | updatedAt | Date | |
 
@@ -1140,7 +1140,7 @@ const {data: settings} = await supabase.from('system_settings').select('*').eq('
 | Booster role | No separate booster role - Admin = booster. One role only. |
 | Order state machine | No escrow - refunds go directly to the payment gateway. See Section 11. |
 | Search | Real-time overlay, debounced 300ms. Service titles only - image + name, max 6 results. Closes on click outside or Escape. |
-| Cart | Same service can be added multiple times as separate CartItems. Cart uses the browser `ms_cart_session` cookie (30-day TTL) consistently across anonymous/login/logout states. All cart operations go server-side via service role key. |
+| Cart | Same service can be added multiple times as separate CartItems. Cart uses the browser `ms_cart_session` cookie (6-hour TTL) consistently across anonymous/login/logout states. All cart operations go server-side via service role key. |
 | Reviews | TrustPilot TrustBox Carousel embed - client-side, no DB storage, no server API calls. |
 | Crypto refund | Wallet address collected at refund request time (required by NowPayments). |
 | Service fees | Taxes and fees included in base price. No extra fee at checkout. |
@@ -1479,7 +1479,7 @@ Full-page storefront render using draft data. Read-only - no checkout.
 
 **User profile sidebar:** Avatar - username - location - orders + spend stats - recent activity - management actions (Update Ticket - Ban User).
 
-**Anonymous session merge:** Anonymous users get a temporary `session_id` (stored in `SupportTicket.sessionId`). On login, `userId` and `username` are attached to existing ticket records - chat history preserved, and the customer's display name updates to their actual username going forward. Pre-login messages retain the anonymous label. Chat session TTL: anonymous = 1 hour. Expired chat session records deleted. (Cart data is on a separate 30-day cookie - independent of this expiry.)
+**Anonymous session merge:** Anonymous users get a temporary `session_id` (stored in `SupportTicket.sessionId`). On login, `userId` and `username` are attached to existing ticket records - chat history preserved, and the customer's display name updates to their actual username going forward. Pre-login messages retain the anonymous label. Chat session TTL: anonymous = 1 hour. Expired chat session records deleted. (Cart data is on a separate 6-hour cookie - independent of this expiry.)
 
 ---
 
