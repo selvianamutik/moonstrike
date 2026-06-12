@@ -7,8 +7,7 @@ export type Currency = 'USD' | 'EUR'
 export type SelectionValue = string | string[] | number | boolean
 
 export const CART_COOKIE = 'ms_cart_session'
-// Testing: 60 seconds. Production target: 60 * 60 * 6.
-const CART_COOKIE_MAX_AGE = 60
+const CART_COOKIE_MAX_AGE = 60 * 60 * 1
 
 export type CartServiceRow = {
   id: string
