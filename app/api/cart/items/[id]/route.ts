@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { assertCartItemOwnership } from '@/lib/cart'
+import { assertCartItemOwnership, touchCart } from '@/lib/cart'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -17,7 +17,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  await supabase.from('carts').update({ updated_at: new Date().toISOString() }).eq('id', owned.cart_id)
+  await touchCart(owned.cart_id)
 
   return NextResponse.json({ ok: true })
 }

@@ -73,10 +73,11 @@ export function CartPageClient() {
     loadCart();
 
     const refreshCart = () => {
+      if (document.visibilityState !== "visible") return;
       loadCart({ showLoading: false });
     };
     const unsubscribeCartUpdates = subscribeToCartUpdates(refreshCart);
-    const intervalId = window.setInterval(refreshCart, 15_000);
+    const intervalId = window.setInterval(refreshCart, 60_000);
 
     window.addEventListener("focus", refreshCart);
 

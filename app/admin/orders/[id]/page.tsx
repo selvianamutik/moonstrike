@@ -1,5 +1,6 @@
 import React from "react";
 import { notFound } from "next/navigation";
+import { LivePageRefresh } from "@/components/live-page-refresh";
 import { getAdminOrder } from "@/lib/admin/orders";
 import { OrderDetailView } from "./OrderDetailView";
 
@@ -7,5 +8,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const order = await getAdminOrder(id);
   if (!order) notFound();
-  return <OrderDetailView order={order} />;
+  return (
+    <>
+      <LivePageRefresh intervalMs={10_000} />
+      <OrderDetailView order={order} />
+    </>
+  );
 }

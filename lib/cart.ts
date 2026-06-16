@@ -101,6 +101,26 @@ export async function getCurrentCartId() {
   return (data?.id as string | undefined) ?? null
 }
 
+export async function refreshCurrentCartSession() {
+  const cookieStore = await cookies()
+  const sessionId = cookieStore.get(CART_COOKIE)?.value
+  if (!sessionId) return null
+
+  setCartSessionCookie(cookieStore, sessionId)
+  return sessionId
+}
+
+export async function touchCart(cartId: string) {
+  const supabase = createAdminClient()
+  const touchedAt = new Date().toISOString()
+  const { error } = await supabase.from('carts').update({ updated_at: touchedAt }).eq('id', cartId)
+
+  if (error) throw error
+
+  await refreshCurrentCartSession()
+  return touchedAt
+}
+
 export async function assertCartItemOwnership(itemId: string) {
   const cartId = await getCurrentCartId()
   if (!cartId) return null

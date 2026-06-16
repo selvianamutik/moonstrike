@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PlaceholderAsset } from "@/components/asset-image";
+import { LivePageRefresh } from "@/components/live-page-refresh";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { requireVerifiedUser } from "@/lib/auth/session";
@@ -96,6 +97,7 @@ export default async function OrderConfirmedPage({ searchParams }: OrderConfirme
     if (result.pendingProvider === "nowpayments") {
       return (
         <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
+          <LivePageRefresh intervalMs={3_000} />
           <SiteHeader />
           <section className="ms-shell py-16">
             <div className="mx-auto max-w-3xl rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-8 text-center">

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { CreditCard, MessageSquare, Pencil, ReceiptText, ShoppingBag } from "lucide-react";
 import { LogoutButton } from "@/components/common/LogoutButton";
 
@@ -29,6 +30,32 @@ function isActive(pathname: string, href: string) {
 
 export function ProfileSidebar({ displayName, email, initials, memberSince, totalOrders, totalSpent }: ProfileSidebarProps) {
   const pathname = usePathname();
+  const [unreadChatTickets, setUnreadChatTickets] = useState(0);
+
+  async function loadUnreadChatTickets() {
+    if (document.visibilityState !== "visible") return;
+
+    const response = await fetch("/api/chat/unread", { cache: "no-store" }).catch(() => null);
+    const payload = (await response?.json().catch(() => null)) as { unreadTicketCount?: number } | null;
+
+    if (response?.ok && typeof payload?.unreadTicketCount === "number") {
+      setUnreadChatTickets(payload.unreadTicketCount);
+    }
+  }
+
+  useEffect(() => {
+    void loadUnreadChatTickets();
+
+    const intervalId = window.setInterval(loadUnreadChatTickets, 30_000);
+    window.addEventListener("focus", loadUnreadChatTickets);
+    window.addEventListener("moonstrike:customer-messages-read", loadUnreadChatTickets);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", loadUnreadChatTickets);
+      window.removeEventListener("moonstrike:customer-messages-read", loadUnreadChatTickets);
+    };
+  }, []);
 
   return (
     <aside className="ms-card h-fit max-w-full rounded-xl p-5 lg:sticky lg:top-28">
@@ -82,7 +109,12 @@ export function ProfileSidebar({ displayName, email, initials, memberSince, tota
                 }`}
               >
                 <Icon size={18} />
-                {item.name}
+                <span className="flex-1">{item.name}</span>
+                {item.href === "/profile/chat" && unreadChatTickets > 0 ? (
+                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--ms-danger)] px-1.5 text-[10px] font-black leading-none text-white">
+                    {unreadChatTickets > 9 ? "9+" : unreadChatTickets}
+                  </span>
+                ) : null}
               </Link>
             );
           })}

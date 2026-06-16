@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { AdminButton } from "@/components/admin/AdminButton";
@@ -183,7 +183,14 @@ export function ServiceForm({
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [pendingImagePath, setPendingImagePath] = useState("");
+  const [draftImageFile, setDraftImageFile] = useState<File | null>(null);
+  const [draftImagePreview, setDraftImagePreview] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (draftImagePreview) URL.revokeObjectURL(draftImagePreview);
+    };
+  }, [draftImagePreview]);
 
   const availableCategories = useMemo(
     () =>
@@ -338,8 +345,14 @@ export function ServiceForm({
     return "";
   }
 
-  async function uploadImage(file: File) {
+  function selectImage(file: File) {
     setError("");
+    if (draftImagePreview) URL.revokeObjectURL(draftImagePreview);
+    setDraftImageFile(file);
+    setDraftImagePreview(URL.createObjectURL(file));
+  }
+
+  async function uploadImage(file: File) {
     setIsUploading(true);
 
     try {
@@ -352,18 +365,15 @@ export function ServiceForm({
       const result = (await response.json().catch(() => null)) as { imageUrl?: string; storagePath?: string; error?: string } | null;
 
       if (!response.ok || !result?.imageUrl) {
-        setError(result?.error ?? "Unable to upload service image.");
-        return;
+        throw new Error(result?.error ?? "Unable to upload service image.");
       }
 
-      if (pendingImagePath) {
-        void cleanupUploadedMedia([pendingImagePath]);
-      }
-
-      setImage(result.imageUrl);
-      setPendingImagePath(result.storagePath ?? "");
+      return {
+        imageUrl: result.imageUrl,
+        storagePath: result.storagePath ?? "",
+      };
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "Unable to upload service image.");
+      throw new Error(uploadError instanceof Error ? uploadError.message : "Unable to upload service image.");
     } finally {
       setIsUploading(false);
     }
@@ -382,6 +392,20 @@ export function ServiceForm({
     }
 
     setIsSaving(true);
+    let uploadedImagePath = "";
+
+    let nextImage = image;
+    if (draftImageFile) {
+      try {
+        const uploadedImage = await uploadImage(draftImageFile);
+        nextImage = uploadedImage.imageUrl;
+        uploadedImagePath = uploadedImage.storagePath;
+      } catch (uploadError) {
+        setError(uploadError instanceof Error ? uploadError.message : "Unable to upload service image.");
+        setIsSaving(false);
+        return;
+      }
+    }
 
     const payload = {
       title,
@@ -392,7 +416,7 @@ export function ServiceForm({
       isHotOffer,
       badges,
       description,
-      image,
+      image: nextImage,
       requirements,
       whatYouGet: benefits.filter((benefit) => benefit.title.trim()),
       basePriceUSD: Number(basePriceUSD),
@@ -409,14 +433,19 @@ export function ServiceForm({
       const result = (await response.json().catch(() => null)) as { error?: string } | null;
 
       if (!response.ok) {
+        if (uploadedImagePath) void cleanupUploadedMedia([uploadedImagePath]);
         setError(result?.error ?? "Unable to save service.");
         return;
       }
 
-      setPendingImagePath("");
+      setImage(nextImage);
+      if (draftImagePreview) URL.revokeObjectURL(draftImagePreview);
+      setDraftImageFile(null);
+      setDraftImagePreview("");
       router.push("/admin/services");
       router.refresh();
     } catch {
+      if (uploadedImagePath) void cleanupUploadedMedia([uploadedImagePath]);
       setError("Unable to reach the services endpoint.");
     } finally {
       setIsSaving(false);
@@ -456,7 +485,7 @@ export function ServiceForm({
               type="button"
               variant="secondary"
               onClick={() => {
-                if (pendingImagePath) void cleanupUploadedMedia([pendingImagePath]);
+                if (draftImagePreview) URL.revokeObjectURL(draftImagePreview);
                 router.push("/admin/services");
               }}
             >
@@ -552,14 +581,15 @@ export function ServiceForm({
             <h2 className="mb-4 text-lg font-bold text-white">Image</h2>
             <AdminFormField label="Service image">
               <div className="space-y-3">
-                {image && <img src={image} alt="" className="h-40 w-full rounded-lg object-cover" />}
+                {(draftImagePreview || image) && <img src={draftImagePreview || image} alt="" className="h-40 w-full rounded-lg object-cover" />}
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
                   className={adminInputClass}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) uploadImage(file);
+                    if (file) selectImage(file);
+                    e.target.value = "";
                   }}
                 />
               </div>

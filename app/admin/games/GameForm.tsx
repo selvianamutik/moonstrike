@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminButton } from "@/components/admin/AdminButton";
@@ -78,10 +78,23 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [pendingImagePath, setPendingImagePath] = useState("");
+  const [draftImageFile, setDraftImageFile] = useState<File | null>(null);
+  const [draftImagePreview, setDraftImagePreview] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (draftImagePreview) URL.revokeObjectURL(draftImagePreview);
+    };
+  }, [draftImagePreview]);
+
+  function selectImage(file: File) {
+    setError("");
+    if (draftImagePreview) URL.revokeObjectURL(draftImagePreview);
+    setDraftImageFile(file);
+    setDraftImagePreview(URL.createObjectURL(file));
+  }
 
   async function uploadImage(file: File) {
-    setError("");
     setIsUploading(true);
 
     try {
@@ -101,18 +114,15 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
       } | null;
 
       if (!response.ok || !result?.imageUrl) {
-        setError(result?.error ?? "Unable to upload game image.");
-        return;
+        throw new Error(result?.error ?? "Unable to upload game image.");
       }
 
-      if (pendingImagePath) {
-        void cleanupUploadedMedia([pendingImagePath]);
-      }
-
-      setImage(result.imageUrl);
-      setPendingImagePath(result.storagePath ?? "");
+      return {
+        imageUrl: result.imageUrl,
+        storagePath: result.storagePath ?? "",
+      };
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "Unable to upload game image.");
+      throw new Error(uploadError instanceof Error ? uploadError.message : "Unable to upload game image.");
     } finally {
       setIsUploading(false);
     }
@@ -122,8 +132,17 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
     e.preventDefault();
     setError("");
     setIsSaving(true);
+    let uploadedImagePath = "";
 
     try {
+      let nextImage = image;
+
+      if (draftImageFile) {
+        const uploadedImage = await uploadImage(draftImageFile);
+        nextImage = uploadedImage.imageUrl;
+        uploadedImagePath = uploadedImage.storagePath;
+      }
+
       const response = await fetch(isEditing ? `/api/admin/games/${game?.id}` : "/api/admin/games", {
         method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
@@ -133,7 +152,7 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
           genreId,
           platform,
           description,
-          image,
+          image: nextImage,
           status,
         }),
       });
@@ -142,15 +161,20 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
       } | null;
 
       if (!response.ok) {
+        if (uploadedImagePath) void cleanupUploadedMedia([uploadedImagePath]);
         setError(result?.error ?? "Unable to save game.");
         return;
       }
 
-      setPendingImagePath("");
+      setImage(nextImage);
+      if (draftImagePreview) URL.revokeObjectURL(draftImagePreview);
+      setDraftImageFile(null);
+      setDraftImagePreview("");
       router.push("/admin/games");
       router.refresh();
-    } catch {
-      setError("Unable to reach the games CMS endpoint.");
+    } catch (saveError) {
+      if (uploadedImagePath) void cleanupUploadedMedia([uploadedImagePath]);
+      setError(saveError instanceof Error ? saveError.message : "Unable to reach the games CMS endpoint.");
     } finally {
       setIsSaving(false);
     }
@@ -203,14 +227,15 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
         </AdminFormField>
         <AdminFormField label="Game image">
           <div className="space-y-3">
-            {image && <img src={image} alt="" className="h-32 w-full rounded-lg object-cover" />}
+            {(draftImagePreview || image) && <img src={draftImagePreview || image} alt="" className="h-32 w-full rounded-lg object-cover" />}
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp"
               className={adminInputClass}
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) uploadImage(file);
+                if (file) selectImage(file);
+                e.target.value = "";
               }}
             />
             <p className="text-xs text-[var(--ms-text-secondary)]">
@@ -240,7 +265,7 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
             type="button"
             variant="secondary"
             onClick={() => {
-              if (pendingImagePath) void cleanupUploadedMedia([pendingImagePath]);
+              if (draftImagePreview) URL.revokeObjectURL(draftImagePreview);
               router.push("/admin/games");
             }}
           >

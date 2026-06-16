@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Eye } from "lucide-react";
+import { LivePageRefresh } from "@/components/live-page-refresh";
 import { ProfileSidebar } from "@/components/profile/ProfileSidebar";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -33,6 +34,7 @@ export default async function ProfileTransactionDetailPage({ params }: ProfileTr
 
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
+      <LivePageRefresh intervalMs={10_000} />
       <SiteHeader />
       <section className="ms-shell grid gap-8 py-16 lg:grid-cols-[270px_minmax(0,1fr)]">
         <ProfileSidebar displayName={displayName} email={user.email} initials={initials} memberSince={memberSince} />

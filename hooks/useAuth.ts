@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
@@ -8,11 +8,17 @@ export function useAuth() {
   const supabase = useMemo(() => createClient(), [])
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const lastSessionStatusCheckRef = useRef(0)
 
   useEffect(() => {
     let isMounted = true
 
-    async function checkSessionStatus() {
+    async function checkSessionStatus({ force = false }: { force?: boolean } = {}) {
+      if (!force && document.visibilityState !== 'visible') return
+      const now = Date.now()
+      if (!force && now - lastSessionStatusCheckRef.current < 60_000) return
+      lastSessionStatusCheckRef.current = now
+
       const response = await fetch('/api/auth/session-status', {
         cache: 'no-store',
       }).catch(() => null)
@@ -32,17 +38,18 @@ export function useAuth() {
       if (!isMounted) return
       setUser(data.user)
       setLoading(false)
-      if (data.user) void checkSessionStatus()
+      if (data.user) void checkSessionStatus({ force: true })
     })
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
-      if (session?.user) void checkSessionStatus()
+      if (session?.user) void checkSessionStatus({ force: true })
     })
 
     function handleSessionRefresh() {
+      if (document.visibilityState !== 'visible') return
       void checkSessionStatus()
     }
 
@@ -60,6 +67,9 @@ export function useAuth() {
   const signIn = useCallback(
     async (email: string, password: string) => {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (!error && data.user) {
+        await fetch('/api/auth/merge-chat', { method: 'POST' }).catch(() => null)
+      }
       return { data, error }
     },
     [supabase]

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bell, KeyRound, Save, Settings2, User } from "lucide-react";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { AdminFormField, adminInputClass, adminSelectClass } from "@/components/admin/AdminFormField";
@@ -84,7 +84,14 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [pendingAvatarPath, setPendingAvatarPath] = useState("");
+  const [draftAvatarFile, setDraftAvatarFile] = useState<File | null>(null);
+  const [draftAvatarPreview, setDraftAvatarPreview] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (draftAvatarPreview) URL.revokeObjectURL(draftAvatarPreview);
+    };
+  }, [draftAvatarPreview]);
 
   const initials = useMemo(() => {
     const parts = settings.adminDisplayName.trim().split(/\s+/).filter(Boolean);
@@ -103,21 +110,40 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
   async function saveSettings() {
     resetMessages();
     setIsSaving(true);
+    let uploadedAvatarPath = "";
+
+    let nextSettings = settings;
+
+    if (draftAvatarFile) {
+      try {
+        const uploadedAvatar = await uploadAvatar(draftAvatarFile);
+        nextSettings = { ...settings, adminAvatar: uploadedAvatar.imageUrl };
+        uploadedAvatarPath = uploadedAvatar.storagePath;
+      } catch (error) {
+        setIsSaving(false);
+        setErrorMessage(error instanceof Error ? error.message : "Failed to upload avatar.");
+        return;
+      }
+    }
 
     const response = await fetch("/api/admin/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings),
+      body: JSON.stringify(nextSettings),
     });
     const payload = await response.json().catch(() => null);
     setIsSaving(false);
 
     if (!response.ok) {
+      if (uploadedAvatarPath) void cleanupUploadedMedia([uploadedAvatarPath]);
       setErrorMessage(payload?.error ?? "Failed to save settings.");
       return;
     }
 
-    setPendingAvatarPath("");
+    setSettings(nextSettings);
+    if (draftAvatarPreview) URL.revokeObjectURL(draftAvatarPreview);
+    setDraftAvatarFile(null);
+    setDraftAvatarPreview("");
     setStatusMessage("Settings saved.");
   }
 
@@ -149,8 +175,15 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
     setStatusMessage("Password changed.");
   }
 
-  async function uploadAvatar(file: File) {
+  function selectAvatar(file: File) {
     resetMessages();
+    if (draftAvatarPreview) URL.revokeObjectURL(draftAvatarPreview);
+    setDraftAvatarFile(file);
+    setDraftAvatarPreview(URL.createObjectURL(file));
+    setStatusMessage("Avatar selected. Save settings to apply it.");
+  }
+
+  async function uploadAvatar(file: File) {
     setIsUploadingAvatar(true);
 
     try {
@@ -168,15 +201,12 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
         throw new Error(payload?.error ?? "Failed to upload avatar.");
       }
 
-      if (pendingAvatarPath) {
-        void cleanupUploadedMedia([pendingAvatarPath]);
-      }
-
-      updateSetting("adminAvatar", payload.imageUrl);
-      setPendingAvatarPath(typeof payload.storagePath === "string" ? payload.storagePath : "");
-      setStatusMessage("Avatar uploaded. Save settings to apply it.");
+      return {
+        imageUrl: String(payload.imageUrl),
+        storagePath: typeof payload.storagePath === "string" ? payload.storagePath : "",
+      };
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to upload avatar.");
+      throw new Error(error instanceof Error ? error.message : "Failed to upload avatar.");
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -188,8 +218,8 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
           <Section icon={<User size={16} className="text-[#8B5CF6]" />} title="Profile Settings">
             <div className="mb-6 flex items-start gap-6">
               <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#22D3EE]/30 bg-[var(--ms-accent)] text-2xl font-bold uppercase text-white">
-                {settings.adminAvatar ? (
-                  <img src={settings.adminAvatar} alt="" className="h-full w-full object-cover" />
+                {draftAvatarPreview || settings.adminAvatar ? (
+                  <img src={draftAvatarPreview || settings.adminAvatar} alt="" className="h-full w-full object-cover" />
                 ) : (
                   initials
                 )}
@@ -202,7 +232,7 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                     accept="image/png,image/jpeg,image/webp"
                     onChange={(event) => {
                       const file = event.target.files?.[0];
-                      if (file) void uploadAvatar(file);
+                      if (file) selectAvatar(file);
                       event.target.value = "";
                     }}
                     disabled={isUploadingAvatar}
@@ -302,8 +332,9 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
         <AdminButton
           variant="secondary"
           onClick={() => {
-            if (pendingAvatarPath) void cleanupUploadedMedia([pendingAvatarPath]);
-            setPendingAvatarPath("");
+            if (draftAvatarPreview) URL.revokeObjectURL(draftAvatarPreview);
+            setDraftAvatarFile(null);
+            setDraftAvatarPreview("");
             setSettings(initialSettings);
           }}
         >

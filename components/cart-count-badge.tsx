@@ -11,6 +11,8 @@ export function CartCountBadge() {
   const [count, setCount] = useState(0);
 
   async function loadCount() {
+    if (document.visibilityState !== "visible") return;
+
     try {
       const response = await fetch("/api/cart", { cache: "no-store" });
       const payload = (await response.json().catch(() => ({}))) as CartPayload;
@@ -26,7 +28,7 @@ export function CartCountBadge() {
     loadCount();
 
     const unsubscribeCartUpdates = subscribeToCartUpdates(loadCount);
-    const intervalId = window.setInterval(loadCount, 15_000);
+    const intervalId = window.setInterval(loadCount, 60_000);
     window.addEventListener("focus", loadCount);
 
     return () => {

@@ -38,7 +38,9 @@ export type StatusType =
   | "ACTIVE"
   | "SCHEDULED"
   | "DRAFT"
-  | "completed";
+  | "completed"
+  | "open"
+  | "resolved";
 
 interface StatusBadgeProps {
   status: StatusType;
@@ -63,6 +65,7 @@ export function StatusBadge({ status, className = "" }: StatusBadgeProps) {
     case "Pending":
     case "PENDING":
     case "pending":
+    case "open":
     case "confirmed":
     case "Scheduled":
     case "SCHEDULED":
@@ -80,6 +83,7 @@ export function StatusBadge({ status, className = "" }: StatusBadgeProps) {
     case "Refunded":
     case "REFUNDED":
     case "refunded":
+    case "resolved":
       styleClasses = "bg-gray-500/10 text-gray-400 border-gray-500/20";
       break;
     case "Critical":

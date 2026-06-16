@@ -13,7 +13,8 @@
     "refund-orders:seed": "node scripts/seed-refund-orders.mjs",
     "refund-orders:reseed": "node scripts/seed-refund-orders.mjs",
     "refund-orders:cleanup": "node scripts/seed-refund-orders.mjs cleanup",
-    "user-data:cleanup": "node scripts/cleanup-user-data.mjs"
+    "user-data:cleanup": "node scripts/cleanup-user-data.mjs",
+    "chat:cleanup": "node scripts/cleanup-chat-history.mjs"
   },
   "dependencies": {
     "@stripe/cli": "^0.0.1",
