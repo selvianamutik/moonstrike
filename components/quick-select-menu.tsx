@@ -13,6 +13,9 @@ type QuickSelectCatalog = {
   services: GameService[];
 };
 
+const GAMES_PER_PAGE = 4;
+const ANIM_DURATION = 240;
+
 export function QuickSelectMenu() {
   const [activeGame, setActiveGame] = useState("all");
   const [isOpen, setIsOpen] = useState(false);
@@ -143,43 +146,42 @@ export function QuickSelectMenu() {
                   />
                 </div>
 
-                {isLoadingCatalog ? (
-                  <div className="min-h-0 flex-1 px-2 py-12 text-center text-sm text-[var(--ms-body)]">
-                    Loading services...
+            {isLoadingCatalog ? (
+              <div className="min-h-0 flex-1 px-2 py-12 text-center text-sm text-[var(--ms-body)]">
+                Loading services...
+              </div>
+            ) : serviceColumns.length > 0 ? (
+              <div className="mt-8 grid min-h-0 flex-1 gap-x-12 gap-y-10 overflow-y-auto px-2 pb-8 pr-3 sm:grid-cols-2 lg:grid-cols-4">
+                {serviceColumns.map(([category, services]) => (
+                  <div key={category}>
+                    <h3 className="mono border-b border-[var(--ms-border)] pb-2 text-xl font-bold uppercase tracking-[0.08em] text-[var(--ms-heading)]">
+                      {category}
+                    </h3>
+                    <ul className="mt-4 space-y-3 text-sm text-[var(--ms-body)]">
+                      {services.map((service) => (
+                        <li key={`${service.gameSlug}-${service.slug}`}>
+                          <Link
+                            href={getServiceDetailHref(service)}
+                            onClick={() => setIsOpen(false)}
+                            className="hover:text-[var(--ms-gradient-end)]"
+                          >
+                            {activeGame === "all" ? `${service.gameName} - ${service.name}` : service.name}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                ) : serviceColumns.length > 0 ? (
-                  <div className="mt-8 grid min-h-0 flex-1 gap-x-12 gap-y-10 overflow-y-auto px-8 pb-8 sm:grid-cols-2 lg:grid-cols-4">
-                    {serviceColumns.map(([category, services]) => (
-                      <div key={category}>
-                        <h3 className="mono border-b border-[var(--ms-border)] pb-2 text-xl font-bold uppercase tracking-[0.08em] text-[var(--ms-heading)]">
-                          {category}
-                        </h3>
-                        <ul className="mt-4 space-y-3 text-sm text-[var(--ms-body)]">
-                          {services.map((service) => (
-                            <li key={`${service.gameSlug}-${service.slug}`}>
-                              <Link
-                                href={getServiceDetailHref(service)}
-                                onClick={() => setIsOpen(false)}
-                                className="hover:text-[var(--ms-gradient-end)]"
-                              >
-                                {activeGame === "all" ? `${service.gameName} - ${service.name}` : service.name}
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="min-h-0 flex-1 px-2 py-12 text-center text-sm text-[var(--ms-body)]">
-                    No services found for {query}.
-                  </div>
-                )}
-              </section>
-            </div>,
-            portalTarget,
-          )
-        : null}
+                ))}
+              </div>
+            ) : (
+              <div className="min-h-0 flex-1 px-2 py-12 text-center text-sm text-[var(--ms-body)]">
+                No services found for {query}.
+              </div>
+            )}
+          </section>
+        </div>,
+        portalTarget,
+      ) : null}
     </>
   );
 }
