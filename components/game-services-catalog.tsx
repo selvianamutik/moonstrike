@@ -74,13 +74,8 @@ export function GameServicesCatalog({
 
   const activeLabel = tabs.find((tab) => tab.slug === activeSlug)?.label ?? "All";
   const filteredServices = services.filter((service) => matchesQuery(service, query));
-  const visibleServices = filteredServices.slice(0, visible);
-  const fixedTabs: ScrollingTabItem[] = tabs.slice(0, 2).map((tab) => ({
-    href: tab.href,
-    key: tab.slug,
-    label: tab.label,
-  }));
-  const scrollingTabs: ScrollingTabItem[] = tabs.slice(2).map((tab) => ({
+  const fixedTabs: ScrollingTabItem[] = [];
+  const scrollingTabs: ScrollingTabItem[] = tabs.map((tab) => ({
     href: tab.href,
     key: tab.slug,
     label: tab.label,
@@ -92,11 +87,12 @@ export function GameServicesCatalog({
         <div>
           <p className="mono text-xs uppercase tracking-[0.24em] text-[var(--ms-gradient-end)]">{game.genre}</p>
           <h1 className="font-display mt-3 text-3xl font-black tracking-[-0.04em]">{game.name} Services</h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--ms-body)]">{game.description}</p>
+          {/* <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--ms-body)]">{game.description}</p> */}
         </div>
       </div>
 
       <PlaceholderAsset
+        isHidden={false}
         alt={`${game.name} boosting service banner`}
         className="mt-8 flex min-h-72 flex-col items-start justify-between gap-8 rounded-md px-8 py-10 md:flex-row md:items-center md:px-16"
         imageClassName="p-16"

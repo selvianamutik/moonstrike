@@ -92,13 +92,9 @@ export function ServicesCatalog({
   const showingFrom = filteredServices.length > 0 ? 1 : 0;
   const showingTo = visibleServices.length;
   const activeLabel = serviceTabs.find((tab) => tab.value === activeCategory)?.label ?? "Services";
-  const fixedTabs: ScrollingTabItem[] = serviceTabs.slice(0, 2).map((tab) => ({
-    href: servicesHref(tab.value, search),
-    key: tab.value,
-    label: tab.label,
-  }));
-  const scrollingTabs: ScrollingTabItem[] = serviceTabs.slice(2).map((tab) => ({
-    href: servicesHref(tab.value, search),
+  const fixedTabs: ScrollingTabItem[] = [];
+  const scrollingTabs: ScrollingTabItem[] = serviceTabs.map((tab) => ({
+    href: servicesHref(tab.value, query),
     key: tab.value,
     label: tab.label,
   }));
@@ -113,6 +109,7 @@ export function ServicesCatalog({
       </div>
 
       <PlaceholderAsset
+        isHidden={false}
         alt="Featured boosting service banner"
         className="mt-8 flex min-h-72 flex-col items-start justify-between gap-8 rounded-md px-8 py-10 md:flex-row md:items-center md:px-16"
         priority

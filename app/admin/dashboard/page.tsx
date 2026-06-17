@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Calendar, Download, TrendingUp, Users, CheckCircle, AlertTriangle, ArrowRight, Shield, Award, Sparkles } from "lucide-react";
 import { StatusBadge, StatusType } from "@/components/admin/StatusBadge";
 import Image from "next/image";
@@ -75,7 +75,7 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between mb-8 border-b border-[#172554] pb-4">
             <div>
               <h2 className="text-lg font-bold text-white mb-1">Traffic vs Performance</h2>
-              <p className="text-sm text-[#94A3B8]">Correlation between ad spend and user conversion.</p>
+              <p className="text-sm text-[var(--admin-muted)]">Correlation between ad spend and user conversion.</p>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
@@ -134,16 +134,16 @@ export default function AdminDashboard() {
       </div>
 
       {/* Recent Activity Table */}
-      <div className="bg-[#0F172A] border border-[#172554] rounded-xl overflow-hidden flex flex-col">
-        <div className="p-6 border-b border-[#172554] flex items-center justify-between">
+      <div className="bg-[var(--admin-surface)] border border-[var(--admin-border)] rounded-xl overflow-hidden flex flex-col">
+        <div className="p-6 border-b border-[var(--admin-border)] flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">Recent Activity</h2>
-          <a href="#" className="text-sm font-medium text-[#22D3EE] hover:text-[#8B5CF6] transition-colors flex items-center gap-1">
+          <a href="/admin/transactions" className="text-sm font-medium text-[var(--admin-cyan)] hover:text-[var(--admin-accent)] transition-colors flex items-center gap-1">
             View Transaction Log <ArrowRight size={14} />
           </a>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-[#94A3B8]">
-            <thead className="bg-[#111827] text-xs uppercase font-semibold text-[#64748B] border-b border-[#172554]">
+          <table className="w-full text-left text-sm text-[var(--admin-muted)]">
+            <thead className="bg-[var(--admin-surface-header)] text-xs uppercase font-semibold text-[var(--admin-muted-dark)] border-b border-[var(--admin-border)]">
               <tr>
                 <th className="px-6 py-4">TRANSACTION ID</th>
                 <th className="px-6 py-4">CUSTOMER</th>
@@ -153,7 +153,7 @@ export default function AdminDashboard() {
                 <th className="px-6 py-4">STATUS</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#172554]">
+            <tbody className="divide-y divide-[var(--admin-border)]">
               <TableRow 
                 id="#TRX-94821" 
                 customer="vortex_striker" 
@@ -261,3 +261,4 @@ function TableRow({ id, customer, service, date, amount, status }: any) {
     </tr>
   );
 }
+

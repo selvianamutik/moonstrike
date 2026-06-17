@@ -197,6 +197,24 @@ export async function getActiveLandingHero() {
   return normalizeLandingHeroData(data?.data)
 }
 
+export async function getActiveHeroSlides() {
+  const supabase = createPublicClient()
+
+  const { data } = await supabase
+    .from('content_blocks')
+    .select('data')
+    .eq('type', 'hero')
+    .eq('status', 'active')
+    .order('modified_at', { ascending: false })
+    .returns<{ data: unknown }[]>()
+
+  if (!data || data.length === 0) {
+    return [DEFAULT_LANDING_HERO]
+  }
+
+  return data.map((row) => normalizeLandingHeroData(row.data))
+}
+
 export async function getActiveLandingBenefits() {
   const supabase = createPublicClient()
 
