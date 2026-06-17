@@ -133,7 +133,7 @@ export function Frame18Sections({ benefits }: { benefits: LandingBenefitsData })
 
       <div className="mt-20 text-center">
         <h2 className="font-display text-4xl font-black tracking-[-0.04em]">
-          Rating <span className="section-accent">TrustPilot</span>
+          Rate <span className="section-accent">Us</span>
         </h2>
         <div className="flex items-center justify-between gap-6">
           {/* Tombol Previous */}
@@ -173,10 +173,11 @@ export function Frame18Sections({ benefits }: { benefits: LandingBenefitsData })
       <div className="mt-16 flex flex-wrap items-center justify-center gap-10">
         {[
           ["/payment/paypal.svg", "PayPal"],
+          ["/payment/btc.svg", "Crypto"],
           ["/payment/master-card.svg", "Mastercard"],
-          ["/payment/apple-pay.svg", "Apple Pay"],
-          ["/payment/google-pay.svg", "Google Pay"],
-          ["/payment/stripe.svg", "Stripe"],
+          ["/payment/QRIS.svg", "QRIS (Doku)"],
+          ["/payment/Skrill.svg", "Skrill"],
+          ["/payment/Payoneer.svg", "Payoneer"],
         ].map(([src, alt]) => (
           <Image key={src} src={src} alt={alt} width={150} height={46} className="h-10 w-auto opacity-90" />
         ))}

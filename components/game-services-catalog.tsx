@@ -81,7 +81,7 @@ export function GameServicesCatalog({
         <div>
           <p className="mono text-xs uppercase tracking-[0.24em] text-[var(--ms-gradient-end)]">{game.genre}</p>
           <h1 className="font-display mt-3 text-3xl font-black tracking-[-0.04em]">{game.name} Services</h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--ms-body)]">{game.description}</p>
+          {/* <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--ms-body)]">{game.description}</p> */}
         </div>
         <div className="flex h-12 w-full items-center rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-card)] px-4 text-[var(--ms-body)] md:w-96">
           <label htmlFor="game-services-search" className="sr-only">

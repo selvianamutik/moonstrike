@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { GlobalChatBubble } from "@/components/global-chat-bubble";
-import { JetBrains_Mono, Montserrat } from "next/font/google";
+import { Cabin, Montserrat } from "next/font/google";
 import { EmailVerificationBanner } from '@/components/common/EmailVerificationBanner'
 import "./globals.css";
 import Script from "next/script";
@@ -12,7 +12,7 @@ const montserrat = Montserrat({
   display: "swap",
 });
 
-const jetBrainsMono = JetBrains_Mono({
+const cabin = Cabin({
   weight: ["400", "500", "600", "700"],
   subsets: ["latin"],
   variable: "--font-mono",
@@ -32,7 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${montserrat.variable} ${jetBrainsMono.variable}`}>
+      <body className={`${montserrat.variable} ${cabin.variable}`}>
         <EmailVerificationBanner />
         {children}
         <GlobalChatBubble />

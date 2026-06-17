@@ -163,10 +163,22 @@ function ServiceOptions({
                 className="h-12 w-full accent-[var(--ms-gradient-end)]"
                 aria-label={option.label}
               />
-              <div className="mt-2 flex items-center justify-between text-xs text-[var(--ms-body)]">
-                <span>
-                  {Number(selections[option.label] ?? getDefaultSelection(option))}
-                </span>
+              <div className="mt-2 flex items-center justify-between gap-3 text-xs text-[var(--ms-body)]">
+                <input
+                  type="number"
+                  min={option.min ?? 1}
+                  max={option.max}
+                  step={option.step ?? 1}
+                  value={Number(selections[option.label] ?? getDefaultSelection(option))}
+                  onChange={(event) => {
+                    const val = Number(event.target.value);
+                    if (!isNaN(val)) {
+                      const clamped = Math.max(option.min ?? 1, Math.min(option.max ?? val, val));
+                      onChange(option.label, clamped);
+                    }
+                  }}
+                  className="h-10 w-24 rounded-md border border-[var(--ms-border)] bg-transparent px-3 text-center text-sm outline-none focus:border-[var(--ms-gradient-end)]"
+                />
                 <span className="mono text-[var(--ms-price)]">
                   + {formatMoney(calculateOptionTotal(option, selections[option.label] ?? getDefaultSelection(option), currency), currency)}
                 </span>
@@ -187,9 +199,21 @@ function ServiceOptions({
                 >
                   -
                 </button>
-                <span className="mono min-w-16 text-center text-sm text-[var(--ms-heading)]">
-                  {Number(selections[option.label] ?? getDefaultSelection(option))}
-                </span>
+                <input
+                  type="number"
+                  min={option.min ?? 1}
+                  max={option.max}
+                  step={option.step ?? 1}
+                  value={Number(selections[option.label] ?? getDefaultSelection(option))}
+                  onChange={(event) => {
+                    const val = Number(event.target.value);
+                    if (!isNaN(val)) {
+                      const clamped = Math.max(option.min ?? 1, option.max ? Math.min(option.max, val) : val);
+                      onChange(option.label, clamped);
+                    }
+                  }}
+                  className="mono h-10 w-24 rounded-md border border-[var(--ms-border)] bg-transparent text-center text-sm text-[var(--ms-heading)] outline-none focus:border-[var(--ms-gradient-end)]"
+                />
                 <button
                   type="button"
                   onClick={() => {
@@ -260,7 +284,7 @@ function ServiceOptions({
             <select
               value={String(selections[option.label] ?? getDefaultSelection(option))}
               onChange={(event) => onChange(option.label, event.target.value)}
-              className="mt-4 h-12 w-full rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-page)] px-4 text-sm outline-none focus:border-[var(--ms-gradient-end)]"
+              className="mt-4 h-12 w-full rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-page)] px-4 pr-10 text-sm outline-none focus:border-[var(--ms-gradient-end)]"
             >
               {(option.options ?? []).map((item) => (
                 <option key={item.label} value={item.label}>

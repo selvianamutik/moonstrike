@@ -16,7 +16,7 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--ms-border)] bg-[var(--ms-bg-navbar)]/95 backdrop-blur">
-      <div className="ms-shell flex min-h-24 items-center gap-4 py-4">
+      <div className="top-nav-user flex min-h-24 items-center gap-12 py-0">
         <Link href="/" className="font-display shrink-0 text-2xl font-black tracking-[-0.03em] sm:text-3xl">
           <span className="brand-gradient">Moon Strike</span>
         </Link>
@@ -55,7 +55,7 @@ export function SiteHeader() {
           <ThemeToggle />
         </div>
 
-        <nav className="ml-auto flex items-center gap-4 text-sm font-semibold text-[var(--ms-heading)] sm:gap-6">
+        <nav className="ml-auto flex items-center gap-8 text-sm font-semibold text-[var(--ms-heading)] sm:gap-6">
           <Link href="/games" className="hidden text-center hover:text-[var(--ms-gradient-end)] sm:block">
             <Gamepad2 size={22} className="mt-1 mx-auto" aria-hidden="true" />
             Games
@@ -66,10 +66,10 @@ export function SiteHeader() {
             Cart
           </Link>
 
-          {/* <button type="button" aria-label="Notifications (coming soon)" className="hidden text-center hover:text-[var(--ms-gradient-end)] sm:block cursor-pointer">
+          <button type="button" aria-label="Notifications (coming soon)" className="hidden text-center hover:text-[var(--ms-gradient-end)] sm:block cursor-pointer">
             <Bell size={22} className="mt-1 mx-auto" aria-hidden="true"/>
             Notif
-          </button> */}
+          </button>
 
           {loading ? (
             <div className="h-11 w-11 animate-pulse rounded bg-white/5" />

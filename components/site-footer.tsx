@@ -19,15 +19,15 @@ const columns = [
       { label: "Refund Policy", href: "/refund-policy" },
     ],
   },
-  {
-    title: "Genres",
-    links: [
-      { label: "Action RPG", href: "/games" },
-      { label: "Tactical Shooting", href: "/games" },
-      { label: "MMORPG", href: "/games" },
-      { label: "MOBA", href: "/games" },
-    ],
-  },
+  // {
+  //   title: "Genres",
+  //   links: [
+  //     { label: "Action RPG", href: "/games" },
+  //     { label: "Tactical Shooting", href: "/games" },
+  //     { label: "MMORPG", href: "/games" },
+  //     { label: "MOBA", href: "/games" },
+  //   ],
+  // },
 ];
 
 const socialLinks = [
