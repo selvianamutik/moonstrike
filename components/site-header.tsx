@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, LogIn, Search, ShoppingCart, User, Gamepad } from "lucide-react";
+import { Bell, LogIn, ShoppingCart, User, Gamepad } from "lucide-react";
+import { CartCountBadge } from "@/components/cart-count-badge";
 import { QuickSelectMenu } from "@/components/quick-select-menu";
+import { SiteSearchOverlay } from "@/components/site-search-overlay";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/useAuth";
 import { useCurrency } from "@/hooks/useCurrency";
@@ -21,24 +23,7 @@ export function SiteHeader() {
 
         <QuickSelectMenu />
 
-        <form
-          action="/services"
-          className="hidden h-12 flex-1 items-center rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-card)] px-4 text-[var(--ms-body)] lg:flex"
-        >
-          <label htmlFor="site-search" className="sr-only">
-            Search services
-          </label>
-          <input
-            id="site-search"
-            name="q"
-            type="search"
-            placeholder="Search games, services..."
-            className="w-full bg-transparent mono text-sm outline-none"
-          />
-          <button type="submit" aria-label="Search" className="ms-focus-ring rounded p-1">
-            <Search size={20} aria-hidden="true" />
-          </button>
-        </form>
+        <SiteSearchOverlay />
 
         <button
           type="button"
@@ -64,9 +49,12 @@ export function SiteHeader() {
             <Bell size={22} className="mx-auto mt-1" aria-hidden="true" />
           </Link>
 
-          <Link href="/cart" className="flex flex-col items-center hover:text-[var(--ms-gradient-end)]" aria-label="Cart">
+          <Link href="/cart" className="relative flex flex-col items-center hover:text-[var(--ms-gradient-end)]" aria-label="Cart">
             <span className="mono hidden text-xs text-[var(--ms-gradient-end)] sm:block">CART</span>
-            <ShoppingCart size={22} className="mt-1" aria-hidden="true" />
+            <span className="relative mt-1">
+              <ShoppingCart size={22} aria-hidden="true" />
+              <CartCountBadge />
+            </span>
           </Link>
 
           {loading ? (

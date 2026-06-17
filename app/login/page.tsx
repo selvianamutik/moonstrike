@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff } from 'lucide-react'
+import { AuthCardSkeleton } from '@/components/storefront-skeletons'
 import { useAuth } from '@/hooks/useAuth'
 import { authProviders, hasEmailPassword } from '@/lib/auth/providers'
 import { createClient } from '@/lib/supabase/client'
@@ -97,6 +98,9 @@ function AuthCard() {
     return getAuthErrorMessage(params)
   })
   const [notice, setNotice] = useState<string | null>(() => {
+    if (searchParams.get('banned') === '1') {
+      return 'This account has been banned. Contact support if you think this is a mistake.'
+    }
     if (searchParams.get('reset') === 'success') {
       return 'Password updated. You can log in with your new password.'
     }
@@ -170,6 +174,7 @@ function AuthCard() {
   }, [resendCooldown])
 
   useEffect(() => {
+    if (searchParams.get('banned') === '1') return
     if (loading || !user?.email_confirmed_at) return
 
     let isCurrent = true
@@ -192,7 +197,7 @@ function AuthCard() {
     return () => {
       isCurrent = false
     }
-  }, [loading, next, router, user])
+  }, [loading, next, router, searchParams, user])
 
   const switchMode = (nextMode: AuthMode) => {
     setMode(nextMode)
@@ -208,6 +213,7 @@ function AuthCard() {
     params.delete('error')
     params.delete('reset')
     params.delete('unverified')
+    params.delete('banned')
 
     if (nextMode === 'register') params.set('tab', 'register')
     if (nextMode === 'login' || nextMode === 'reset') params.delete('tab')
@@ -330,11 +336,7 @@ function AuthCard() {
   }
 
   if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_50%_0%,rgba(139,92,246,0.2),transparent_28rem),var(--ms-bg-page)] px-5 py-16">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--ms-gradient-start)] border-t-transparent" />
-      </main>
-    )
+    return <AuthCardSkeleton />
   }
 
   return (
@@ -643,11 +645,7 @@ function AuthCard() {
 export default function LoginPage() {
   return (
     <Suspense
-      fallback={
-        <main className="flex min-h-screen items-center justify-center bg-[var(--ms-bg-page)]">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--ms-gradient-start)] border-t-transparent" />
-        </main>
-      }
+      fallback={<AuthCardSkeleton />}
     >
       <AuthCard />
     </Suspense>

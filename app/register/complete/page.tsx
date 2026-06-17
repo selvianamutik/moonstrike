@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
+import { AuthCardSkeleton } from "@/components/storefront-skeletons";
 import { createClient } from "@/lib/supabase/client";
 import { authProviders, hasEmailPassword } from "@/lib/auth/providers";
 
@@ -225,11 +226,7 @@ function CompleteGoogleRegistrationCard() {
 export default function CompleteGoogleRegistrationPage() {
   return (
     <Suspense
-      fallback={
-        <main className="flex min-h-screen items-center justify-center bg-[var(--ms-bg-page)]">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--ms-gradient-start)] border-t-transparent" />
-        </main>
-      }
+      fallback={<AuthCardSkeleton />}
     >
       <CompleteGoogleRegistrationCard />
     </Suspense>

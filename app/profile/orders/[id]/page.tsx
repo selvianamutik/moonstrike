@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { MessageSquare } from "lucide-react";
 import { PlaceholderAsset } from "@/components/asset-image";
+import { ConfirmOrderButton } from "@/components/profile/ConfirmOrderButton";
 import { ProfileSidebar } from "@/components/profile/ProfileSidebar";
 import { RefundRequestButton } from "@/components/profile/RefundRequestButton";
 import { SiteFooter } from "@/components/site-footer";
@@ -12,6 +14,7 @@ import {
   formatOrderOptionValue,
   formatPaymentProvider,
   canRequestOrderRefund,
+  getRefundWindowDays,
   getCustomerOrder,
 } from "@/lib/orders";
 
@@ -42,7 +45,8 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
   const initials = getUserInitials(displayName, user.email);
   const memberSince = formatMemberSince(user.created_at);
   const completedSteps = completedStepCount(order.status);
-  const canRequestRefund = canRequestOrderRefund(order.status, order.completedAt);
+  const refundWindowDays = await getRefundWindowDays();
+  const canRequestRefund = canRequestOrderRefund(order.status, order.completedAt, refundWindowDays);
 
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
@@ -51,24 +55,25 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
       <section className="ms-shell grid gap-8 py-16 lg:grid-cols-[270px_minmax(0,1fr)]">
         <ProfileSidebar displayName={displayName} email={user.email} initials={initials} memberSince={memberSince} />
 
-        <div>
-          <div>
+        <div className="min-w-0">
           <div className="flex flex-col justify-between gap-5 border-b border-[var(--ms-border)] pb-7 md:flex-row md:items-end">
-            <div>
+            <div className="min-w-0">
               <p className="mono text-xs uppercase tracking-[0.28em] text-[var(--ms-gradient-end)]">
-                Profile / Order Detail / {order.orderReference}
+                Profile / Order Detail
               </p>
               <h1 className="font-display mt-3 text-4xl font-black tracking-[-0.05em]">Order Detail</h1>
-              <p className="mt-3 text-[var(--ms-body)]">{order.orderReference}</p>
+              <p className="mt-3 break-words text-[var(--ms-body)]">{order.orderReference}</p>
             </div>
-            <div className="flex flex-col items-start gap-3 md:items-end">
+            <div className="shrink-0 flex flex-col items-start gap-3 md:items-end">
               <span className="w-fit rounded-full border border-[var(--ms-gradient-end)]/50 px-4 py-2 mono text-sm uppercase text-[var(--ms-success)]">
                 {order.status.replace("_", " ")}
               </span>
               <div className="flex flex-wrap items-center gap-3">
-                <Link href="/profile/chat" className="inline-flex items-center justify-center rounded-md border border-[var(--ms-border)] px-4 py-3 text-sm text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
+                <Link href="/profile/chat" className="ms-action-button inline-flex items-center justify-center rounded-md border border-[var(--ms-border)] px-4 py-3 text-sm text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
+                  <MessageSquare size={16} />
                   Open Chat
                 </Link>
+                {order.status === "delivered" ? <ConfirmOrderButton orderId={order.id} /> : null}
                 {canRequestRefund ? <RefundRequestButton orderId={order.id} compact /> : null}
               </div>
             </div>
@@ -179,7 +184,6 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
             </article>
           </section>
 
-          </div>
         </div>
       </section>
       <SiteFooter />

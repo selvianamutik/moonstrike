@@ -8,6 +8,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui";
 import { useCurrency, type Currency } from "@/hooks/useCurrency";
+import { notifyCartUpdated } from "@/lib/cart-events";
 import type { ServiceOption, ServiceRow } from "@/lib/cms/services";
 
 function optionLabel(option: ServiceOption) {
@@ -384,6 +385,8 @@ export function ServiceDetail({
         setCartMessage(payload.error ?? "Unable to add this service to cart.");
         return;
       }
+
+      notifyCartUpdated();
 
       if (nextAction === "cart") {
         router.push("/cart");

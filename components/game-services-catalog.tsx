@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { PlaceholderAsset } from "@/components/asset-image";
 import { ScrollingTabList, type ScrollingTabItem } from "@/components/scrolling-tab-list";
 import { ServiceCard } from "@/components/service-card";
+import { useCurrency } from "@/hooks/useCurrency";
 import type { GameCatalogItem, GameService } from "@/lib/catalog";
 
 type ServiceTab = {
@@ -12,6 +13,9 @@ type ServiceTab = {
   slug: string;
   sortOrder: number;
 };
+
+const initialVisibleCount = 8;
+const visibleIncrement = 8;
 
 function matchesQuery(service: GameService, query: string) {
   const normalizedQuery = query.trim().toLowerCase();
@@ -40,6 +44,8 @@ export function GameServicesCatalog({
   services: GameService[];
 }) {
   const [query, setQuery] = useState("");
+  const [visible, setVisible] = useState(initialVisibleCount);
+  const { currency, setCurrency } = useCurrency();
   const tabSourceServices = navigationServices ?? services;
   const tabs = useMemo<ServiceTab[]>(() => {
     const categoryTabs = new Map<string, ServiceTab>();
@@ -68,6 +74,7 @@ export function GameServicesCatalog({
 
   const activeLabel = tabs.find((tab) => tab.slug === activeSlug)?.label ?? "All";
   const filteredServices = services.filter((service) => matchesQuery(service, query));
+  const visibleServices = filteredServices.slice(0, visible);
   const fixedTabs: ScrollingTabItem[] = tabs.slice(0, 2).map((tab) => ({
     href: tab.href,
     key: tab.slug,
@@ -86,19 +93,6 @@ export function GameServicesCatalog({
           <p className="mono text-xs uppercase tracking-[0.24em] text-[var(--ms-gradient-end)]">{game.genre}</p>
           <h1 className="font-display mt-3 text-3xl font-black tracking-[-0.04em]">{game.name} Services</h1>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--ms-body)]">{game.description}</p>
-        </div>
-        <div className="flex h-12 w-full items-center rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-card)] px-4 text-[var(--ms-body)] md:w-96">
-          <label htmlFor="game-services-search" className="sr-only">
-            Search services
-          </label>
-          <input
-            id="game-services-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={`Search ${game.name} services...`}
-            className="w-full bg-transparent mono text-sm outline-none"
-          />
         </div>
       </div>
 
@@ -119,14 +113,30 @@ export function GameServicesCatalog({
         </div>
         <div className="relative z-10 text-left md:text-center">
           <div className="inline-flex rounded-full border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-1">
-            <span className="h-9 rounded-full bg-[var(--primary)] px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]">
+            <button
+              type="button"
+              onClick={() => setCurrency("USD")}
+              className={`h-9 rounded-full px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] transition ${
+                currency === "USD"
+                  ? "bg-[var(--primary)] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]"
+                  : "text-[var(--ms-body)] hover:text-[var(--ms-heading)]"
+              }`}
+            >
               USD
-            </span>
-            <span className="h-9 rounded-full px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] text-[var(--ms-body)]">
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrency("EUR")}
+              className={`h-9 rounded-full px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] transition ${
+                currency === "EUR"
+                  ? "bg-[var(--primary)] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]"
+                  : "text-[var(--ms-body)] hover:text-[var(--ms-heading)]"
+              }`}
+            >
               EUR
-            </span>
+            </button>
           </div>
-          <p className="mt-3 text-sm text-[var(--ms-gradient-end)]">USD / EUR pricing view</p>
+          <p className="mt-3 text-sm text-[var(--ms-gradient-end)]">{currency} pricing view</p>
         </div>
       </PlaceholderAsset>
 
@@ -140,20 +150,38 @@ export function GameServicesCatalog({
       </div>
 
       <div className="mt-6 flex flex-col justify-between gap-3 text-sm text-[var(--ms-body)] md:flex-row md:items-center">
-        <p>
-          Showing <span className="mono text-[var(--ms-heading)]">{filteredServices.length}</span> services in{" "}
-          <span className="text-[var(--ms-gradient-end)]">{activeLabel}</span>
-        </p>
-        {query ? (
-          <button type="button" onClick={() => setQuery("")} className="w-fit text-[var(--ms-gradient-end)] hover:underline">
-            Clear search
-          </button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-3">
+          <p>
+            Showing <span className="mono text-[var(--ms-heading)]">{visibleServices.length}</span> services in{" "}
+            <span className="text-[var(--ms-gradient-end)]">{activeLabel}</span>
+          </p>
+          {query ? (
+            <button type="button" onClick={() => setQuery("")} className="w-fit text-[var(--ms-gradient-end)] hover:underline">
+              Clear search
+            </button>
+          ) : null}
+        </div>
+        <div className="flex h-12 w-full items-center rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-card)] px-4 text-[var(--ms-body)] md:w-96">
+          <label htmlFor="game-services-search" className="sr-only">
+            Search services
+          </label>
+          <input
+            id="game-services-search"
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setVisible(initialVisibleCount);
+            }}
+            placeholder={`Search ${game.name} services...`}
+            className="w-full bg-transparent mono text-sm outline-none"
+          />
+        </div>
       </div>
 
       {filteredServices.length > 0 ? (
         <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-          {filteredServices.map((service) => (
+          {visibleServices.map((service) => (
             <ServiceCard key={service.slug} service={service} />
           ))}
         </div>
@@ -163,6 +191,17 @@ export function GameServicesCatalog({
           <p className="mt-3 text-[var(--ms-body)]">Try another search term or switch category.</p>
         </div>
       )}
+      {visible < filteredServices.length ? (
+        <div className="mt-10 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setVisible((current) => current + visibleIncrement)}
+            className="ms-button h-12 px-8 mono text-sm uppercase tracking-[0.18em]"
+          >
+            Load More
+          </button>
+        </div>
+      ) : null}
     </>
   );
 }

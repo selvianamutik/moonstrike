@@ -14,6 +14,27 @@ type QuickSelectCatalog = {
 const GAMES_PER_PAGE = 4;
 const ANIM_DURATION = 240;
 
+function QuickSelectSkeleton() {
+  return (
+    <div className="mt-8 grid min-h-0 flex-1 gap-x-12 gap-y-10 overflow-hidden px-2 pb-8 pr-3 sm:grid-cols-2 lg:grid-cols-4">
+      {[0, 1, 2, 3].map((column) => (
+        <div key={column}>
+          <div className="h-7 w-3/4 animate-pulse rounded bg-white/10" />
+          <div className="mt-5 space-y-3">
+            {[0, 1, 2, 3, 4].map((row) => (
+              <div
+                key={row}
+                className="h-4 animate-pulse rounded bg-white/10"
+                style={{ width: `${row % 2 === 0 ? 88 : 68}%` }}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function QuickSelectMenu() {
   const [activeGame, setActiveGame] = useState("all");
   const [isOpen, setIsOpen] = useState(false);
@@ -266,9 +287,7 @@ export function QuickSelectMenu() {
             </div>
 
             {isLoadingCatalog ? (
-              <div className="min-h-0 flex-1 px-2 py-12 text-center text-sm text-[var(--ms-body)]">
-                Loading services...
-              </div>
+              <QuickSelectSkeleton />
             ) : serviceColumns.length > 0 ? (
               <div className="mt-8 grid min-h-0 flex-1 gap-x-12 gap-y-10 overflow-y-auto px-2 pb-8 pr-3 sm:grid-cols-2 lg:grid-cols-4">
                 {serviceColumns.map(([category, services]) => (

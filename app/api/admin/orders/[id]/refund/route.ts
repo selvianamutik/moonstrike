@@ -2,13 +2,18 @@ import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { writeAuditLog } from "@/lib/admin/audit";
 import { getAdminSession } from "@/lib/admin/session";
-import { getStripeClient } from "@/lib/stripe";
+import { getPaymentProvider, ProviderRefundError } from "@/lib/payments/providers";
+import type { PaymentProviderId, RefundMode } from "@/lib/payments/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 function parseRefundAmount(value: unknown) {
   if (typeof value === "number") return value;
   if (typeof value === "string") return Number(value);
   return NaN;
+}
+
+function parseRefundMode(value: unknown): RefundMode {
+  return value === "manual" ? "manual" : "automatic";
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -21,6 +26,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { id } = await params;
   const body = await request.json().catch(() => null);
   const amount = parseRefundAmount(body?.amount);
+  const refundMode = parseRefundMode(body?.mode);
 
   if (!Number.isFinite(amount) || amount <= 0) {
     return NextResponse.json({ error: "Refund amount must be greater than 0." }, { status: 400 });
@@ -56,7 +62,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .eq("checkout_session_id", order.checkout_session_id)
     .maybeSingle<{
       id: string;
-      provider: "stripe" | "nowpayments";
+      provider: PaymentProviderId;
       provider_payment_id: string;
       amount: number | string;
       currency: "USD" | "EUR";
@@ -83,25 +89,58 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const normalizedAmount = Math.round(amount * 100) / 100;
   const refundedAt = new Date().toISOString();
-  const providerRefund =
-    transaction.provider === "stripe"
-      ? await getStripeClient().refunds.create({
-          payment_intent: transaction.provider_payment_id,
-          amount: Math.round(normalizedAmount * 100),
-          reason: "requested_by_customer",
-          metadata: {
-            order_id: order.id,
-            checkout_session_id: order.checkout_session_id,
-          },
-        })
-      : null;
+  const provider = getPaymentProvider(transaction.provider);
+  let providerRefund;
+
+  try {
+    providerRefund = await provider.refund({
+      order: {
+        id: order.id,
+        checkoutSessionId: order.checkout_session_id,
+      },
+      transaction: {
+        providerPaymentId: transaction.provider_payment_id,
+        currency: transaction.currency,
+        rawProviderPayload: transaction.raw_provider_payload,
+      },
+      amount: normalizedAmount,
+      mode: refundMode,
+    });
+  } catch (error) {
+    if (error instanceof ProviderRefundError) {
+      await writeAuditLog({
+        action: `${provider.label} refund blocked for order ${order.order_ref}: ${error.message}`,
+        status: "blocked",
+        request,
+        admin,
+        eventType: "refund",
+      });
+      return NextResponse.json({ error: error.message, manualAvailable: provider.refundCapabilities.manual }, { status: error.status });
+    }
+
+    const message = error instanceof Error ? error.message : "Automatic refund failed. No refund was recorded.";
+    await writeAuditLog({
+      action: `${provider.label} refund failed for order ${order.order_ref}: ${message}`,
+      status: "critical",
+      request,
+      admin,
+      eventType: "refund",
+    });
+    return NextResponse.json(
+      {
+        error: `${provider.label} refund failed: ${message}. No refund was recorded. You can complete the refund externally and record it manually.`,
+        manualAvailable: provider.refundCapabilities.manual,
+      },
+      { status: 502 },
+    );
+  }
 
   const { error: updateTransactionError } = await supabase
     .from("transactions")
     .update({
       status: "refunded",
       refund_status: "refunded",
-      provider_refund_id: providerRefund?.id ?? null,
+      provider_refund_id: providerRefund.providerRefundId,
       refund_amount: normalizedAmount,
       refund_currency: transaction.currency,
       refund_category: null,
@@ -109,21 +148,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       refunded_at: refundedAt,
       raw_provider_payload: {
         ...(transaction.raw_provider_payload ?? {}),
-        refund: providerRefund
-          ? {
-              id: providerRefund.id,
-              amount: providerRefund.amount,
-              currency: providerRefund.currency,
-              status: providerRefund.status,
-              reason: providerRefund.reason,
-            }
-          : {
-              manual: true,
-              provider: transaction.provider,
-              amount: normalizedAmount,
-              currency: transaction.currency,
-              recorded_at: refundedAt,
-            },
+        refund: {
+          mode: refundMode,
+          ...providerRefund.payload,
+        },
       },
       updated_at: refundedAt,
     })
@@ -146,12 +174,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   await writeAuditLog({
-    action: providerRefund
-      ? `Issued Stripe refund ${providerRefund.id} for order ${order.id.slice(0, 8)}`
-      : `Recorded manual ${transaction.provider} refund for order ${order.id.slice(0, 8)}`,
+    action: providerRefund.manual
+      ? `Recorded manual ${provider.label} refund for order ${order.id.slice(0, 8)}`
+      : `Issued ${provider.label} refund ${providerRefund.providerRefundId} for order ${order.id.slice(0, 8)}`,
     status: "success",
     request,
     admin,
+    eventType: "refund",
   });
 
   revalidatePath("/admin/orders");
@@ -163,5 +192,5 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   revalidatePath(`/profile/orders/${order.order_ref}`);
   revalidatePath("/profile/transactions");
 
-  return NextResponse.json({ ok: true, refundId: providerRefund?.id ?? null, manual: !providerRefund });
+  return NextResponse.json({ ok: true, refundId: providerRefund.providerRefundId, manual: providerRefund.manual });
 }

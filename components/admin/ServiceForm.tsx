@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { AdminFormField, adminInputClass, adminSelectClass, adminTextareaClass } from "@/components/admin/AdminFormField";
+import { cleanupUploadedMedia } from "@/lib/cms/client-media-cleanup";
 import type { GameRow } from "@/lib/cms/games";
 import type { ServiceCategoryRow } from "@/lib/cms/service-categories";
 import type { ServiceBenefit, ServiceOption, ServiceRow } from "@/lib/cms/services";
@@ -182,6 +183,7 @@ export function ServiceForm({
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [pendingImagePath, setPendingImagePath] = useState("");
 
   const availableCategories = useMemo(
     () =>
@@ -347,14 +349,19 @@ export function ServiceForm({
       formData.set("image", compressed);
 
       const response = await fetch("/api/admin/services/image", { method: "POST", body: formData });
-      const result = (await response.json().catch(() => null)) as { imageUrl?: string; error?: string } | null;
+      const result = (await response.json().catch(() => null)) as { imageUrl?: string; storagePath?: string; error?: string } | null;
 
       if (!response.ok || !result?.imageUrl) {
         setError(result?.error ?? "Unable to upload service image.");
         return;
       }
 
+      if (pendingImagePath) {
+        void cleanupUploadedMedia([pendingImagePath]);
+      }
+
       setImage(result.imageUrl);
+      setPendingImagePath(result.storagePath ?? "");
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Unable to upload service image.");
     } finally {
@@ -406,6 +413,7 @@ export function ServiceForm({
         return;
       }
 
+      setPendingImagePath("");
       router.push("/admin/services");
       router.refresh();
     } catch {
@@ -444,7 +452,14 @@ export function ServiceForm({
             <p className="text-xs text-[#94A3B8]">Actions stay available while you scroll.</p>
           </div>
           <div className="flex gap-3">
-            <AdminButton type="button" variant="secondary" onClick={() => router.push("/admin/services")}>
+            <AdminButton
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                if (pendingImagePath) void cleanupUploadedMedia([pendingImagePath]);
+                router.push("/admin/services");
+              }}
+            >
               Discard
             </AdminButton>
             <AdminButton type="submit" disabled={isSaving || isUploading}>

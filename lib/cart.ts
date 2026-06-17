@@ -7,7 +7,7 @@ export type Currency = 'USD' | 'EUR'
 export type SelectionValue = string | string[] | number | boolean
 
 export const CART_COOKIE = 'ms_cart_session'
-const CART_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
+const CART_COOKIE_MAX_AGE = 60 * 60 * 1
 
 export type CartServiceRow = {
   id: string
@@ -34,6 +34,8 @@ export type CartItemRow = {
   services: CartServiceRow | CartServiceRow[] | null
 }
 
+type CookieStore = Awaited<ReturnType<typeof cookies>>
+
 function relationOne<T>(value: T | T[] | null | undefined) {
   return Array.isArray(value) ? value[0] : value
 }
@@ -55,17 +57,19 @@ async function getCartSessionId() {
   const existing = cookieStore.get(CART_COOKIE)?.value
   const sessionId = existing || randomUUID()
 
-  if (!existing) {
-    cookieStore.set(CART_COOKIE, sessionId, {
-      httpOnly: true,
-      maxAge: CART_COOKIE_MAX_AGE,
-      path: '/',
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-    })
-  }
+  setCartSessionCookie(cookieStore, sessionId)
 
   return sessionId
+}
+
+function setCartSessionCookie(cookieStore: CookieStore, sessionId: string) {
+  cookieStore.set(CART_COOKIE, sessionId, {
+    httpOnly: true,
+    maxAge: CART_COOKIE_MAX_AGE,
+    path: '/',
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  })
 }
 
 export async function getOrCreateCartId() {
@@ -87,7 +91,10 @@ export async function getOrCreateCartId() {
 }
 
 export async function getCurrentCartId() {
-  const sessionId = await getCartSessionId()
+  const cookieStore = await cookies()
+  const sessionId = cookieStore.get(CART_COOKIE)?.value
+  if (!sessionId) return null
+
   const supabase = createAdminClient()
   const { data, error } = await supabase.from('carts').select('id').eq('session_id', sessionId).maybeSingle()
   if (error) throw error

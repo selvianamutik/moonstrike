@@ -1,5 +1,4 @@
 import type Stripe from "stripe";
-import { getCartService, getServiceCategory, getServiceGame, type CartItemRow } from "@/lib/cart";
 import { isCheckoutSnapshotItems, type CheckoutSnapshotItem } from "@/lib/checkout/snapshot";
 import { createOrderReference, createTransactionReference } from "@/lib/order-ref";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -152,17 +151,4 @@ export async function fulfillStripeCheckoutSession(sessionOrId: Stripe.Checkout.
   await supabase.from("carts").update({ updated_at: new Date().toISOString() }).eq("id", checkoutSession.cart_id);
 
   return { status: "created", orderCount: checkoutSession.items.length, checkoutSessionId: checkoutSession.id };
-}
-
-export function cartItemToStripeProduct(item: CartItemRow) {
-  const service = getCartService(item);
-  const game = getServiceGame(service);
-  const category = getServiceCategory(service);
-  const image = service?.image?.startsWith("http") ? service.image : undefined;
-
-  return {
-    name: service?.title ?? "Moon Strike Service",
-    description: [game?.name, category?.name].filter(Boolean).join(" / ") || undefined,
-    images: image ? [image] : undefined,
-  };
 }

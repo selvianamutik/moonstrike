@@ -6,15 +6,26 @@ import { ServiceCard } from "@/components/service-card";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui";
-import { gameServices, trustMetrics } from "@/lib/catalog";
+import { trustMetrics } from "@/lib/catalog";
 import { listActiveCatalogGames } from "@/lib/cms/games";
 import { getActiveLandingCms } from "@/lib/cms/landing";
+import { listActiveServices, serviceRowToCatalogService } from "@/lib/cms/services";
 
 export default async function Home() {
-  const [{ hero, benefits }, gameCards] = await Promise.all([
+  const [{ hero, benefits }, gameCards, activeServices] = await Promise.all([
     getActiveLandingCms(),
     listActiveCatalogGames(),
+    listActiveServices(),
   ]);
+  const hotOffers = activeServices
+    .filter((service) => service.is_hot_offer)
+    .sort((a, b) => {
+      const aTime = a.hot_offer_at ? new Date(a.hot_offer_at).getTime() : 0;
+      const bTime = b.hot_offer_at ? new Date(b.hot_offer_at).getTime() : 0;
+
+      return bTime - aTime || a.title.localeCompare(b.title);
+    });
+  const bestOffers = (hotOffers.length > 0 ? hotOffers : activeServices).slice(0, 4).map(serviceRowToCatalogService);
 
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
@@ -68,11 +79,18 @@ export default async function Home() {
             View all deals
           </Link>
         </div>
-        <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-          {gameServices.slice(0, 4).map((service) => (
-            <ServiceCard key={`${service.gameSlug}-${service.slug}`} service={service} />
-          ))}
-        </div>
+        {bestOffers.length > 0 ? (
+          <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+            {bestOffers.map((service) => (
+              <ServiceCard key={`${service.gameSlug}-${service.slug}`} service={service} />
+            ))}
+          </div>
+        ) : (
+          <div className="ms-card mt-10 rounded-xl p-10 text-center">
+            <h3 className="text-2xl font-black">No active offers yet</h3>
+            <p className="mt-3 text-[var(--ms-body)]">Publish services from admin to feature them here.</p>
+          </div>
+        )}
       </section>
 
       <LandingGamesSection games={gameCards} />
