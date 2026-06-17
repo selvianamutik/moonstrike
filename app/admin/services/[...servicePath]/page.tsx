@@ -7,7 +7,7 @@ import { ServiceDetail } from "@/components/service-detail";
 import { getAdminSession } from "@/lib/admin/session";
 import { listAdminGames } from "@/lib/cms/games";
 import { listServiceCategories } from "@/lib/cms/service-categories";
-import { getAdminService, getAdminServiceByGameAndSlug, type ServiceRow } from "@/lib/cms/services";
+import { getAdminService, getAdminServiceByGameAndSlug, listAdminServices, type ServiceRow } from "@/lib/cms/services";
 
 type AdminServiceAction = "edit" | "preview";
 
@@ -79,7 +79,7 @@ export default async function AdminServiceRoutePage({
     );
   }
 
-  const [games, categories] = await Promise.all([listAdminGames(), listServiceCategories()]);
+  const [games, categories, services] = await Promise.all([listAdminGames(), listServiceCategories(), listAdminServices()]);
 
   return (
     <div className="max-w-7xl mx-auto flex flex-col gap-6">
@@ -87,7 +87,7 @@ export default async function AdminServiceRoutePage({
         breadcrumbs={ServiceBreadcrumbs({ action: resolved.action, service: resolved.service })}
         title={`Edit: ${resolved.service.title}`}
       />
-      <ServiceForm categories={categories} games={games} service={resolved.service} />
+      <ServiceForm categories={categories} games={games} service={resolved.service} services={services} />
     </div>
   );
 }

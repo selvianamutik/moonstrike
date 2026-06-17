@@ -487,9 +487,21 @@ export function ServiceDetail({
           <h2 className="mt-12 border-b border-[var(--ms-border)] pb-5 text-base font-medium">Requirements</h2>
           <ul className="mt-6 space-y-5 text-[var(--ms-body)]">
             {service.requirements.map((item) => (
-              <li key={item} className="flex items-center gap-3">
+              <li key={`${item.text}-${item.serviceId ?? item.serviceSlug ?? ""}`} className="flex flex-col gap-3 rounded-lg border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-4 sm:flex-row sm:items-center">
                 <span className="text-[var(--ms-danger)]">-</span>
-                {item}
+                <span className="flex-1">{item.text}</span>
+                {item.gameSlug && item.serviceSlug ? (
+                  <Link
+                    href={
+                      item.serviceCategorySlug
+                        ? `/${item.gameSlug}/${item.serviceCategorySlug}/${item.serviceSlug}`
+                        : `/services/${item.gameSlug}/${item.serviceSlug}`
+                    }
+                    className="inline-flex h-9 items-center justify-center rounded-md border border-[var(--ms-border)] px-3 text-xs font-bold uppercase tracking-[0.12em] text-[var(--ms-heading)] transition-colors hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-gradient-end)]"
+                  >
+                    {item.serviceTitle ? `Open ${item.serviceTitle}` : "Open service"}
+                  </Link>
+                ) : null}
               </li>
             ))}
           </ul>

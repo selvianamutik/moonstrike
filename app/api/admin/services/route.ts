@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { writeAuditLog } from '@/lib/admin/audit'
 import { getAdminSession } from '@/lib/admin/session'
+import { serializeServiceRequirements } from '@/lib/cms/service-requirements'
 import { slugifyService } from '@/lib/cms/services'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
@@ -132,9 +133,7 @@ function parsePayload(body: any) {
           .filter((value: unknown) => typeof value === 'string' && value.trim())
           .map((value: string) => value.trim())
       : [],
-    requirements: Array.isArray(body?.requirements)
-      ? body.requirements.filter((value: unknown) => typeof value === 'string' && value.trim()).map((value: string) => value.trim())
-      : [],
+    requirements: serializeServiceRequirements(body?.requirements),
     what_you_get: Array.isArray(body?.whatYouGet) ? body.whatYouGet : [],
     base_price_usd: Number(body?.basePriceUSD) || 0,
     base_price_eur: Number(body?.basePriceEUR) || 0,

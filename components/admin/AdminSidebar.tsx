@@ -89,7 +89,12 @@ export function AdminSidebar() {
               }`}
             >
               <Icon size={18} className={isActive ? "text-white" : "text-[var(--admin-muted)]"} aria-hidden="true" />
-              {item.name}
+              <span className="flex-1">{item.name}</span>
+              {item.href === "/admin/messages" && unreadMessageTickets > 0 ? (
+                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--ms-danger)] px-1.5 text-[10px] font-black leading-none text-white">
+                  {unreadMessageTickets > 9 ? "9+" : unreadMessageTickets}
+                </span>
+              ) : null}
             </Link>
           );
         })}
