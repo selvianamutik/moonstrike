@@ -43,7 +43,7 @@ export function HeroCarousel({ heroes }: HeroCarouselProps) {
     <div className="relative">
       <div className="grid overflow-hidden rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] lg:grid-cols-[1fr_280px]">
         <PlaceholderAsset
-          alt={currentHero.imageAlt || "Hero banner"}
+          alt={"Hero banner"}
           className="min-h-[450px]"
           priority
           imageClassName="p-20"
