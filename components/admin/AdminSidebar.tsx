@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
@@ -64,15 +64,15 @@ export function AdminSidebar() {
   }, []);
 
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-[240px] bg-[var(--ms-primary)] border-r border-[var(--ms-accent)] flex flex-col z-50">
+    <aside className="fixed left-0 top-0 bottom-0 w-[var(--admin-sidebar-w,320px)] bg-[var(--admin-bg)] border-r border-[var(--admin-border)] flex flex-col z-50">
       <div className="h-16 flex items-center px-6 pt-4 pb-2">
         <Link href="/admin/dashboard" className="flex flex-col">
-          <span className="text-[var(--ms-text-primary)] text-xl font-bold font-display tracking-wide">MoonStrike</span>
-          <span className="text-[var(--ms-text-secondary)] text-xs">Admin Terminal</span>
+          <span className="text-[var(--admin-text)] text-xl font-bold font-display tracking-wide">MoonStrike</span>
+          <span className="text-[var(--admin-muted)] text-xs">Admin Terminal</span>
         </Link>
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-6 px-4 flex flex-col gap-1">
+      <nav className="flex-1 overflow-y-auto py-6 px-4 flex flex-col gap-1" aria-label="Admin navigation">
         {navItems.map((item) => {
           const isActive = isNavActive(pathname, item.href);
           const Icon = item.icon;
@@ -81,19 +81,15 @@ export function AdminSidebar() {
             <Link
               key={item.name}
               href={item.href}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+              aria-current={isActive ? "page" : undefined}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors min-h-[44px] ${
                 isActive
-                  ? "bg-[#8B5CF6] text-white shadow-[0_0_15px_rgba(139,92,246,0.3)]"
-                  : "text-[var(--ms-text-secondary)] hover:text-white hover:bg-white/5"
+                  ? "bg-[var(--admin-accent)] text-white shadow-[0_0_15px_var(--admin-accent-hover)]"
+                  : "text-[var(--admin-muted)] hover:text-white hover:bg-white/5"
               }`}
             >
-              <Icon size={18} className={isActive ? "text-white" : "text-[var(--ms-text-secondary)]"} />
-              <span className="flex-1">{item.name}</span>
-              {item.href === "/admin/messages" && unreadMessageTickets > 0 ? (
-                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--ms-danger)] px-1.5 text-[10px] font-black leading-none text-white">
-                  {unreadMessageTickets > 9 ? "9+" : unreadMessageTickets}
-                </span>
-              ) : null}
+              <Icon size={18} className={isActive ? "text-white" : "text-[var(--admin-muted)]"} aria-hidden="true" />
+              {item.name}
             </Link>
           );
         })}

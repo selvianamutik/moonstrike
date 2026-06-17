@@ -29,7 +29,7 @@ export function ServiceCard({ service }: { service: GameService }) {
               <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/35" />
             </>
           ) : (
-            <PlaceholderAsset alt={`${service.name} preview`} className="h-full" />
+            <PlaceholderAsset alt={`${service.name} preview`} className="h-full" isHidden={false}/>
           )}
           {service.isHotOffer ? <span className="absolute left-3 top-3"><Badge variant="hot" /></span> : null}
         </div>

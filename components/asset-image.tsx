@@ -6,6 +6,7 @@ type AssetImageProps = {
   className?: string;
   imageClassName?: string;
   priority?: boolean;
+  isHidden: boolean;
 };
 
 export function PlaceholderAsset({
@@ -14,6 +15,7 @@ export function PlaceholderAsset({
   className = "",
   imageClassName = "",
   priority = false,
+  isHidden = false
 }: AssetImageProps) {
   return (
     <div
@@ -25,7 +27,7 @@ export function PlaceholderAsset({
         fill
         priority={priority}
         sizes="(max-width: 768px) 100vw, 50vw"
-        className={`object-contain p-10 opacity-45 ${imageClassName}`}
+        className={`object-contain p-10 opacity-45 ${imageClassName} ${!isHidden ? "block" : "hidden"}`}
       />
       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/35" />
       {children}

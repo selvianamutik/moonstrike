@@ -132,7 +132,7 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
                         {item.service.image ? (
                           <img src={item.service.image} alt="" className="h-20 w-20 rounded-md object-cover" />
                         ) : (
-                          <PlaceholderAsset alt={`${item.service.title} order preview`} className="h-20 w-20 rounded-md" imageClassName="p-3" />
+                          <PlaceholderAsset isHidden={false} alt={`${item.service.title} order preview`} className="h-20 w-20 rounded-md" imageClassName="p-3" />
                         )}
                         <div>
                           <h3 className="text-lg font-black">{item.service.title}</h3>
