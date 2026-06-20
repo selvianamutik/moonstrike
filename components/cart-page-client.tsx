@@ -169,7 +169,7 @@ export function CartPageClient() {
                       {item.service?.image ? (
                         <img src={item.service.image} alt="" className="h-28 rounded-md object-cover" />
                       ) : (
-                        <PlaceholderAsset alt={`${item.service?.title ?? "Service"} preview`} className="h-28 rounded-md" imageClassName="p-4" />
+                        <PlaceholderAsset isHidden={false} alt={`${item.service?.title ?? "Service"} preview`} className="h-28 rounded-md" imageClassName="p-4" />
                       )}
                       <div>
                         <div className="flex flex-wrap items-center gap-3">

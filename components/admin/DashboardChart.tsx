@@ -40,7 +40,7 @@ export function DashboardChart() {
           tick={{ fill: MUTED, fontSize: 11 }}
           axisLine={false}
           tickLine={false}
-          tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+          tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
         />
         <Tooltip
           contentStyle={{

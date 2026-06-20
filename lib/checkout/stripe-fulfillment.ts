@@ -1,5 +1,6 @@
 import type Stripe from "stripe";
 import { isCheckoutSnapshotItems, type CheckoutSnapshotItem } from "@/lib/checkout/snapshot";
+import { notifyOrderCreated } from "@/lib/notifications";
 import { createOrderReference, createTransactionReference } from "@/lib/order-ref";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getStripeClient } from "@/lib/stripe";
@@ -74,6 +75,7 @@ export async function fulfillStripeCheckoutSession(sessionOrId: Stripe.Checkout.
   const stripePaymentIntentId = paymentIntentId(session);
   const currency = checkoutSession.currency;
   const referenceDate = new Date(checkoutSession.created_at);
+  const orderRef = createOrderReference(referenceDate, checkoutSession.id);
   const amountTotal =
     typeof session.amount_total === "number"
       ? session.amount_total / 100
@@ -109,7 +111,7 @@ export async function fulfillStripeCheckoutSession(sessionOrId: Stripe.Checkout.
     .from("orders")
     .upsert(
       {
-        order_ref: createOrderReference(referenceDate, checkoutSession.id),
+        order_ref: orderRef,
         user_id: checkoutSession.user_id,
         checkout_session_id: checkoutSession.id,
         status: "pending",
@@ -139,6 +141,13 @@ export async function fulfillStripeCheckoutSession(sessionOrId: Stripe.Checkout.
       ignoreDuplicates: true,
     });
   if (insertError) throw insertError;
+
+  await notifyOrderCreated({
+    orderId: order.id,
+    orderRef,
+    userId: checkoutSession.user_id,
+    serviceNames: checkoutSession.items.map((item) => item.product.name),
+  });
 
   const { error: clearError } = await supabase.from("cart_items").delete().eq("cart_id", checkoutSession.cart_id);
   if (clearError) throw clearError;

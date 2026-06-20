@@ -1,7 +1,8 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { LogIn, Search, ShoppingCart, User, Gamepad2, Bell, CircleUserRound } from "lucide-react";
+import { LogIn, Search, ShoppingCart, User, Gamepad2, CircleUserRound } from "lucide-react";
+import { NotificationBell } from "@/components/notification-bell";
 import { QuickSelectMenu } from "@/components/quick-select-menu";
 import { SiteSearchOverlay } from "@/components/site-search-overlay";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -50,10 +51,12 @@ export function SiteHeader() {
             Cart
           </Link>
 
-          <button type="button" aria-label="Notifications (coming soon)" className="hidden text-center hover:text-[var(--ms-gradient-end)] sm:block cursor-pointer">
-            <Bell size={22} className="mt-1 mx-auto" aria-hidden="true"/>
-            Notif
-          </button>
+          {isLoggedIn ? (
+            <div className="hidden flex-col items-center text-center hover:text-[var(--ms-gradient-end)] sm:flex">
+              <NotificationBell mode="customer" iconSize={22} label="Notifications" />
+              <span>Notif</span>
+            </div>
+          ) : null}
 
           {loading ? (
             <div className="h-11 w-11 animate-pulse rounded bg-white/5" />

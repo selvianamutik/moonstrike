@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { writeAuditLog } from "@/lib/admin/audit";
 import { requireVerifiedUser } from "@/lib/auth/session";
+import { getOrderNotificationContext, notifyRefundRequested } from "@/lib/notifications";
 import { canRequestOrderRefund, getRefundWindowDays } from "@/lib/orders";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -65,6 +66,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     eventType: "refund",
     actorLabel: user.email ?? "Customer",
   });
+
+  const notificationContext = await getOrderNotificationContext(order.id);
+  if (notificationContext) {
+    await notifyRefundRequested(notificationContext);
+  }
 
   revalidatePath("/profile");
   revalidatePath("/profile/orders");

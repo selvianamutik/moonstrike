@@ -7,9 +7,9 @@
 
 ## Current Progress Snapshot
 
-_Last refreshed: 2026-06-07_
+_Last refreshed: 2026-06-20_
 
-Moon Strike has moved past the static prototype phase. The current working surface is Supabase-backed auth, admin auth, game CMS, genre CMS, service category CMS, service CMS, service image upload, CMS-backed storefront browsing, CMS-backed Quick Select, browser-session cart APIs, real add-to-cart/remove-cart flows, real-cart checkout, Stripe sandbox Checkout Sessions, NowPayments crypto checkout, frozen checkout snapshots, idempotent payment webhook fulfillment, confirmed-payment transactions, internal order/transaction references, order confirmation, real customer order/transaction history/detail readout, and real admin order/transaction management.
+Moon Strike has moved past the static prototype phase. The current working surface is Supabase-backed auth, admin auth, game CMS, genre CMS, service category CMS, service CMS, service image upload, CMS-backed storefront browsing, CMS-backed Quick Select, browser-session cart APIs, real add-to-cart/remove-cart flows, real-cart checkout, Stripe sandbox Checkout Sessions, NowPayments crypto checkout, frozen checkout snapshots, idempotent payment webhook fulfillment, confirmed-payment transactions, internal order/transaction references, order confirmation, real customer order/transaction history/detail readout, real admin order/transaction management, protected API-refresh chat, in-app notifications, and selected customer transactional emails.
 
 **Implemented / mostly working:**
 - Customer auth: email/password, Google OAuth, verification, reset password, profile edit, connected accounts, and auth gates.
@@ -17,13 +17,13 @@ Moon Strike has moved past the static prototype phase. The current working surfa
 - Admin games: create/edit/list/delete/archive, image upload, genre add/delete, active/draft/archived states.
 - Admin services: list/filter/search/delete, service categories per game, slug-based edit/preview routes, service images, custom badges, sticky editor layout, and validated option schema builder.
 - Storefront catalog: landing game section, `/games`, `/services`, `/[game-slug]`, category pages, service detail pages, and Quick Select use CMS data instead of mock service data.
-- Seeds: `npm run admin:seed`, `npm run admin:reseed`, `npm run catalog:seed`, and `npm run refund-orders:reseed` for refund/order testing data.
+- Seeds: `npm run admin:seed`, `npm run admin:reseed`, `npm run catalog:seed`, `npm run refund-orders:reseed`, `npm run notifications:seed`, and `npm run chat-user:seed` for test data.
 - Browser-session cart: anonymous/login/logout in the same browser all use the same `ms_cart_session` cart; service detail Add to Cart and Buy Now persist selected option snapshots.
-- Orders/payments: one internal order per checkout, `order_items` for purchased services, `transactions` for confirmed provider payments, `order_ref` and `transaction_ref` user/admin-facing IDs, Stripe refund execution, and manual non-Stripe refund recording.
+- Orders/payments: one internal order per checkout, `order_items` for purchased services, `transactions` for confirmed provider payments, `order_ref` and `transaction_ref` user/admin-facing IDs, Stripe refund execution, manual non-Stripe refund recording, customer/admin notification events, and customer emails for delivered/refund decisions.
+- Chat: persisted support/order tickets, protected API polling/local events, unread badges, image/shared-link attachments, lazy loading, and cleanup cron are wired.
 
 **Still pending / mock-backed:**
-- Google Sheets sync and order notification emails.
-- Support chat persistence/realtime.
+- Google Sheets sync.
 - Dedicated `/hot-offers` route and final CMS polish for all landing blocks.
 
 **Current route direction:**
@@ -131,7 +131,7 @@ Moon Strike has moved past the static prototype phase. The current working surfa
 
 | Component | Description |
 |---|---|
-| `<Navbar>` / `<SiteHeader>` | Logo, Quick Select trigger, `/services` search form, currency toggle (USD/EUR, persisted in `localStorage`), Games link, Notifications link, cart icon (`/cart`), theme toggle, and Login/Profile state from Supabase Auth. Current implementation lives in `components/site-header.tsx`. Cart count badge and live search overlay are still pending. |
+| `<Navbar>` / `<SiteHeader>` | Logo, Quick Select trigger, global search overlay, currency toggle (USD/EUR, persisted in `localStorage`), Games link, Notifications link, cart icon (`/cart`) with count badge, theme toggle, and Login/Profile state from Supabase Auth. Current implementation lives in `components/site-header.tsx`. |
 | `<QuickSelectMenu>` | CMS-backed services menu. Fetches `/api/catalog/quick-select`, renders active games/services only, uses a body portal overlay, closes on outside click/Escape, and uses a one-step game carousel with fixed All + prev/next controls. |
 | `<Footer>` | Logo, sitemap, legal links, genres, social links, disclaimer, copyright. |
 | `<GameCard>` | Image thumbnail, genre tags, game name, short description. |
@@ -141,7 +141,7 @@ Moon Strike has moved past the static prototype phase. The current working surfa
 | `<CurrencySelector>` | USD / EUR display toggle. Controls visible prices only; never controls service availability. |
 | `<Badge>` | Custom badge text from CMS for services; do not hardcode a fixed service badge list. |
 | `<ThemeToggle>` | Switches dark and light mode; persisted in user preference. |
-| `<SearchResults>` | Planned real-time overlay below the navbar search bar. Current global header search submits to `/services` with a query. `/services`, `/games`, and Quick Select already have CMS-backed search/filter behavior. |
+| `<SearchResults>` | Global search overlay for games and services. Searches service/game names and includes related game services when a game name is searched. `/services`, `/games`, and Quick Select also have CMS-backed search/filter behavior. |
 
 ---
 
@@ -367,7 +367,7 @@ If `orderId` doesn't belong to the logged-in user - call `notFound()` to render 
 - Collapsed: circular icon + unread count badge
 - Expanded: 320x480px chat panel (does not navigate away)
 - Same data source as Admin Messages (`SupportTicket` + `Message` models)
-- Real-time via Supabase Realtime WebSocket subscription
+- Near real-time via protected API refresh/local update events; no direct browser table subscription for private message payloads
 - Excluded from `/admin/*`, `/login`, `/register`
 
 ---
@@ -871,7 +871,7 @@ One role only: `ADMIN`. Admin = booster. No partial-access roles. Auth is manual
 
 ### Support Chat
 
-A `SupportTicket` is the container for a conversation. `Message` records are a separate table joined by `ticketId` - **not a JSONB array on the ticket row**. This is required for Supabase Realtime to work on individual messages.
+A `SupportTicket` is the container for a conversation. `Message` records are a separate table joined by `ticketId` - **not a JSONB array on the ticket row**. This keeps message loading paginated and lets protected API routes enforce customer/admin access before returning private chat data.
 
 Two thread types: general support (`orderId` is null) and order-specific (`orderId` is set).
 
@@ -1019,9 +1019,9 @@ const {data: settings} = await supabase.from('system_settings').select('*').eq('
 | Terms of Service UI | done | Implemented. |
 | Privacy Policy UI | not-started | Same layout as ToS and Refund Policy. |
 | Quick Select Mega Menu | done | CMS-backed via `/api/catalog/quick-select`; game carousel uses fixed All + prev/next + animated one-step scrolling; service links use canonical detail URLs. |
-| Global Navbar | in-progress | Shared header uses Supabase auth state, quick select, `/services` search, Games link, Notifications link, cart link, theme toggle, and persisted currency toggle. Cart count and live search overlay remain pending. |
+| Global Navbar | in-progress | Shared header uses Supabase auth state, quick select, global search overlay, Games link, Notifications link, cart count badge, cart link, theme toggle, and persisted currency toggle. |
 | Global Footer | done | Shared footer exists; some placeholder links may remain. |
-| Global Chat Bubble | in-progress | UI exists; Supabase realtime/persistence is pending. |
+| Global Chat Bubble | in-progress | Persisted support chat exists with protected API refresh, unread badge, image/shared-link attachments, lazy loaded messages, and anonymous `ms_chat_session` support. Opening the bubble does not create a ticket until a chat is started or the first message is sent. |
 | Customer Login | in-progress | Supabase email/password, Google OAuth, reset password, rate limits, safe `next`, callback errors, resend verification, and auth gates are wired. Cart is browser-session based, so the same browser cart remains visible before/after login/logout. |
 | Customer Register | in-progress | Supabase sign-up, provider-aware checks, app rate limit, Google OAuth, Google register completion at `/register/complete`, confirm password validation, verification/resend UX are wired. Profile persistence beyond auth metadata is pending. |
 | Customer Profile | in-progress | Auth-gated profile and edit flow exist, including metadata username updates, password changes, Google identity linking, connected accounts, email/password addition for OAuth users, real order history from `orders`, and real transaction history from `transactions`. Avatar upload remains pending. |
@@ -1033,7 +1033,7 @@ const {data: settings} = await supabase.from('system_settings').select('*').eq('
 | Light mode theme | done | CSS variable swap exists. |
 | Theme toggle | done | Toggle persists to `localStorage` and updates `<html data-theme>`. |
 | TrustPilot integration | not-started | Static review cards exist; TrustBox/API integration is pending. |
-| Notifications | in-progress | Navbar links to `/notifications`; placeholder notification center exists. Real notification persistence and email/in-app events are pending. |
+| Notifications | in-progress | Customer/admin notification tables, feeds, unread badges, filter tabs, read/delete actions, cleanup cron, seeds, and event wiring are implemented. Customer emails are sent only for `order_delivered`, `refund_approved`, and `refund_denied`. |
 | Mobile / responsive layouts | in-progress | Tailwind breakpoints exist; browser screenshot QA still recommended. |
 | Not Found page (404) | in-progress | `app/not-found.tsx` exists; dynamic route behavior should be rechecked after slug-route changes. |
 
@@ -1043,7 +1043,7 @@ const {data: settings} = await supabase.from('system_settings').select('*').eq('
 |---|---|---|
 | Admin Login | done | Single seeded admin account; password login issues signed HttpOnly admin session cookie. No OTP by design. Login attempts are rate-limited/audited. |
 | Admin Dashboard Overview | done | UI exists; KPI/chart data still mostly static. |
-| Admin Users | in-progress | UI/search/actions exist with mock data. |
+| Admin Users | in-progress | Reads real Supabase Auth users, supports name/email search, active/banned filter, detail pages by readable user slug, ban/unban actions, customer activity, ban history, order/transaction summaries, and pagination. |
 | Admin Games | in-progress | CMS-backed list/create/edit/archive/delete flows exist with upload support; further validation/polish may remain. |
 | Admin Services List | done | CMS-backed list/filter/search/delete with active/draft/archived tabs, game/category filters, image thumbnails, slug-based edit/preview links, and service category management modal. |
 | Admin Service CMS | done | CMS-backed create/edit with upload image, custom badges, base USD/EUR price, service category, benefits, requirements, sticky section nav/actions, and validated option builder. |
@@ -1056,7 +1056,7 @@ const {data: settings} = await supabase.from('system_settings').select('*').eq('
 | Promotional Banners CMS | in-progress | Banner/content management exists; full scheduling/fallback behavior pending. |
 | Media Library CMS | in-progress | Supabase Storage upload exists for content/game/service images. Dedicated library/usage tracking/delete guards are pending. |
 | Hot Offers auto-population | in-progress | Services support `is_hot_offer`; dedicated `/hot-offers` page pending. |
-| Admin Messages / Chat | in-progress | Inbox UI exists with mock support/order threads. |
+| Admin Messages / Chat | in-progress | Admin inbox reads real support/order tickets, uses protected API refresh/local events, unread badges, lazy loads messages, supports attachments/shared links, and does not auto-select the first chat. |
 | Admin Audit Logs | in-progress | Audit logs now include `event_type` plus status. Coverage includes admin auth/CMS/settings/order actions, checkout, payment webhooks, refunds, customer order lifecycle actions, and cron outcomes. |
 | Admin Settings | in-progress | Settings persist to `system_settings`, support admin profile/password changes, session timeout, refund window, delivered-order auto-complete window, and notification-event toggles. |
 | Admin Auth Guard | done | `proxy.ts` verifies signed admin cookie for `/admin/*` except `/admin/login`. |
@@ -1079,10 +1079,10 @@ const {data: settings} = await supabase.from('system_settings').select('*').eq('
 | Rate limiting | in-progress | Auth/admin login/password-reset/register limits exist. Broader API limits pending. |
 | Audit log (admin/system/customer actions) | in-progress | Covers admin auth/CMS/settings/order actions plus checkout creation/block/failure, payment webhook signature/fulfillment outcomes, refund success/failure/block, customer refund requests, customer completion confirmation, and auto-complete cron outcomes. |
 | Google Sheets integration | not-started | Orders + Transactions tabs pending. |
-| Real-time chat | not-started | Supabase Realtime pending. |
+| Real-time chat | in-progress | Uses fast protected API refresh and local update events instead of exposing private message payloads through browser-side table subscriptions. Active chats, ticket previews, and unread badges update without manual reload. |
 | Admin second factor | removed | Extra login factors intentionally out of scope. |
 | Anonymous cart API routes | in-progress | Browser-session cart uses `ms_cart_session` and server-side service role routes for add/list/remove plus checkout readout. |
-| Backend API routes | in-progress | Auth/admin/CMS/catalog/cart APIs, provider-backed `POST /api/checkout`, provider-backed `POST /api/checkout/nowpayments`, `/api/v1/webhooks/stripe`, and `/api/v1/webhooks/nowpayments` exist. Checkout/refund provider dispatch is centralized in `lib/payments`; chat and notifications pending. |
+| Backend API routes | in-progress | Auth/admin/CMS/catalog/cart APIs, provider-backed checkout, Stripe/NOWPayments webhooks, chat APIs, notification APIs, cleanup cron routes, and provider dispatch in `lib/payments` exist. |
 ---
 
 ## 8. Stack & Decisions
@@ -1467,19 +1467,44 @@ Full-page storefront render using draft data. Read-only - no checkout.
 
 ### 10.11 Admin Messages (`/admin/messages`)
 
-**Layout:** Left sidebar - Middle panel (conversation list) - Right panel (active chat + user profile)
+**Layout:** Conversation list + large active chat panel. User/order context is opened in a modal so the chat surface stays wide.
 
-**Two thread types, one unified tab:**
-- `[Support]` - general support; available to anonymous and logged-in customers
-- `[Order #id]` - order-specific; initiated from order list or order management page
+**Two thread types, one unified inbox:**
+- `[Support]` - general support; available to anonymous and logged-in customers.
+- `[Order MS-...]` - order-specific chat linked to a paid order.
 
-**Chat:** Customer messages left (dark bubble) - Admin messages right (purple gradient bubble) - timestamps - file attachments inline.
+**Creation rules:**
+- Opening a chat UI does not create a ticket by itself.
+- Customer/admin create-chat actions open an existing matching ticket when one exists.
+- If no matching ticket exists, the UI starts as a draft and writes the ticket only when the first message is sent.
+- Admin and customer message lists do not auto-select the first chat by default.
+- Duplicate support/order tickets are prevented by uniqueness rules for customer general chat, customer order chat, and anonymous general chat.
 
-**Composer:** Formatting toolbar (B - I - Link - List - Emoji) - text input - attach button - Send button.
+**Read state and badges:**
+- `support_tickets.admin_last_read_at` tracks unread customer messages for admins.
+- `support_tickets.customer_last_read_at` tracks unread admin messages for customers.
+- Admin sidebar Messages badge shows the count of unread tickets, capped as `9+`.
+- Each admin/customer chat row shows unread message count for that ticket, capped as `9+`.
+- Opening, typing in, interacting with, or scrolling through a chat may mark it read.
+- Browser tab title can show unread chat count when messages arrive.
 
-**User profile sidebar:** Avatar - username - location - orders + spend stats - recent activity - management actions (Update Ticket - Ban User).
+**Realtime model:** Chat uses protected API refresh loops and local update events. Browser-side direct Supabase table subscriptions for private message payloads are avoided. Active chats refresh quickly; ticket lists/unread badges refresh on a slower interval and on focus/visibility return.
 
-**Anonymous session merge:** Anonymous users get a temporary `session_id` (stored in `SupportTicket.sessionId`). On login, `userId` and `username` are attached to existing ticket records - chat history preserved, and the customer's display name updates to their actual username going forward. Pre-login messages retain the anonymous label. Chat session TTL: anonymous = 1 hour. Expired chat session records deleted. (Cart data is on a separate 6-hour cookie - independent of this expiry.)
+**Messages and attachments:**
+- Enter sends a message; Shift+Enter can be reserved for multiline behavior where supported.
+- Older messages lazy-load in pages of 10 when scrolling upward.
+- Messages support text, image attachments, and shared game/service links.
+- Uploaded chat images are cleaned up if removed/cancelled before send.
+- Image attachments can be opened in a full-size viewer; click outside or Escape closes it.
+- Shared game/service cards keep consistent preview sizing and open target pages in a new tab.
+
+**Anonymous session merge:** Anonymous users get a temporary `session_id` stored in the `ms_chat_session` cookie. On login, matching anonymous support chat can be merged into the user account. Chat session TTL is 1 hour and refreshes from recent chat activity so active users do not lose the thread mid-conversation. Cart data is separate and uses `ms_cart_session`.
+
+**Retention/cleanup:**
+- Anonymous support chats can be deleted after their session expires.
+- Logged-in general support chats can be deleted after the configured support retention window.
+- Order chats are retained until a few days after the linked order is completed or refunded.
+- Cleanup route: `/api/cron/chat/cleanup`.
 
 ---
 
@@ -1738,51 +1763,61 @@ Admin -> Strict at login, relaxed after session verification
 
 ### Notifications
 
-**Customer (in-app bell + email):**
+**Storage:** Notifications are persisted in the `notifications` table. Chat unread badges are separate and do not use this table.
 
-| Trigger | Message |
-|---|---|
-| `in_progress - delivered` | "Your boost is complete!" |
-| `refund_requested - refunded` | "Your refund has been approved and is being processed." |
-| `refund_requested - previous status` (denied) | "Your refund request has been denied." |
+**Delivery model:** Notification feeds and badges use protected API polling. Customer notification APIs are called only for logged-in customers. Admin notification APIs are called only inside admin layout/pages. Feed pages poll about every 30 seconds while visible and refresh on focus/visibility return and read/delete actions.
 
-**Admin (in-app bell + email via Resend):**
+**Customer events:**
 
-| Trigger | Message |
-|---|---|
-| New order enters `pending` | In-app bell: "New order received - [service name]" + email to admin |
-| Order enters `refund_requested` | In-app bell: "Refund requested - [order ID]" + email to admin |
+| Event | In-app | Email |
+|---|---|---|
+| `order_confirmed` | Yes | No |
+| `order_in_progress` | Yes | No |
+| `order_delivered` | Yes | Yes |
+| `order_completed` | Yes | No |
+| `refund_approved` | Yes | Yes |
+| `refund_denied` | Yes | Yes |
 
-**In-App Bell:** Unread counter badge on bell icon. Clicking opens notification feed. Marked as read on open/click. Present in both storefront navbar and admin top bar.
+**Admin events:**
+
+| Event | In-app | Email |
+|---|---|---|
+| `order_created` | Yes | No |
+| `refund_requested` | Yes | No |
+| `order_completed` | Yes | No |
+
+**Notification feed UX:**
+- Customer page: `/notifications`.
+- Admin page: `/admin/notifications`.
+- Filters: All, Unread, Orders, Refunds.
+- Actions: mark read, mark all read, delete notification with confirmation.
+- Cleanup: `/api/cron/notifications/cleanup` deletes read notifications older than 30 days; unread notifications are never deleted by cleanup.
+
+**Email rule:** Customer transactional email is intentionally limited to `order_delivered`, `refund_approved`, and `refund_denied`. Do not add email for routine status changes without a product decision.
 
 ---
 
-### Resend (SMTP)
+### Resend Email
 
-Resend is a developer-focused email API. It handles transactional emails - no newsletter features, no drag-and-drop builder. Just reliable email delivery via API or SDK.
+Resend is used in two ways:
+- Supabase Auth emails can be routed through Resend SMTP from the Supabase dashboard.
+- MoonStrike app transactional emails use the Resend HTTP API from `lib/email.ts`.
 
 **What it sends for Moon Strike:**
-- Auth emails: email confirmation on register, password reset link (both triggered by Supabase Auth automatically when configured)
-- Order notification emails: boost complete, refund approved, refund denied (triggered by your backend on state transitions)
+- Auth emails: email confirmation on register and password reset links, triggered by Supabase Auth.
+- App emails: `order_delivered`, `refund_approved`, and `refund_denied`, triggered by backend notification helpers.
 
-**How it works:**
-1. Create a free account at resend.com (100 emails/day free, 3,000/month)
-2. Verify your sending domain (adds DNS records - one-time setup)
-3. Add `RESEND_API_KEY` to env vars
-4. Install the SDK: `npm install resend`
-5. Send emails from your backend:
+**Implementation:**
+- `lib/email.ts` provides `sendEmail()` and the reusable branded `renderMoonStrikeEmail()` template.
+- `lib/notifications.ts` sends app emails only after the matching in-app notification is newly created, so deduped/retried actions do not spam the customer.
+- `scripts/test-email.mjs` sends a branded test email without touching orders/refunds/notifications.
+- Test command: `npm run email:test` or `npm.cmd run email:test`.
 
-```ts
-import {Resend} from 'resend';
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-await resend.emails.send({from: 'MoonStrike <noreply@yourdomain.com>',
-to: customer.email,
-subject: 'Your boost is complete!',
-html: '<p>Your order has been delivered...</p>'});
-```
-
-**Supabase integration:** In Supabase dashboard - Authentication - Email - set custom SMTP to Resend's SMTP details. This routes all Supabase auth emails (confirm, reset) through Resend automatically.
+**Required env for app email:**
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+- `NEXT_PUBLIC_SITE_URL`
+- `EMAIL_TEST_TO` only for the test script
 
 ---
 
@@ -1936,17 +1971,20 @@ Test every flow end-to-end as a real user before going live. Use Stripe test car
 | Full purchase - NowPayments crypto | Webhook fires, signature verified, orders created, wallet address flow works on refund |
 | Multi-item checkout | All CartItems shown in order summary, one payment, one Order per CartItem created, all visible on Order Confirmed page |
 | Order Confirmed page | All orders from checkout shown, View My Orders links to profile Order History |
-| Admin: Confirm Order - In Progress - Delivered | Each status transition updates customer profile and sends notification |
+| Admin: Confirm Order - In Progress - Delivered | Each status transition updates customer profile and sends in-app notification; delivered also sends customer email |
 | Customer requests refund (pre-delivery) | Button visible on pending/confirmed/in_progress, refund_requested status set |
 | Customer requests refund after completion within configured window | Button visible, configured refund window enforced |
 | Customer requests refund (post-delivery, after 7 days) | Button hidden - refund not available |
-| Admin approves refund - Stripe | Refund issued via Stripe API, status = refunded |
+| Admin approves refund - Stripe | Refund issued via Stripe API, status = refunded, customer in-app notification + email sent |
 | Admin approves refund - NowPayments | Wallet address collected, refund issued via NowPayments API, status = refunded |
-| Admin denies refund | Status restores to pre-refund workflow state; transaction refund status is `rejected`; customer notification pending notification feature |
+| Admin denies refund | Status restores to pre-refund workflow state; transaction refund status is `rejected`; customer in-app notification + email sent |
 | Second refund attempt on same order | Not possible - button hidden after first attempt |
 | Auto-complete delivered orders | Delivered order auto-moves to completed after the configured auto-complete window with no refund request |
-| Support chat (anonymous) | Chat opens, message sent to admin |
+| Support chat (anonymous) | Chat opens without creating a ticket until first message/start action; message appears in admin inbox |
 | Support chat - login - name updates | History preserved, username shown going forward |
+| Chat unread badges | Admin/customer unread badges clear after opening, scrolling, typing, or interacting with the chat |
+| Notification feed | `/notifications` and `/admin/notifications` show filters, unread badges, mark read/all read, delete with confirmation |
+| Email test | `npm run email:test` sends a branded test email to `EMAIL_TEST_TO` without changing app data |
 | Admin search | Finds orders by ID, transactions by ID, users by email/username |
 | Unverified user tries to purchase | Blocked, verification banner shown, resend email works |
 | Admin login | Seeded admin credentials log in, cookie session is created, and protected admin routes open |
@@ -2206,6 +2244,15 @@ npm run admin:reseed Replace/reseed the single admin account
 npm run catalog:seed Seed 20 games, genres, categories, and 20 services per game with option schemas
 npm run refund-orders:seed Clean seed refund/order test scenarios for USD and EUR
 npm run refund-orders:reseed Alias for the same clean refund/order reseed
+npm run refund-orders:cleanup Remove refund/order test data
+npm run notifications:seed Seed customer/admin notification examples
+npm run notifications:reseed Alias for notification reseed
+npm run notifications:cleanup Remove seeded notifications
+npm run chat-user:seed Seed support/order chat examples for the test user
+npm run chat-user:reseed Alias for chat-user reseed
+npm run chat-user:cleanup Remove seeded test-user chats
+npm run email:test Send a branded Resend test email to EMAIL_TEST_TO
+npm run chat:cleanup Delete all chat history when called with confirmation
 ```
 
 ---
@@ -2219,7 +2266,7 @@ Follow these during development - not as a post-launch fix.
 | Images | Lazy load all game/service images. Use Cloudflare Images URLs with size transforms (e.g. `?width=600`). Never serve original upload URLs directly to the frontend. |
 | Infinite scroll | Fetch in pages of 16 items. Never load entire table. Use Supabase `.range(from, to)` pagination. |
 | Search debounce | Already specced at 300ms - do not reduce. Each keystroke = one DB query. |
-| Supabase Realtime | Subscribe to chat WebSocket only when chat bubble is open. Unsubscribe on close. Never keep open connections across all pages. |
+| Chat refresh | Use protected API refresh/local events for private chat data. Active chats refresh quickly; ticket lists/unread badges refresh slower and on focus/visibility return. Avoid browser-side direct table subscriptions for private message payloads. |
 | TrustBox widget | Load async via script tag. Does not block page render - no action needed. |
 | Options schema render | Service Detail configurator reads `optionsSchema` JSONB. Parse once on load, do not re-parse on every price recalculation. |
 | Price calculation | Run entirely client-side on each option change - no API call needed. One pure function (see section 6). |
@@ -2241,6 +2288,7 @@ Follow these during development - not as a post-launch fix.
 | `SUPABASE_SECRET_KEY` | Backend API routes only | Runtime | Supabase secret key (`sb_secret_...`). **Never expose to frontend.** Bypasses RLS. Legacy fallback: `SUPABASE_SERVICE_ROLE_KEY`. |
 | `JWT_SECRET` | Backend | Runtime | Signs and verifies admin JWTs. Min 32 chars, random. Generate with `openssl rand -base64 32`. |
 | `CRON_SECRET` | Backend cron routes | Runtime | Optional local/manual authorization for cron endpoints. Vercel Cron also sends `x-vercel-cron: 1`. |
+| `NEXT_PUBLIC_SITE_URL` | Backend emails + links | Runtime | Canonical app URL used in transactional email CTA links. Local default: `http://localhost:3000`. |
 | `ADMIN_EMAIL` | Seed script | Local reseed + deploy setup | Email for the single seeded admin account. Defaults to `admin@moonstrike.io` if omitted. |
 | `ADMIN_PASSWORD` | Seed script | Local reseed + deploy setup | Password for the single seeded admin account. Required for `npm run admin:seed` / `npm run admin:reseed`. |
 | `ADMIN_DISPLAY_NAME` | Seed script | Local reseed + deploy setup | Display name for the single seeded admin account. Defaults to `Admin Alpha`. |
@@ -2249,7 +2297,9 @@ Follow these during development - not as a post-launch fix.
 | `STRIPE_WEBHOOK_SECRET` | Backend webhook handler | Runtime | From Stripe Dashboard - Webhooks - signing secret. Used to verify webhook signatures. |
 | `NOWPAYMENTS_API_KEY` | Backend | Runtime | From NowPayments dashboard. Used to create crypto payments. |
 | `NOWPAYMENTS_IPN_SECRET` | Backend webhook handler | Runtime | WARNING: Setup pending. From NowPayments dashboard > API Settings > IPN Secret. Used to verify webhook signatures. |
-| `RESEND_API_KEY` | Backend | Runtime | From resend.com dashboard. Used for transactional emails (auth and order notifications). |
+| `RESEND_API_KEY` | Backend | Runtime | From resend.com dashboard. Used by MoonStrike app transactional emails. Supabase Auth email may also use Resend SMTP from Supabase dashboard config. |
+| `RESEND_FROM_EMAIL` | Backend | Runtime | Sender address for app transactional emails. Use `onboarding@resend.dev` only for local testing; production should use a verified domain sender. |
+| `EMAIL_TEST_TO` | Seed/test script | Local testing | Recipient used by `npm run email:test`. |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Backend | Runtime | Full JSON key file contents as a string. From Google Cloud Console - Service Accounts. Used for Sheets writes. |
 | `GOOGLE_SHEET_ID` | Backend | Runtime | Spreadsheet ID from the Google Sheets URL. The sheet must be shared with the service account email. |
 | `NEXT_PUBLIC_CLOUDFLARE_IMAGES_ACCOUNT_HASH` | Frontend | Build + Runtime | From Cloudflare Images dashboard. Used to construct CDN image URLs. |
@@ -2284,6 +2334,8 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 NOWPAYMENTS_API_KEY=...
 NOWPAYMENTS_IPN_SECRET=...
 RESEND_API_KEY=re_...
+RESEND_FROM_EMAIL=MoonStrike <noreply@yourdomain.com>
+EMAIL_TEST_TO=you@example.com
 GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"..."}
 GOOGLE_SHEET_ID=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms
 NEXT_PUBLIC_CLOUDFLARE_IMAGES_ACCOUNT_HASH=abc123xyz

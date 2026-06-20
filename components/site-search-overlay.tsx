@@ -29,7 +29,7 @@ function ResultRow({ result, onSelect }: { result: SearchResult; onSelect: () =>
       {result.image ? (
         <img src={result.image} alt="" className="h-14 w-14 rounded-md object-cover" />
       ) : (
-        <PlaceholderAsset alt="" className="h-14 w-14 rounded-md" imageClassName="p-2" />
+        <PlaceholderAsset isHidden={false} alt="" className="h-14 w-14 rounded-md" imageClassName="p-2" />
       )}
       <span className="min-w-0">
         <span className="block truncate text-sm font-black text-[var(--ms-heading)]">{result.title}</span>

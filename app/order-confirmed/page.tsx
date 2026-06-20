@@ -155,7 +155,7 @@ export default async function OrderConfirmedPage({ searchParams }: OrderConfirme
                     {item.service.image ? (
                       <img src={item.service.image} alt="" className="h-22 w-22 rounded-md object-cover" />
                     ) : (
-                      <PlaceholderAsset alt={`${item.service.title} preview`} className="h-22 w-22 rounded-md" imageClassName="p-3" />
+                      <PlaceholderAsset isHidden={false} alt={`${item.service.title} preview`} className="h-22 w-22 rounded-md" imageClassName="p-3" />
                     )}
                     <div>
                       <div className="flex flex-wrap items-center gap-3">

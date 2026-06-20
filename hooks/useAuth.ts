@@ -1,30 +1,46 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
+
+type SessionStatusPayload = {
+  banned?: boolean
+} | null
+
+let lastSessionStatusCheckAt = 0
+let sessionStatusInFlight: Promise<SessionStatusPayload> | null = null
+
+async function loadSessionStatus({ force = false }: { force?: boolean } = {}) {
+  const now = Date.now()
+
+  if (!force && now - lastSessionStatusCheckAt < 60_000) return null
+  if (sessionStatusInFlight) return sessionStatusInFlight
+
+  lastSessionStatusCheckAt = now
+  sessionStatusInFlight = fetch('/api/auth/session-status', {
+    cache: 'no-store',
+  })
+    .then((response) => response.json().catch(() => null) as Promise<SessionStatusPayload>)
+    .catch(() => null)
+    .finally(() => {
+      sessionStatusInFlight = null
+    })
+
+  return sessionStatusInFlight
+}
 
 export function useAuth() {
   const supabase = useMemo(() => createClient(), [])
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const lastSessionStatusCheckRef = useRef(0)
 
   useEffect(() => {
     let isMounted = true
 
     async function checkSessionStatus({ force = false }: { force?: boolean } = {}) {
       if (!force && document.visibilityState !== 'visible') return
-      const now = Date.now()
-      if (!force && now - lastSessionStatusCheckRef.current < 60_000) return
-      lastSessionStatusCheckRef.current = now
-
-      const response = await fetch('/api/auth/session-status', {
-        cache: 'no-store',
-      }).catch(() => null)
-      const payload = (await response?.json().catch(() => null)) as {
-        banned?: boolean
-      } | null
+      const payload = await loadSessionStatus({ force })
 
       if (!isMounted || !payload?.banned) return
 
