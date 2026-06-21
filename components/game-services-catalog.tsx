@@ -74,6 +74,7 @@ export function GameServicesCatalog({
 
   const activeLabel = tabs.find((tab) => tab.slug === activeSlug)?.label ?? "All";
   const filteredServices = services.filter((service) => matchesQuery(service, query));
+  const visibleServices = filteredServices.slice(0, visible);
   const fixedTabs: ScrollingTabItem[] = [];
   const scrollingTabs: ScrollingTabItem[] = tabs.map((tab) => ({
     href: tab.href,
