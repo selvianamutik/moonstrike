@@ -6,7 +6,7 @@ type AssetImageProps = {
   className?: string;
   imageClassName?: string;
   priority?: boolean;
-  isHidden: boolean;
+  isHidden?: boolean;
 };
 
 export function PlaceholderAsset({
