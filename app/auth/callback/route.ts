@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { EmailOtpType } from '@supabase/supabase-js'
 import { authProviders, hasEmailPassword } from '@/lib/auth/providers'
+import { mergeAnonymousChatTickets } from '@/lib/chat'
 
 function getSafeNext(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/profile'
@@ -40,6 +41,10 @@ export async function GET(request: NextRequest) {
       } = await supabase.auth.getUser()
       const providers = user ? authProviders(user) : []
 
+      if (user) {
+        await mergeAnonymousChatTickets(user.id).catch(() => null)
+      }
+
       if (user && providers.includes('google') && !hasEmailPassword(user)) {
         const completeUrl = new URL('/register/complete', origin)
         completeUrl.searchParams.set('next', next)
@@ -65,6 +70,13 @@ export async function GET(request: NextRequest) {
     })
 
     if (!otpError) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        await mergeAnonymousChatTickets(user.id).catch(() => null)
+      }
+
       const redirectUrl = new URL(next, origin)
       return NextResponse.redirect(redirectUrl)
     }

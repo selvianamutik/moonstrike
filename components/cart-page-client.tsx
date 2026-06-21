@@ -73,10 +73,11 @@ export function CartPageClient() {
     loadCart();
 
     const refreshCart = () => {
+      if (document.visibilityState !== "visible") return;
       loadCart({ showLoading: false });
     };
     const unsubscribeCartUpdates = subscribeToCartUpdates(refreshCart);
-    const intervalId = window.setInterval(refreshCart, 15_000);
+    const intervalId = window.setInterval(refreshCart, 60_000);
 
     window.addEventListener("focus", refreshCart);
 
@@ -168,7 +169,7 @@ export function CartPageClient() {
                       {item.service?.image ? (
                         <img src={item.service.image} alt="" className="h-28 rounded-md object-cover" />
                       ) : (
-                        <PlaceholderAsset alt={`${item.service?.title ?? "Service"} preview`} className="h-28 rounded-md" imageClassName="p-4" />
+                        <PlaceholderAsset isHidden={false} alt={`${item.service?.title ?? "Service"} preview`} className="h-28 rounded-md" imageClassName="p-4" />
                       )}
                       <div>
                         <div className="flex flex-wrap items-center gap-3">

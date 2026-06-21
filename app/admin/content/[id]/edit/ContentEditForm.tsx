@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminButton } from "@/components/admin/AdminButton";
@@ -94,8 +94,20 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [pendingHeroPaths, setPendingHeroPaths] = useState<string[]>([]);
-  const [pendingBenefitsPaths, setPendingBenefitsPaths] = useState<string[]>([]);
+  const [draftHeroImage, setDraftHeroImage] = useState<{ file: File; previewUrl: string } | null>(null);
+  const [draftBenefitsImage, setDraftBenefitsImage] = useState<{ file: File; previewUrl: string } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (draftHeroImage?.previewUrl) URL.revokeObjectURL(draftHeroImage.previewUrl);
+    };
+  }, [draftHeroImage]);
+
+  useEffect(() => {
+    return () => {
+      if (draftBenefitsImage?.previewUrl) URL.revokeObjectURL(draftBenefitsImage.previewUrl);
+    };
+  }, [draftBenefitsImage]);
 
   function updateBenefit(index: number, field: keyof LandingBenefitItem, value: string) {
     setBenefitItems((current) =>
@@ -105,8 +117,20 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
     );
   }
 
-  async function uploadImage(file: File, usage: "hero" | "benefits") {
+  function selectImage(file: File, usage: "hero" | "benefits") {
     setError("");
+    const previewUrl = URL.createObjectURL(file);
+
+    if (usage === "hero") {
+      if (draftHeroImage?.previewUrl) URL.revokeObjectURL(draftHeroImage.previewUrl);
+      setDraftHeroImage({ file, previewUrl });
+    } else {
+      if (draftBenefitsImage?.previewUrl) URL.revokeObjectURL(draftBenefitsImage.previewUrl);
+      setDraftBenefitsImage({ file, previewUrl });
+    }
+  }
+
+  async function uploadImage(file: File, usage: "hero" | "benefits") {
     setIsUploading(true);
 
     try {
@@ -128,29 +152,12 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
         | null;
 
       if (!response.ok || !result) {
-        setError(result?.error ?? "Unable to upload image.");
-        return;
+        throw new Error(result?.error ?? "Unable to upload image.");
       }
 
-      const nextPaths = [result.storagePath, result.thumbnailPath].filter(Boolean);
-
-      if (usage === "hero") {
-        if (pendingHeroPaths.length > 0) void cleanupUploadedMedia(pendingHeroPaths);
-        setHeroImageUrl(result.imageUrl);
-        setHeroThumbnailUrl(result.thumbnailUrl);
-        setHeroStoragePath(result.storagePath);
-        setHeroThumbnailPath(result.thumbnailPath);
-        setPendingHeroPaths(nextPaths);
-      } else {
-        if (pendingBenefitsPaths.length > 0) void cleanupUploadedMedia(pendingBenefitsPaths);
-        setImageUrl(result.imageUrl);
-        setThumbnailUrl(result.thumbnailUrl);
-        setStoragePath(result.storagePath);
-        setThumbnailPath(result.thumbnailPath);
-        setPendingBenefitsPaths(nextPaths);
-      }
+      return result;
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "Unable to upload image.");
+      throw new Error(uploadError instanceof Error ? uploadError.message : "Unable to upload image.");
     } finally {
       setIsUploading(false);
     }
@@ -160,32 +167,59 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
     e.preventDefault();
     setError("");
     setIsSaving(true);
-
-    const data = isHero
-      ? {
-          label,
-          headline,
-          subtext,
-          ctaText,
-          ctaHref,
-          badgeVariant,
-          imageUrl: heroImageUrl,
-          thumbnailUrl: heroThumbnailUrl,
-          storagePath: heroStoragePath,
-          thumbnailPath: heroThumbnailPath,
-        }
-      : {
-          title: benefitsTitle,
-          accent: benefitsAccent,
-          imageUrl,
-          thumbnailUrl,
-          storagePath,
-          thumbnailPath,
-          imageAlt,
-          items: benefitItems,
-        };
+    const uploadedPaths: string[] = [];
+    let nextHeroImageUrl = heroImageUrl;
+    let nextHeroThumbnailUrl = heroThumbnailUrl;
+    let nextHeroStoragePath = heroStoragePath;
+    let nextHeroThumbnailPath = heroThumbnailPath;
+    let nextBenefitsImageUrl = imageUrl;
+    let nextBenefitsThumbnailUrl = thumbnailUrl;
+    let nextBenefitsStoragePath = storagePath;
+    let nextBenefitsThumbnailPath = thumbnailPath;
 
     try {
+      if (isHero && draftHeroImage) {
+        const uploadedHero = await uploadImage(draftHeroImage.file, "hero");
+        nextHeroImageUrl = uploadedHero.imageUrl;
+        nextHeroThumbnailUrl = uploadedHero.thumbnailUrl;
+        nextHeroStoragePath = uploadedHero.storagePath;
+        nextHeroThumbnailPath = uploadedHero.thumbnailPath;
+        uploadedPaths.push(uploadedHero.storagePath, uploadedHero.thumbnailPath);
+      }
+
+      if (!isHero && draftBenefitsImage) {
+        const uploadedBenefits = await uploadImage(draftBenefitsImage.file, "benefits");
+        nextBenefitsImageUrl = uploadedBenefits.imageUrl;
+        nextBenefitsThumbnailUrl = uploadedBenefits.thumbnailUrl;
+        nextBenefitsStoragePath = uploadedBenefits.storagePath;
+        nextBenefitsThumbnailPath = uploadedBenefits.thumbnailPath;
+        uploadedPaths.push(uploadedBenefits.storagePath, uploadedBenefits.thumbnailPath);
+      }
+
+      const data = isHero
+        ? {
+            label,
+            headline,
+            subtext,
+            ctaText,
+            ctaHref,
+            badgeVariant,
+            imageUrl: nextHeroImageUrl,
+            thumbnailUrl: nextHeroThumbnailUrl,
+            storagePath: nextHeroStoragePath,
+            thumbnailPath: nextHeroThumbnailPath,
+          }
+        : {
+            title: benefitsTitle,
+            accent: benefitsAccent,
+            imageUrl: nextBenefitsImageUrl,
+            thumbnailUrl: nextBenefitsThumbnailUrl,
+            storagePath: nextBenefitsStoragePath,
+            thumbnailPath: nextBenefitsThumbnailPath,
+            imageAlt,
+            items: benefitItems,
+          };
+
       const response = await fetch(`/api/admin/content/${content.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -196,16 +230,28 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
       } | null;
 
       if (!response.ok) {
+        void cleanupUploadedMedia(uploadedPaths);
         setError(result?.error ?? "Unable to save content.");
         return;
       }
 
-      setPendingHeroPaths([]);
-      setPendingBenefitsPaths([]);
+      setHeroImageUrl(nextHeroImageUrl);
+      setHeroThumbnailUrl(nextHeroThumbnailUrl);
+      setHeroStoragePath(nextHeroStoragePath);
+      setHeroThumbnailPath(nextHeroThumbnailPath);
+      setImageUrl(nextBenefitsImageUrl);
+      setThumbnailUrl(nextBenefitsThumbnailUrl);
+      setStoragePath(nextBenefitsStoragePath);
+      setThumbnailPath(nextBenefitsThumbnailPath);
+      if (draftHeroImage?.previewUrl) URL.revokeObjectURL(draftHeroImage.previewUrl);
+      if (draftBenefitsImage?.previewUrl) URL.revokeObjectURL(draftBenefitsImage.previewUrl);
+      setDraftHeroImage(null);
+      setDraftBenefitsImage(null);
       router.push("/admin/content");
       router.refresh();
-    } catch {
-      setError("Unable to reach the CMS save endpoint.");
+    } catch (saveError) {
+      void cleanupUploadedMedia(uploadedPaths);
+      setError(saveError instanceof Error ? saveError.message : "Unable to reach the CMS save endpoint.");
     } finally {
       setIsSaving(false);
     }
@@ -254,14 +300,17 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
             </AdminFormField>
             <AdminFormField label="Hero banner image">
               <div className="space-y-3">
-                {heroThumbnailUrl && <img src={heroThumbnailUrl} alt="" className="h-28 w-full rounded-lg object-cover" />}
+                {(draftHeroImage?.previewUrl || heroThumbnailUrl) && (
+                  <img src={draftHeroImage?.previewUrl || heroThumbnailUrl} alt="" className="h-28 w-full rounded-lg object-cover" />
+                )}
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
                   className={adminInputClass}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) uploadImage(file, "hero");
+                    if (file) selectImage(file, "hero");
+                    e.target.value = "";
                   }}
                 />
                 <p className="text-xs text-[var(--ms-text-secondary)]">
@@ -282,14 +331,17 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
             </div>
             <AdminFormField label="Section image">
               <div className="space-y-3">
-                {thumbnailUrl && <img src={thumbnailUrl} alt="" className="h-28 w-full rounded-lg object-cover" />}
+                {(draftBenefitsImage?.previewUrl || thumbnailUrl) && (
+                  <img src={draftBenefitsImage?.previewUrl || thumbnailUrl} alt="" className="h-28 w-full rounded-lg object-cover" />
+                )}
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
                   className={adminInputClass}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) uploadImage(file, "benefits");
+                    if (file) selectImage(file, "benefits");
+                    e.target.value = "";
                   }}
                 />
                 <p className="text-xs text-[var(--ms-text-secondary)]">
@@ -334,7 +386,7 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
         )}
 
         <p className="text-xs text-[var(--ms-text-secondary)]">
-          New images are uploaded immediately. Replaced saved images are removed from Storage after you save this content block.
+          New images are previewed locally and uploaded only when you save. Replaced saved images are removed from Storage after save succeeds.
         </p>
 
         <div className="flex gap-3">
@@ -345,7 +397,8 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
             type="button"
             variant="secondary"
             onClick={() => {
-              void cleanupUploadedMedia([...pendingHeroPaths, ...pendingBenefitsPaths]);
+              if (draftHeroImage?.previewUrl) URL.revokeObjectURL(draftHeroImage.previewUrl);
+              if (draftBenefitsImage?.previewUrl) URL.revokeObjectURL(draftBenefitsImage.previewUrl);
               router.push("/admin/content");
             }}
           >

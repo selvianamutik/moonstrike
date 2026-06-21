@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MessageSquare } from "lucide-react";
 import { PlaceholderAsset } from "@/components/asset-image";
+import { LivePageRefresh } from "@/components/live-page-refresh";
 import { ConfirmOrderButton } from "@/components/profile/ConfirmOrderButton";
 import { ProfileSidebar } from "@/components/profile/ProfileSidebar";
 import { RefundRequestButton } from "@/components/profile/RefundRequestButton";
@@ -50,6 +51,7 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
 
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
+      <LivePageRefresh intervalMs={10_000} />
       <SiteHeader />
       
       <section className="ms-shell grid gap-8 py-16 lg:grid-cols-[270px_minmax(0,1fr)]">
@@ -69,7 +71,7 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
                 {order.status.replace("_", " ")}
               </span>
               <div className="flex flex-wrap items-center gap-3">
-                <Link href="/profile/chat" className="ms-action-button inline-flex items-center justify-center rounded-md border border-[var(--ms-border)] px-4 py-3 text-sm text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
+                <Link href={`/profile/chat?order=${encodeURIComponent(order.orderReference)}`} className="ms-action-button inline-flex items-center justify-center rounded-md border border-[var(--ms-border)] px-4 py-3 text-sm text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
                   <MessageSquare size={16} />
                   Open Chat
                 </Link>

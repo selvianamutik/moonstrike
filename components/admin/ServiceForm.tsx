@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2, X } from "lucide-react";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { AdminFormField, adminInputClass, adminSelectClass, adminTextareaClass } from "@/components/admin/AdminFormField";
 import { cleanupUploadedMedia } from "@/lib/cms/client-media-cleanup";
 import type { GameRow } from "@/lib/cms/games";
 import type { ServiceCategoryRow } from "@/lib/cms/service-categories";
+import { emptyServiceRequirement, type ServiceRequirement } from "@/lib/cms/service-requirements";
 import type { ServiceBenefit, ServiceOption, ServiceRow } from "@/lib/cms/services";
 
 const optionTypes: Array<[ServiceOption["type"], string]> = [
@@ -153,10 +154,12 @@ export function ServiceForm({
   categories,
   games,
   service,
+  services = [],
 }: {
   categories: ServiceCategoryRow[];
   games: GameRow[];
   service?: ServiceRow;
+  services?: ServiceRow[];
 }) {
   const router = useRouter();
   const isEditing = Boolean(service);
@@ -171,8 +174,14 @@ export function ServiceForm({
   const [basePriceUSD, setBasePriceUSD] = useState(String(service?.base_price_usd ?? 0));
   const [basePriceEUR, setBasePriceEUR] = useState(String(service?.base_price_eur ?? 0));
   const [image, setImage] = useState(service?.image ?? "");
-  const [requirements, setRequirements] = useState<string[]>(
-    service?.requirements.length ? service.requirements : [""],
+  const [requirements, setRequirements] = useState<ServiceRequirement[]>(
+    service?.requirements.length ? service.requirements : [emptyServiceRequirement()],
+  );
+  const [requirementServiceSearches, setRequirementServiceSearches] = useState<string[]>(() =>
+    service?.requirements.length ? service.requirements.map(() => "") : [""],
+  );
+  const [openRequirementServicePickers, setOpenRequirementServicePickers] = useState<boolean[]>(() =>
+    service?.requirements.length ? service.requirements.map((requirement) => Boolean(requirement.serviceId || requirement.serviceSlug)) : [false],
   );
   const [benefits, setBenefits] = useState<ServiceBenefit[]>(
     service?.what_you_get.length ? service.what_you_get : [emptyBenefit()],
@@ -183,7 +192,14 @@ export function ServiceForm({
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [pendingImagePath, setPendingImagePath] = useState("");
+  const [draftImageFile, setDraftImageFile] = useState<File | null>(null);
+  const [draftImagePreview, setDraftImagePreview] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (draftImagePreview) URL.revokeObjectURL(draftImagePreview);
+    };
+  }, [draftImagePreview]);
 
   const availableCategories = useMemo(
     () =>
@@ -194,6 +210,81 @@ export function ServiceForm({
   );
 
   const hasQuantityOption = optionsSchema.some((option) => option.type === "quantity");
+  const linkableServices = useMemo(
+    () =>
+      services
+        .filter((item) => item.id !== service?.id)
+        .sort((a, b) => a.game_name.localeCompare(b.game_name) || a.title.localeCompare(b.title)),
+    [service?.id, services],
+  );
+
+  function updateRequirement(index: number, patch: Partial<ServiceRequirement>) {
+    setRequirements((current) =>
+      current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)),
+    );
+  }
+
+  function updateRequirementService(index: number, serviceId: string) {
+    const linkedService = linkableServices.find((item) => item.id === serviceId);
+
+    updateRequirement(
+      index,
+      linkedService
+        ? {
+            serviceId: linkedService.id,
+            serviceTitle: linkedService.title,
+            serviceSlug: linkedService.slug,
+            serviceCategorySlug: linkedService.service_category_slug ?? undefined,
+            gameSlug: linkedService.game_slug,
+          }
+        : {
+            serviceId: undefined,
+            serviceTitle: undefined,
+            serviceSlug: undefined,
+            serviceCategorySlug: undefined,
+            gameSlug: undefined,
+          },
+    );
+  }
+
+  function addRequirementRow() {
+    setRequirements((current) => [...current, emptyServiceRequirement()]);
+    setRequirementServiceSearches((current) => [...current, ""]);
+    setOpenRequirementServicePickers((current) => [...current, false]);
+  }
+
+  function removeRequirementRow(index: number) {
+    setRequirements((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    setRequirementServiceSearches((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    setOpenRequirementServicePickers((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function updateRequirementServiceSearch(index: number, value: string) {
+    setRequirementServiceSearches((current) =>
+      current.map((item, itemIndex) => (itemIndex === index ? value : item)),
+    );
+  }
+
+  function requirementServiceMatches(query: string) {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    return linkableServices
+      .filter((item) => {
+        if (!normalizedQuery) return true;
+
+        return [item.title, item.game_name, item.service_category_name ?? "", item.slug]
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedQuery);
+      })
+      .slice(0, 8);
+  }
+
+  function setRequirementServicePickerOpen(index: number, isOpen: boolean) {
+    setOpenRequirementServicePickers((current) =>
+      current.map((item, itemIndex) => (itemIndex === index ? isOpen : item)),
+    );
+  }
 
   function scrollToSection(id: string) {
     document.getElementById(`service-form-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -338,8 +429,14 @@ export function ServiceForm({
     return "";
   }
 
-  async function uploadImage(file: File) {
+  function selectImage(file: File) {
     setError("");
+    if (draftImagePreview) URL.revokeObjectURL(draftImagePreview);
+    setDraftImageFile(file);
+    setDraftImagePreview(URL.createObjectURL(file));
+  }
+
+  async function uploadImage(file: File) {
     setIsUploading(true);
 
     try {
@@ -352,18 +449,15 @@ export function ServiceForm({
       const result = (await response.json().catch(() => null)) as { imageUrl?: string; storagePath?: string; error?: string } | null;
 
       if (!response.ok || !result?.imageUrl) {
-        setError(result?.error ?? "Unable to upload service image.");
-        return;
+        throw new Error(result?.error ?? "Unable to upload service image.");
       }
 
-      if (pendingImagePath) {
-        void cleanupUploadedMedia([pendingImagePath]);
-      }
-
-      setImage(result.imageUrl);
-      setPendingImagePath(result.storagePath ?? "");
+      return {
+        imageUrl: result.imageUrl,
+        storagePath: result.storagePath ?? "",
+      };
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "Unable to upload service image.");
+      throw new Error(uploadError instanceof Error ? uploadError.message : "Unable to upload service image.");
     } finally {
       setIsUploading(false);
     }
@@ -382,6 +476,20 @@ export function ServiceForm({
     }
 
     setIsSaving(true);
+    let uploadedImagePath = "";
+
+    let nextImage = image;
+    if (draftImageFile) {
+      try {
+        const uploadedImage = await uploadImage(draftImageFile);
+        nextImage = uploadedImage.imageUrl;
+        uploadedImagePath = uploadedImage.storagePath;
+      } catch (uploadError) {
+        setError(uploadError instanceof Error ? uploadError.message : "Unable to upload service image.");
+        setIsSaving(false);
+        return;
+      }
+    }
 
     const payload = {
       title,
@@ -392,8 +500,8 @@ export function ServiceForm({
       isHotOffer,
       badges,
       description,
-      image,
-      requirements,
+      image: nextImage,
+      requirements: requirements.filter((requirement) => requirement.text.trim()),
       whatYouGet: benefits.filter((benefit) => benefit.title.trim()),
       basePriceUSD: Number(basePriceUSD),
       basePriceEUR: Number(basePriceEUR),
@@ -409,14 +517,19 @@ export function ServiceForm({
       const result = (await response.json().catch(() => null)) as { error?: string } | null;
 
       if (!response.ok) {
+        if (uploadedImagePath) void cleanupUploadedMedia([uploadedImagePath]);
         setError(result?.error ?? "Unable to save service.");
         return;
       }
 
-      setPendingImagePath("");
+      setImage(nextImage);
+      if (draftImagePreview) URL.revokeObjectURL(draftImagePreview);
+      setDraftImageFile(null);
+      setDraftImagePreview("");
       router.push("/admin/services");
       router.refresh();
     } catch {
+      if (uploadedImagePath) void cleanupUploadedMedia([uploadedImagePath]);
       setError("Unable to reach the services endpoint.");
     } finally {
       setIsSaving(false);
@@ -456,7 +569,7 @@ export function ServiceForm({
               type="button"
               variant="secondary"
               onClick={() => {
-                if (pendingImagePath) void cleanupUploadedMedia([pendingImagePath]);
+                if (draftImagePreview) URL.revokeObjectURL(draftImagePreview);
                 router.push("/admin/services");
               }}
             >
@@ -552,14 +665,15 @@ export function ServiceForm({
             <h2 className="mb-4 text-lg font-bold text-white">Image</h2>
             <AdminFormField label="Service image">
               <div className="space-y-3">
-                {image && <img src={image} alt="" className="h-40 w-full rounded-lg object-cover" />}
+                {(draftImagePreview || image) && <img src={draftImagePreview || image} alt="" className="h-40 w-full rounded-lg object-cover" />}
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
                   className={adminInputClass}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) uploadImage(file);
+                    if (file) selectImage(file);
+                    e.target.value = "";
                   }}
                 />
               </div>
@@ -808,16 +922,93 @@ export function ServiceForm({
           <section id="service-form-requirements" className={sectionClass}>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold text-white">Requirements</h2>
-              <button type="button" onClick={() => setRequirements((current) => [...current, ""])} className="text-sm text-[#22D3EE]">
+              <button type="button" onClick={addRequirementRow} className="text-sm text-[#22D3EE]">
                 + Add row
               </button>
             </div>
             {requirements.map((req, index) => (
-              <div key={index} className="mb-2 flex gap-2">
-                <input className={adminInputClass} value={req} onChange={(e) => setRequirements((current) => current.map((item, i) => i === index ? e.target.value : item))} />
-                <button type="button" onClick={() => setRequirements((current) => current.filter((_, i) => i !== index))} className="p-2 text-red-400">
-                  <Trash2 size={16} />
-                </button>
+              <div key={index} className="mb-4 grid gap-3 rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] p-3">
+                <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+                  <input
+                    className={adminInputClass}
+                    value={req.text}
+                    onChange={(e) => updateRequirement(index, { text: e.target.value })}
+                    placeholder="Level 80+ character, unlocked dungeon, or any other requirement"
+                  />
+                  <button type="button" onClick={() => removeRequirementRow(index)} className="rounded-lg border border-red-500/30 p-2 text-red-400 transition-colors hover:bg-red-500/10">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+
+                <div className="rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-secondary)] p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--ms-text-secondary)]">Shared service link</span>
+                    {req.serviceTitle ? (
+                      <button type="button" onClick={() => updateRequirementService(index, "")} className="inline-flex items-center gap-1 text-xs text-red-300 hover:text-red-200">
+                        <X size={13} /> Clear
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setRequirementServicePickerOpen(index, !openRequirementServicePickers[index])}
+                        className="rounded-md border border-[#22D3EE]/30 px-3 py-1.5 text-xs font-bold text-[#22D3EE] transition-colors hover:bg-[#22D3EE]/10"
+                      >
+                        {openRequirementServicePickers[index] ? "Hide search" : "Add shared service"}
+                      </button>
+                    )}
+                  </div>
+
+                  {req.serviceTitle ? (
+                    <div className="mt-3 rounded-lg border border-[#22D3EE]/30 bg-[#22D3EE]/10 px-3 py-2">
+                      <p className="truncate text-sm font-bold text-white">{req.serviceTitle}</p>
+                      <p className="mt-1 truncate text-xs text-[#94A3B8]">{req.gameSlug}</p>
+                    </div>
+                  ) : null}
+
+                  {openRequirementServicePickers[index] && !req.serviceTitle ? (
+                    <>
+                      <label className="relative mt-3 block">
+                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#64748B]" />
+                        <input
+                          className={`${adminInputClass} pl-9`}
+                          value={requirementServiceSearches[index] ?? ""}
+                          onChange={(e) => updateRequirementServiceSearch(index, e.target.value)}
+                          placeholder="Search service title, game, category, or slug..."
+                        />
+                      </label>
+
+                      <div className="mt-3 max-h-56 overflow-y-auto rounded-lg border border-[var(--ms-accent)]">
+                        {requirementServiceMatches(requirementServiceSearches[index] ?? "").length === 0 ? (
+                          <p className="p-3 text-sm text-[#64748B]">No matching services found.</p>
+                        ) : (
+                          requirementServiceMatches(requirementServiceSearches[index] ?? "").map((linkedService) => (
+                            <button
+                              key={linkedService.id}
+                              type="button"
+                              onClick={() => {
+                                updateRequirementService(index, linkedService.id);
+                                setRequirementServicePickerOpen(index, false);
+                              }}
+                              className={`block w-full border-b border-[var(--ms-accent)] p-3 text-left transition-colors last:border-b-0 hover:bg-white/5 ${
+                                req.serviceId === linkedService.id ? "bg-[#22D3EE]/10" : ""
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="truncate text-sm font-bold text-white">{linkedService.title}</span>
+                                <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-[#22D3EE]">
+                                  {linkedService.game_name}
+                                </span>
+                              </div>
+                              <p className="mt-1 truncate text-xs text-[#64748B]">
+                                {linkedService.service_category_name ?? "Uncategorized"} / {linkedService.slug}
+                              </p>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
               </div>
             ))}
           </section>

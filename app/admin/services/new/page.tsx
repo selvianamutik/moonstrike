@@ -5,6 +5,7 @@ import { ServiceForm } from "@/components/admin/ServiceForm";
 import { getAdminSession } from "@/lib/admin/session";
 import { listAdminGames } from "@/lib/cms/games";
 import { listServiceCategories } from "@/lib/cms/service-categories";
+import { listAdminServices } from "@/lib/cms/services";
 
 export default async function NewServicePage() {
   const admin = await getAdminSession();
@@ -13,7 +14,7 @@ export default async function NewServicePage() {
     redirect("/admin/login?next=/admin/services/new");
   }
 
-  const [games, categories] = await Promise.all([listAdminGames(), listServiceCategories()]);
+  const [games, categories, services] = await Promise.all([listAdminGames(), listServiceCategories(), listAdminServices()]);
 
   return (
     <div className="max-w-7xl mx-auto flex flex-col gap-6">
@@ -26,7 +27,7 @@ export default async function NewServicePage() {
         title="Create New Service"
         description="Configure a new boosting or coaching offering for the marketplace."
       />
-      <ServiceForm categories={categories} games={games} />
+      <ServiceForm categories={categories} games={games} services={services} />
     </div>
   );
 }

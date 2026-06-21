@@ -1,4 +1,5 @@
 import { isCheckoutSnapshotItems, type CheckoutSnapshotItem } from "@/lib/checkout/snapshot";
+import { notifyOrderCreated } from "@/lib/notifications";
 import { createOrderReference, createTransactionReference } from "@/lib/order-ref";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -88,6 +89,7 @@ export async function fulfillNowPaymentsCheckout(payload: NowPaymentsIpnPayload)
 
   const currency = checkoutSession.currency;
   const referenceDate = new Date(checkoutSession.created_at);
+  const orderRef = createOrderReference(referenceDate, checkoutSession.id);
   const orderTotal = checkoutSession.items.reduce((total, item) => total + (currency === "EUR" ? item.priceEUR : item.priceUSD), 0);
   const completedAt = new Date().toISOString();
 
@@ -115,7 +117,7 @@ export async function fulfillNowPaymentsCheckout(payload: NowPaymentsIpnPayload)
     .from("orders")
     .upsert(
       {
-        order_ref: createOrderReference(referenceDate, checkoutSession.id),
+        order_ref: orderRef,
         user_id: checkoutSession.user_id,
         checkout_session_id: checkoutSession.id,
         status: "pending",
@@ -145,6 +147,13 @@ export async function fulfillNowPaymentsCheckout(payload: NowPaymentsIpnPayload)
       ignoreDuplicates: true,
     });
   if (insertError) throw insertError;
+
+  await notifyOrderCreated({
+    orderId: order.id,
+    orderRef,
+    userId: checkoutSession.user_id,
+    serviceNames: checkoutSession.items.map((item) => item.product.name),
+  });
 
   await supabase.from("cart_items").delete().eq("cart_id", checkoutSession.cart_id);
   await supabase

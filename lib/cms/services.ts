@@ -1,5 +1,6 @@
 import type { GameService } from '@/lib/catalog'
 import type { ServiceCategoryRow } from '@/lib/cms/service-categories'
+import { parseServiceRequirements, type ServiceRequirement } from '@/lib/cms/service-requirements'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export type ServiceStatus = 'active' | 'draft' | 'archived'
@@ -51,7 +52,7 @@ export type ServiceRow = {
   is_hot_offer: boolean
   hot_offer_at: string | null
   badges: string[]
-  requirements: string[]
+  requirements: ServiceRequirement[]
   what_you_get: ServiceBenefit[]
   base_price_usd: number
   base_price_eur: number
@@ -69,11 +70,13 @@ type RawServiceRow = Omit<
   | 'service_category_sort_order'
   | 'base_price_usd'
   | 'base_price_eur'
+  | 'requirements'
   | 'what_you_get'
   | 'options_schema'
 > & {
   base_price_usd: string | number
   base_price_eur: string | number
+  requirements: unknown
   what_you_get: unknown
   options_schema: unknown
   games: { name: string; slug: string } | { name: string; slug: string }[] | null
@@ -135,7 +138,7 @@ function rawServiceToRow(row: RawServiceRow): ServiceRow {
     is_hot_offer: row.is_hot_offer,
     hot_offer_at: row.hot_offer_at,
     badges: row.badges,
-    requirements: row.requirements,
+    requirements: parseServiceRequirements(row.requirements),
     what_you_get: asArray<ServiceBenefit>(row.what_you_get),
     base_price_usd: Number(row.base_price_usd),
     base_price_eur: Number(row.base_price_eur),

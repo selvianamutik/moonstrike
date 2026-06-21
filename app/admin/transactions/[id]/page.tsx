@@ -4,6 +4,7 @@ import { ArrowLeft, Eye } from "lucide-react";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { StatusBadge, type StatusType } from "@/components/admin/StatusBadge";
+import { LivePageRefresh } from "@/components/live-page-refresh";
 import { getAdminTransaction } from "@/lib/admin/transactions";
 
 type AdminTransactionDetailPageProps = {
@@ -24,6 +25,7 @@ export default async function AdminTransactionDetailPage({ params }: AdminTransa
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
+      <LivePageRefresh intervalMs={10_000} />
       <AdminPageHeader
         breadcrumbs={[
           { label: "Management" },

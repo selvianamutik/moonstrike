@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { writeAuditLog } from "@/lib/admin/audit";
 import { requireVerifiedUser } from "@/lib/auth/session";
+import { getOrderNotificationContext, notifyOrderCompleted } from "@/lib/notifications";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -64,6 +65,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     eventType: "order_lifecycle",
     actorLabel: user.email ?? "Customer",
   });
+
+  const notificationContext = await getOrderNotificationContext(order.id);
+  if (notificationContext) {
+    await notifyOrderCompleted(notificationContext);
+  }
 
   revalidatePath("/profile");
   revalidatePath("/profile/orders");

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -36,6 +36,32 @@ function isNavActive(pathname: string, href: string) {
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const [unreadMessageTickets, setUnreadMessageTickets] = useState(0);
+
+  async function loadUnreadMessageTickets() {
+    if (document.visibilityState !== "visible") return;
+
+    const response = await fetch("/api/admin/messages/unread", { cache: "no-store" }).catch(() => null);
+    const payload = await response?.json().catch(() => null) as { unreadTicketCount?: number } | null;
+
+    if (response?.ok && typeof payload?.unreadTicketCount === "number") {
+      setUnreadMessageTickets(payload.unreadTicketCount);
+    }
+  }
+
+  useEffect(() => {
+    void loadUnreadMessageTickets();
+
+    const intervalId = window.setInterval(loadUnreadMessageTickets, 30_000);
+    window.addEventListener("focus", loadUnreadMessageTickets);
+    window.addEventListener("moonstrike:admin-messages-read", loadUnreadMessageTickets);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", loadUnreadMessageTickets);
+      window.removeEventListener("moonstrike:admin-messages-read", loadUnreadMessageTickets);
+    };
+  }, []);
 
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-[var(--admin-sidebar-w,320px)] bg-[var(--admin-bg)] border-r border-[var(--admin-border)] flex flex-col z-50">
@@ -63,7 +89,12 @@ export function AdminSidebar() {
               }`}
             >
               <Icon size={18} className={isActive ? "text-white" : "text-[var(--admin-muted)]"} aria-hidden="true" />
-              {item.name}
+              <span className="flex-1">{item.name}</span>
+              {item.href === "/admin/messages" && unreadMessageTickets > 0 ? (
+                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--ms-danger)] px-1.5 text-[10px] font-black leading-none text-white">
+                  {unreadMessageTickets > 9 ? "9+" : unreadMessageTickets}
+                </span>
+              ) : null}
             </Link>
           );
         })}

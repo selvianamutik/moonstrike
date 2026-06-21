@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, MessageSquare, PackageCheck, Play, RotateCcw, Truck, XCircle } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
@@ -22,6 +22,10 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
   const [pendingRefund, setPendingRefund] = useState<{ amount: number; mode: RefundMode } | null>(null);
   const actions = getNextOrderActions(order.status);
   const automaticRefundSupported = order.paymentProvider === "stripe";
+
+  useEffect(() => {
+    setOrder(initialOrder);
+  }, [initialOrder]);
 
   function renderActionIcon(next: AdminOrderActionStatus | undefined) {
     if (next === "confirmed") return <CheckCircle2 size={16} />;
@@ -256,7 +260,11 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
                 </AdminButton>
               ))}
             </div>
-            <AdminButton href={`/admin/messages?ticket=t1`} variant="secondary" className="w-full mt-4">
+            <AdminButton
+              href={`/admin/messages?order=${encodeURIComponent(order.orderReference)}&customer=${encodeURIComponent(order.customerName)}&email=${encodeURIComponent(order.customerEmail)}`}
+              variant="secondary"
+              className="w-full mt-4"
+            >
               <MessageSquare size={16} /> Open Chat
             </AdminButton>
           </section>

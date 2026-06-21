@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { writeAuditLog } from "@/lib/admin/audit";
 import { getAdminSession } from "@/lib/admin/session";
+import { getOrderNotificationContext, notifyRefundApproved } from "@/lib/notifications";
 import { getPaymentProvider, ProviderRefundError } from "@/lib/payments/providers";
 import type { PaymentProviderId, RefundMode } from "@/lib/payments/types";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -182,6 +183,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     admin,
     eventType: "refund",
   });
+
+  const notificationContext = await getOrderNotificationContext(order.id);
+  if (notificationContext) {
+    await notifyRefundApproved(notificationContext);
+  }
 
   revalidatePath("/admin/orders");
   revalidatePath(`/admin/orders/${order.id}`);

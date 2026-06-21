@@ -102,7 +102,7 @@ export function ProfileOrdersList({ orders }: { orders: CustomerOrder[] }) {
                   {order.primaryImage ? (
                     <img src={order.primaryImage} alt="" className="h-24 w-24 rounded-md object-cover" />
                   ) : (
-                    <PlaceholderAsset alt={`${order.serviceSummary} order preview`} className="h-24 rounded-md" imageClassName="p-4" />
+                    <PlaceholderAsset isHidden={false} alt={`${order.serviceSummary} order preview`} className="h-24 rounded-md" imageClassName="p-4" />
                   )}
                   <div>
                     <div className="flex flex-wrap items-center gap-3">

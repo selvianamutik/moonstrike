@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { calculateCartSnapshot, getOrCreateCartId } from '@/lib/cart'
+import { calculateCartSnapshot, getOrCreateCartId, touchCart } from '@/lib/cart'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  await supabase.from('carts').update({ updated_at: new Date().toISOString() }).eq('id', cartId)
+  await touchCart(cartId)
 
   return NextResponse.json({ itemId: item.id })
 }

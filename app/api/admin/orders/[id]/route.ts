@@ -2,6 +2,7 @@ import { revalidatePath } from 'next/cache'
 import { NextResponse, type NextRequest } from 'next/server'
 import { writeAuditLog } from '@/lib/admin/audit'
 import { getAdminSession } from '@/lib/admin/session'
+import { getOrderNotificationContext, notifyOrderCompleted, notifyOrderDelivered, notifyOrderStatusChanged, notifyRefundDenied } from '@/lib/notifications'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const ORDER_ACTIONS = new Set(['pending', 'confirmed', 'in_progress', 'delivered', 'completed', 'refund_requested', 'deny_refund', 'refunded'])
@@ -93,6 +94,25 @@ export async function PATCH(
     request,
     admin,
   })
+
+  const notificationContext = await getOrderNotificationContext(data.id)
+  if (notificationContext) {
+    if (nextStatus === 'confirmed' || nextStatus === 'in_progress') {
+      await notifyOrderStatusChanged(notificationContext, nextStatus)
+    }
+
+    if (nextStatus === 'delivered') {
+      await notifyOrderDelivered(notificationContext)
+    }
+
+    if (nextStatus === 'completed' && status !== 'deny_refund') {
+      await notifyOrderCompleted(notificationContext)
+    }
+
+    if (status === 'deny_refund') {
+      await notifyRefundDenied(notificationContext)
+    }
+  }
 
   revalidatePath('/admin/orders')
   revalidatePath(`/admin/orders/${id}`)

@@ -13,7 +13,15 @@
     "refund-orders:seed": "node scripts/seed-refund-orders.mjs",
     "refund-orders:reseed": "node scripts/seed-refund-orders.mjs",
     "refund-orders:cleanup": "node scripts/seed-refund-orders.mjs cleanup",
-    "user-data:cleanup": "node scripts/cleanup-user-data.mjs"
+    "notifications:seed": "node scripts/seed-notifications.mjs",
+    "notifications:reseed": "node scripts/seed-notifications.mjs",
+    "notifications:cleanup": "node scripts/seed-notifications.mjs cleanup",
+    "chat-user:seed": "node scripts/seed-chat-user.mjs",
+    "chat-user:reseed": "node scripts/seed-chat-user.mjs",
+    "chat-user:cleanup": "node scripts/seed-chat-user.mjs cleanup",
+    "email:test": "node scripts/test-email.mjs",
+    "user-data:cleanup": "node scripts/cleanup-user-data.mjs",
+    "chat:cleanup": "node scripts/cleanup-chat-history.mjs"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.2.0",
@@ -31,6 +39,7 @@
     "react-dom": "latest",
     "recharts": "^3.8.1",
     "stripe": "^22.2.2",
+    "stripe": "^22.2.1",
     "supabase": "^2.101.0"
   },
   "devDependencies": {

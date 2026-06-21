@@ -4,6 +4,32 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
+type SessionStatusPayload = {
+  banned?: boolean
+} | null
+
+let lastSessionStatusCheckAt = 0
+let sessionStatusInFlight: Promise<SessionStatusPayload> | null = null
+
+async function loadSessionStatus({ force = false }: { force?: boolean } = {}) {
+  const now = Date.now()
+
+  if (!force && now - lastSessionStatusCheckAt < 60_000) return null
+  if (sessionStatusInFlight) return sessionStatusInFlight
+
+  lastSessionStatusCheckAt = now
+  sessionStatusInFlight = fetch('/api/auth/session-status', {
+    cache: 'no-store',
+  })
+    .then((response) => response.json().catch(() => null) as Promise<SessionStatusPayload>)
+    .catch(() => null)
+    .finally(() => {
+      sessionStatusInFlight = null
+    })
+
+  return sessionStatusInFlight
+}
+
 export function useAuth() {
   const supabase = useMemo(() => createClient(), [])
   const [user, setUser] = useState<User | null>(null)
@@ -12,13 +38,9 @@ export function useAuth() {
   useEffect(() => {
     let isMounted = true
 
-    async function checkSessionStatus() {
-      const response = await fetch('/api/auth/session-status', {
-        cache: 'no-store',
-      }).catch(() => null)
-      const payload = (await response?.json().catch(() => null)) as {
-        banned?: boolean
-      } | null
+    async function checkSessionStatus({ force = false }: { force?: boolean } = {}) {
+      if (!force && document.visibilityState !== 'visible') return
+      const payload = await loadSessionStatus({ force })
 
       if (!isMounted || !payload?.banned) return
 
@@ -32,17 +54,18 @@ export function useAuth() {
       if (!isMounted) return
       setUser(data.user)
       setLoading(false)
-      if (data.user) void checkSessionStatus()
+      if (data.user) void checkSessionStatus({ force: true })
     })
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
-      if (session?.user) void checkSessionStatus()
+      if (session?.user) void checkSessionStatus({ force: true })
     })
 
     function handleSessionRefresh() {
+      if (document.visibilityState !== 'visible') return
       void checkSessionStatus()
     }
 
@@ -60,6 +83,9 @@ export function useAuth() {
   const signIn = useCallback(
     async (email: string, password: string) => {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (!error && data.user) {
+        await fetch('/api/auth/merge-chat', { method: 'POST' }).catch(() => null)
+      }
       return { data, error }
     },
     [supabase]

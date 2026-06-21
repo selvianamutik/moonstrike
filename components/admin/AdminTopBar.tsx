@@ -3,7 +3,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, Bell, HelpCircle } from "lucide-react";
+import { Search, HelpCircle } from "lucide-react";
+import { NotificationBell } from "@/components/notification-bell";
 import { adminOrders, adminTransactions, adminUsers } from "@/lib/admin-mock";
 
 export function AdminTopBar() {
@@ -149,10 +150,7 @@ export function AdminTopBar() {
 
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-4">
-          <button type="button" className="text-[var(--admin-muted)] hover:text-white transition-colors relative min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Notifications">
-            <Bell size={20} aria-hidden="true" />
-            <span className="absolute top-2 right-2 block h-2 w-2 rounded-full bg-[var(--admin-cyan)] ring-2 ring-[var(--admin-bg)]" aria-label="New notifications" />
-          </button>
+          <NotificationBell mode="admin" className="text-[var(--admin-muted)] hover:text-white" iconSize={20} label="Admin notifications" />
           <button type="button" className="text-[var(--admin-muted)] hover:text-white transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Help">
             <HelpCircle size={20} aria-hidden="true" />
           </button>
