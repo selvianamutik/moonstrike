@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/orders/auto-complete",
       "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/sheets/sync",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

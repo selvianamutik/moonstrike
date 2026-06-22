@@ -1,6 +1,7 @@
 import { revalidatePath } from 'next/cache'
 import { NextResponse, type NextRequest } from 'next/server'
 import { writeAuditLog } from '@/lib/admin/audit'
+import { enqueueGoogleSheetsSync } from '@/lib/admin/google-sheets-sync'
 import { getAdminSession } from '@/lib/admin/session'
 import { getOrderNotificationContext, notifyOrderCompleted, notifyOrderDelivered, notifyOrderStatusChanged, notifyRefundDenied } from '@/lib/notifications'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -113,6 +114,8 @@ export async function PATCH(
       await notifyRefundDenied(notificationContext)
     }
   }
+
+  await enqueueGoogleSheetsSync(status === 'deny_refund' ? 'all' : 'orders')
 
   revalidatePath('/admin/orders')
   revalidatePath(`/admin/orders/${id}`)

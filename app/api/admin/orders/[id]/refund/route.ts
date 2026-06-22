@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { writeAuditLog } from "@/lib/admin/audit";
+import { enqueueGoogleSheetsSync } from "@/lib/admin/google-sheets-sync";
 import { getAdminSession } from "@/lib/admin/session";
 import { getOrderNotificationContext, notifyRefundApproved } from "@/lib/notifications";
 import { getPaymentProvider, ProviderRefundError } from "@/lib/payments/providers";
@@ -188,6 +189,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (notificationContext) {
     await notifyRefundApproved(notificationContext);
   }
+
+  await enqueueGoogleSheetsSync("all");
 
   revalidatePath("/admin/orders");
   revalidatePath(`/admin/orders/${order.id}`);

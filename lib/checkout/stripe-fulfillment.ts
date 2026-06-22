@@ -1,5 +1,6 @@
 import type Stripe from "stripe";
 import { isCheckoutSnapshotItems, type CheckoutSnapshotItem } from "@/lib/checkout/snapshot";
+import { enqueueGoogleSheetsSync } from "@/lib/admin/google-sheets-sync";
 import { notifyOrderCreated } from "@/lib/notifications";
 import { createOrderReference, createTransactionReference } from "@/lib/order-ref";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -158,6 +159,7 @@ export async function fulfillStripeCheckoutSession(sessionOrId: Stripe.Checkout.
     .eq("id", checkoutSession.id);
 
   await supabase.from("carts").update({ updated_at: new Date().toISOString() }).eq("id", checkoutSession.cart_id);
+  await enqueueGoogleSheetsSync("all");
 
   return { status: "created", orderCount: checkoutSession.items.length, checkoutSessionId: checkoutSession.id };
 }

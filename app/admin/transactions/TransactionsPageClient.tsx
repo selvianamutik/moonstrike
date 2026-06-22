@@ -8,6 +8,7 @@ import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { AdminFilterBar } from "@/components/admin/AdminFilterBar";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
 import { AdminPagination } from "@/components/admin/AdminPagination";
+import { SheetsSyncButton } from "@/components/admin/SheetsSyncButton";
 import { StatusBadge, type StatusType } from "@/components/admin/StatusBadge";
 import { ActionTooltip } from "@/components/common/ActionTooltip";
 import type { AdminTransactionRecord, AdminTransactionStats } from "@/lib/admin/transactions";
@@ -117,13 +118,16 @@ export function TransactionsPageClient({
         title="Financial Ledger"
         description="Monitor real payment transactions from checkout providers."
         actions={
-          <button
-            type="button"
-            className="admin-action-button rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-accent)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1E293B]"
-          >
-            <Download size={16} />
-            Export Report
-          </button>
+          <>
+            <SheetsSyncButton target="transactions" label="Sync Transactions" />
+            <button
+              type="button"
+              className="admin-action-button rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-accent)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1E293B]"
+            >
+              <Download size={16} />
+              Export Report
+            </button>
+          </>
         }
       />
 

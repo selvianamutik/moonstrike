@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { writeAuditLog } from "@/lib/admin/audit";
+import { enqueueGoogleSheetsSync } from "@/lib/admin/google-sheets-sync";
 import { requireVerifiedUser } from "@/lib/auth/session";
 import { getOrderNotificationContext, notifyOrderCompleted } from "@/lib/notifications";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -70,6 +71,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (notificationContext) {
     await notifyOrderCompleted(notificationContext);
   }
+
+  await enqueueGoogleSheetsSync("orders");
 
   revalidatePath("/profile");
   revalidatePath("/profile/orders");

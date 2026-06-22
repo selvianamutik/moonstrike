@@ -8,6 +8,7 @@ import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { AdminFilterBar } from "@/components/admin/AdminFilterBar";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
 import { AdminPagination } from "@/components/admin/AdminPagination";
+import { SheetsSyncButton } from "@/components/admin/SheetsSyncButton";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { ActionTooltip } from "@/components/common/ActionTooltip";
 import { ORDER_FILTER_TABS, type AdminOrderStatus } from "@/lib/admin-constants";
@@ -87,6 +88,7 @@ export function OrdersPageClient({ orders }: { orders: AdminOrderRecord[] }) {
         breadcrumbs={[{ label: "Management" }, { label: "Orders", active: true }]}
         title="Order Management"
         description="Track real checkout-created orders through the boost lifecycle."
+        actions={<SheetsSyncButton target="orders" label="Sync Orders" />}
       />
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
