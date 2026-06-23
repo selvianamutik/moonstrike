@@ -116,6 +116,7 @@ function AuthCard() {
   const [isResendingVerification, setIsResendingVerification] = useState(false)
   const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null)
   const [resendCooldown, setResendCooldown] = useState(0)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
 
   useEffect(() => {
     if (!window.location.hash) return
@@ -266,17 +267,17 @@ function AuthCard() {
       return
     }
 
+    if (!acceptedTerms) {
+      setError('You must accept the Terms & Conditions to create an account.')
+      return
+    }
+
     setIsSubmitting(true)
     const { data, error: signUpError } = await signUp(email, password, username.trim())
     setIsSubmitting(false)
 
     if (signUpError) {
       setError(signUpError.message)
-      return
-    }
-
-    if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-      setError('This email is already registered. Go to Login and sign in with this email. If it is not verified yet, the Resend Verification button will appear there.')
       return
     }
 
@@ -562,9 +563,30 @@ function AuthCard() {
                 />
               </div>
 
+              <div className="mt-6 flex items-start gap-3">
+                <input
+                  id="register-terms"
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="ms-focus-ring mt-1 h-4 w-4 shrink-0 cursor-pointer rounded border-[var(--ms-border)] bg-[var(--ms-field)] accent-[var(--ms-gradient-end)]"
+                />
+                <label htmlFor="register-terms" className="text-sm leading-6 text-[var(--ms-body)] cursor-pointer">
+                  I accept the{' '}
+                  <a
+                    href="/terms"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[var(--ms-gradient-end)] hover:underline"
+                  >
+                    Terms & Conditions
+                  </a>
+                </label>
+              </div>
+
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !acceptedTerms}
                 className="ms-button mt-7 flex h-13 w-full items-center justify-center mono text-sm uppercase tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSubmitting ? 'Creating account...' : 'Create Account'}

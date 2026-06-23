@@ -21,6 +21,9 @@ type AdminUserRow = {
   email: string
   password_hash: string
   status: 'active' | 'suspended' | 'banned'
+  failed_login_attempts: number
+  last_failed_login: string | null
+  locked_until: string | null
 }
 
 function getClientIp(request: NextRequest) {
@@ -101,7 +104,7 @@ export async function POST(request: NextRequest) {
   const supabase = createAdminClient()
   const { data: admin, error } = await supabase
     .from('admin_users')
-    .select('id, display_name, email, password_hash, status')
+    .select('id, display_name, email, password_hash, status, failed_login_attempts, last_failed_login, locked_until')
     .eq('email', email)
     .maybeSingle<AdminUserRow>()
 
@@ -119,16 +122,60 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // Check if account is locked
+  if (admin.locked_until) {
+    const lockedUntil = new Date(admin.locked_until)
+    if (lockedUntil > new Date()) {
+      const minutesRemaining = Math.ceil((lockedUntil.getTime() - Date.now()) / 60000)
+      
+      await writeAuditLog({
+        action: `Admin login blocked - account locked for ${email}`,
+        status: 'blocked',
+        request,
+        actorLabel: email,
+      })
+
+      return NextResponse.json(
+        { 
+          error: `Account is temporarily locked due to multiple failed login attempts. Please try again in ${minutesRemaining} minute${minutesRemaining !== 1 ? 's' : ''}.` 
+        },
+        { status: 423 } // 423 Locked
+      )
+    }
+  }
+
   if (!verifyAdminPassword(password, admin.password_hash)) {
+    // Increment failed login attempts
+    const { data: lockoutData } = await supabase
+      .rpc('increment_admin_failed_login', { admin_email: email })
+      .single<{ attempts: number; is_locked: boolean; locked_until_ts: string | null }>()
+
     await writeAuditLog({
-      action: `Admin login failed for ${email}`,
+      action: `Admin login failed for ${email} (attempt ${lockoutData?.attempts || 'unknown'})`,
       status: 'blocked',
       request,
       actorLabel: email,
     })
 
+    if (lockoutData?.is_locked) {
+      const lockedUntil = lockoutData.locked_until_ts ? new Date(lockoutData.locked_until_ts) : null
+      const minutesRemaining = lockedUntil ? Math.ceil((lockedUntil.getTime() - Date.now()) / 60000) : 30
+      
+      return NextResponse.json(
+        { 
+          error: `Account locked due to multiple failed login attempts. Please try again in ${minutesRemaining} minute${minutesRemaining !== 1 ? 's' : ''}.` 
+        },
+        { status: 423 }
+      )
+    }
+
+    const remainingAttempts = 5 - (lockoutData?.attempts || 0)
+    const errorMessage = remainingAttempts > 0 
+      ? `Invalid admin credentials. ${remainingAttempts} attempt${remainingAttempts !== 1 ? 's' : ''} remaining before account lockout.`
+      : 'Invalid admin credentials.'
+
     return NextResponse.json(
-      { error: 'Invalid admin credentials.' },
+      { error: errorMessage },
       { status: 401 }
     )
   }
@@ -161,10 +208,8 @@ export async function POST(request: NextRequest) {
     maxAge,
   })
 
-  await supabase
-    .from('admin_users')
-    .update({ last_login: new Date().toISOString() })
-    .eq('id', admin.id)
+  // Reset failed login attempts on successful login
+  await supabase.rpc('reset_admin_login_attempts', { admin_email: email })
 
   clearRateLimit(emailKey)
 

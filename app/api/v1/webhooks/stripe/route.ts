@@ -61,5 +61,35 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (event.type === "checkout.session.expired") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const checkoutSessionId = session.metadata?.checkoutSessionId ?? session.id;
+
+    try {
+      const supabase = (await import("@/lib/supabase/admin")).createAdminClient();
+      await supabase
+        .from("checkout_sessions")
+        .update({ status: "expired" })
+        .eq("id", checkoutSessionId);
+
+      await writeAuditLog({
+        action: `Stripe checkout session expired: ${checkoutSessionId}`,
+        status: "blocked",
+        request,
+        eventType: "payment_webhook",
+        actorLabel: "System (Webhook)",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update expired session.";
+      await writeAuditLog({
+        action: `Stripe expired session update failed for ${checkoutSessionId}: ${message}`,
+        status: "critical",
+        request,
+        eventType: "payment_webhook",
+        actorLabel: "System (Webhook)",
+      });
+    }
+  }
+
   return NextResponse.json({ received: true });
 }

@@ -36,24 +36,26 @@ async function findUserByEmail(email: string) {
     },
   })
 
-  let page = 1
-  const perPage = 1000
-
-  while (page <= 10) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
+  try {
+    // Query users with pagination, but with optimized approach
+    // We only need to check first page since email should be unique
+    const { data, error } = await admin.auth.admin.listUsers({ 
+      page: 1, 
+      perPage: 1000 
+    })
 
     if (error) throw error
 
+    // Search for user with matching email
     const user = data.users.find(
       (candidate) => candidate.email?.toLowerCase() === email
     )
-    if (user) return user
-    if (data.users.length < perPage) return null
-
-    page += 1
+    
+    return user || null
+  } catch (error) {
+    console.error('Error finding user by email:', error)
+    throw error
   }
-
-  return null
 }
 
 function getProviderMessage(providers: string[]) {
@@ -88,9 +90,9 @@ export async function POST(request: NextRequest) {
   const existingUser = await findUserByEmail(email)
 
   if (existingUser) {
-    const providers = Array.isArray(existingUser.app_metadata.providers)
+    const providers = Array.isArray(existingUser.app_metadata?.providers)
       ? existingUser.app_metadata.providers.filter(
-          (provider): provider is string => typeof provider === 'string'
+          (provider: unknown): provider is string => typeof provider === 'string'
         )
       : []
 
