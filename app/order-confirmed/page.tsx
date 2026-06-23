@@ -121,6 +121,42 @@ export default async function OrderConfirmedPage({ searchParams }: OrderConfirme
       );
     }
 
+    // Check if the session was a Stripe session that expired or failed
+    if (session && session.startsWith("cs_")) {
+      return (
+        <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
+          <SiteHeader />
+          <section className="ms-shell py-16">
+            <div className="mx-auto max-w-3xl rounded-xl border border-red-500/20 bg-[var(--ms-bg-card)] p-8 text-center">
+              <p className="mono text-xs uppercase tracking-[0.28em] text-red-400">Payment Not Completed</p>
+              <h1 className="font-display mt-4 text-4xl font-black tracking-[-0.05em]">
+                Your payment was not processed
+              </h1>
+              <p className="mx-auto mt-5 max-w-2xl text-[var(--ms-body)]">
+                The Stripe checkout session expired or the payment was cancelled before completion.
+                Your cart items are still saved — you can try again.
+              </p>
+              <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
+                <Link
+                  href="/checkout"
+                  className="ms-button flex h-12 items-center px-6 mono text-xs uppercase tracking-[0.14em]"
+                >
+                  Retry Payment
+                </Link>
+                <Link
+                  href="/profile/orders"
+                  className="flex h-12 items-center rounded-md border border-[var(--ms-border)] px-6 mono text-xs uppercase tracking-[0.14em] text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]"
+                >
+                  View My Orders
+                </Link>
+              </div>
+            </div>
+          </section>
+          <SiteFooter />
+        </main>
+      );
+    }
+
     notFound();
   }
 

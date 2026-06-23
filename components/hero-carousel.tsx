@@ -82,13 +82,13 @@ export function HeroCarousel({ heroes }: HeroCarouselProps) {
               <button
                 type="button"
                 onClick={() => handleManualNav(goToNext)}
-                className="absolute right-0 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--ms-border)] bg-[var(--ms-bg-card)]/90 text-xl text-[var(--ms-heading)] backdrop-blur-sm transition-all hover:border-[var(--ms-gradient-end)] hover:bg-[var(--ms-bg-card)] hover:text-[var(--ms-gradient-end)] lg:right-[296px]"
+                className="absolute right-0 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-[var(--ms-border)] bg-[var(--ms-bg-card)]/90 text-xl text-[var(--ms-heading)] backdrop-blur-sm transition-all hover:border-[var(--ms-gradient-end)] hover:bg-[var(--ms-bg-card)] hover:text-[var(--ms-gradient-end)] lg:right-4"
                 aria-label="Next slide"
               >
                 ›
               </button>
 
-              <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 gap-2 lg:left-1/4">
+              <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 gap-2 lg:left-1/2">
                 {heroes.map((_, index) => (
                   <button
                     key={index}
