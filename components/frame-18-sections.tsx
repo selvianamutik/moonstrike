@@ -1,9 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useCallback, useEffect, useRef } from "react";
 import { PlaceholderAsset } from "@/components/asset-image";
-import { StarRating } from "@/components/ui";
+import { TrustpilotReviewCollector } from "@/components/trustpilot-review-collector";
 import type { LandingBenefitsData } from "@/lib/cms/landing";
 
 const steps = [
@@ -13,62 +12,7 @@ const steps = [
   ["4. Enjoy the Result", "Log back in after delivery and review the completed work."],
 ];
 
-const reviews = [
-  ["ArcNova", "Fast mythic run, clean communication, and the order status stayed clear the whole time."],
-  ["Valkyr", "The configuration flow made pricing easy to understand before checkout."],
-  ["Kestrel", "Support answered quickly and the booster finished earlier than expected."],
-  ["IonRush", "Good experience for a ranked push. I knew exactly what was happening."],
-  ["Zenith", "Amazing service quality. The booster was professional and completed ahead of schedule."],
-  ["Phoenix", "Highly recommended! Clear instructions and excellent customer support throughout."],
-  ["Shadow", "Best boosting experience I've had. Worth every penny and delivered fast."],
-  ["Striker", "Smooth process from start to finish. Communication was top notch."],
-  ["Mystic", "Great attention to detail. Booster paid close attention to my specific preferences."],
-];
-
-const REVIEWS_PER_PAGE = 4;
-const AUTO_SCROLL_INTERVAL = 5000;
-
 export function Frame18Sections({ benefits }: { benefits: LandingBenefitsData }) {
-  const [reviewsIndex, setReviewsIndex] = useState(0);
-  const [isAutoScroll, setIsAutoScroll] = useState(true);
-  const autoScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const visibleReviews = reviews.slice(reviewsIndex, reviewsIndex + REVIEWS_PER_PAGE);
-
-  const handlePrevReviews = useCallback(() => {
-    setReviewsIndex((prev) => (prev - 1 + reviews.length) % reviews.length);
-    setIsAutoScroll(false);
-  }, []);
-
-  const handleNextReviews = useCallback(() => {
-    setReviewsIndex((prev) => (prev + 1) % reviews.length);
-    setIsAutoScroll(false);
-  }, []);
-
-  // Auto-scroll effect
-  useEffect(() => {
-    if (!isAutoScroll) {
-      if (autoScrollTimerRef.current) {
-        clearTimeout(autoScrollTimerRef.current);
-      }
-      // Resume auto-scroll after 8 seconds of inactivity
-      autoScrollTimerRef.current = setTimeout(() => {
-        setIsAutoScroll(true);
-      }, 8000);
-      return;
-    }
-
-    autoScrollTimerRef.current = setInterval(() => {
-      setReviewsIndex((prev) => (prev + 1) % reviews.length);
-    }, AUTO_SCROLL_INTERVAL);
-
-    return () => {
-      if (autoScrollTimerRef.current) {
-        clearInterval(autoScrollTimerRef.current);
-      }
-    };
-  }, [isAutoScroll]);
-
   return (
     <section id="about" className="ms-shell mt-24 text-[var(--ms-heading)]">
       <h2 className="font-display text-center text-4xl font-black tracking-[-0.04em]">
@@ -135,38 +79,11 @@ export function Frame18Sections({ benefits }: { benefits: LandingBenefitsData })
         <h2 className="font-display text-4xl font-black tracking-[-0.04em]">
           Rate <span className="section-accent">Us</span>
         </h2>
-        <div className="flex items-center justify-between gap-6">
-          {/* Tombol Previous */}
-          <button
-            type="button"
-            onClick={handlePrevReviews}
-            className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-card)] text-2xl text-[var(--ms-body)] transition-all hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-gradient-end)] md:flex"
-            aria-label="Previous reviews"
-          >
-            &lt;
-          </button>
-
-          {/* Container Review Cards */}
-          <div className="mt-7 grid grid-cols-4 grid-rows-1 flex-1 gap-6 sm:grid-cols-2">
-            {visibleReviews.map(([username, comment]) => (
-              <div 
-                key={`${username}-${reviewsIndex}`} 
-                className="animate-fadeIn transition-all duration-300"
-              >
-                <StarRating username={username} comment={comment} />
-              </div>
-            ))}
-          </div>
-
-          {/* Tombol Next */}
-          <button
-            type="button"
-            onClick={handleNextReviews}
-            className="hidden h-14 w-14 shrink-0 items-center justify-center rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-card)] text-2xl text-[var(--ms-body)] transition-all hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-gradient-end)] md:flex"
-            aria-label="Next reviews"
-          >
-            &gt;
-          </button>
+        <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-[var(--ms-body)]">
+          Finished an order with MoonStrike? Share your experience on Trustpilot and help the next player choose with confidence.
+        </p>
+        <div className="mx-auto mt-7 max-w-3xl rounded-lg border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-5">
+          <TrustpilotReviewCollector />
         </div>
       </div>
 

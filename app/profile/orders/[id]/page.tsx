@@ -6,6 +6,7 @@ import { LivePageRefresh } from "@/components/live-page-refresh";
 import { ConfirmOrderButton } from "@/components/profile/ConfirmOrderButton";
 import { ProfileSidebar } from "@/components/profile/ProfileSidebar";
 import { RefundRequestButton } from "@/components/profile/RefundRequestButton";
+import { TrustpilotReviewPrompt } from "@/components/profile/TrustpilotReviewPrompt";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { requireVerifiedUser } from "@/lib/auth/session";
@@ -52,6 +53,7 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
       <LivePageRefresh intervalMs={10_000} />
+      <TrustpilotReviewPrompt orderId={order.id} />
       <SiteHeader />
       
       <section className="ms-shell grid gap-8 py-16 lg:grid-cols-[270px_minmax(0,1fr)]">

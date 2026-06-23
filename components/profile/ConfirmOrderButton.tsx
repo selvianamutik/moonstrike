@@ -1,12 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { openTrustpilotReviewPrompt } from "@/components/profile/TrustpilotReviewPrompt";
 
 export function ConfirmOrderButton({ orderId }: { orderId: string }) {
-  const router = useRouter();
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -26,7 +25,7 @@ export function ConfirmOrderButton({ orderId }: { orderId: string }) {
         return;
       }
 
-      router.refresh();
+      openTrustpilotReviewPrompt(orderId);
     } catch {
       setError("Unable to reach order service.");
     } finally {
