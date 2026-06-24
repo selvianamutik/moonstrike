@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { writeAuditLog } from "@/lib/admin/audit";
+import { enqueueGoogleSheetsSync } from "@/lib/admin/google-sheets-sync";
 import { requireVerifiedUser } from "@/lib/auth/session";
 import { getOrderNotificationContext, notifyRefundRequested } from "@/lib/notifications";
 import { canRequestOrderRefund, getRefundWindowDays } from "@/lib/orders";
@@ -71,6 +72,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (notificationContext) {
     await notifyRefundRequested(notificationContext);
   }
+
+  await enqueueGoogleSheetsSync("orders");
 
   revalidatePath("/profile");
   revalidatePath("/profile/orders");

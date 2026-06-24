@@ -48,7 +48,9 @@ export function NotificationBell({ mode, className = "", iconSize = 22, label = 
     if (response?.ok && Array.isArray(payload?.notifications)) {
       setNotifications(payload.notifications.slice(0, 5));
       setUnreadCount(payload.notifications.filter((notification) => !notification.readAt).length);
+      return payload.notifications;
     }
+    return [];
   }, [base]);
 
   const loadUnread = useCallback(async () => {
@@ -96,7 +98,12 @@ export function NotificationBell({ mode, className = "", iconSize = 22, label = 
   async function openMenu() {
     const next = !isOpen;
     setIsOpen(next);
-    if (next) await loadNotifications();
+    if (!next) return;
+
+    const loadedNotifications = await loadNotifications();
+    if (unreadCount > 0 || loadedNotifications.some((notification) => !notification.readAt)) {
+      await markAllRead();
+    }
   }
 
   async function markRead(id: string) {

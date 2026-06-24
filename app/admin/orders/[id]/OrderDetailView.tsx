@@ -250,6 +250,10 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
                       setPendingStatus(action.next);
                       return;
                     }
+                    if (order.status === "delivered" && action.next === "completed") {
+                      setPendingStatus(action.next);
+                      return;
+                    }
                     applyStatus(action.next);
                   }}
                   className="w-full"
@@ -372,6 +376,19 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
           if (!isSaving) setPendingStatus(null);
         }}
         onConfirm={() => applyStatus("refund_requested")}
+      />
+
+      <ConfirmDialog
+        open={pendingStatus === "completed"}
+        title="Mark order completed?"
+        description="This confirms the delivered order as completed from the admin side. Use this when the customer has accepted the delivery or when the auto-complete window has passed and no issue was reported."
+        confirmLabel="Mark Completed"
+        variant="primary"
+        isLoading={isSaving}
+        onClose={() => {
+          if (!isSaving) setPendingStatus(null);
+        }}
+        onConfirm={() => applyStatus("completed")}
       />
 
       <ConfirmDialog

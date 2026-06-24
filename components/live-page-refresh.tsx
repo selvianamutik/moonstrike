@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type LivePageRefreshProps = {
@@ -10,9 +10,28 @@ type LivePageRefreshProps = {
 
 export function LivePageRefresh({ enabled = true, intervalMs = 10_000 }: LivePageRefreshProps) {
   const router = useRouter();
+  const [isSuspended, setIsSuspended] = useState(false);
 
   useEffect(() => {
-    if (!enabled) return;
+    function suspend() {
+      setIsSuspended(true);
+    }
+
+    function resume() {
+      setIsSuspended(false);
+    }
+
+    window.addEventListener("moonstrike:live-refresh-suspend", suspend);
+    window.addEventListener("moonstrike:live-refresh-resume", resume);
+
+    return () => {
+      window.removeEventListener("moonstrike:live-refresh-suspend", suspend);
+      window.removeEventListener("moonstrike:live-refresh-resume", resume);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!enabled || isSuspended) return;
 
     function refreshVisiblePage() {
       if (document.visibilityState === "visible") {
@@ -29,7 +48,7 @@ export function LivePageRefresh({ enabled = true, intervalMs = 10_000 }: LivePag
       window.removeEventListener("focus", refreshVisiblePage);
       document.removeEventListener("visibilitychange", refreshVisiblePage);
     };
-  }, [enabled, intervalMs, router]);
+  }, [enabled, intervalMs, isSuspended, router]);
 
   return null;
 }

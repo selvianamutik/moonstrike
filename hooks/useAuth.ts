@@ -82,10 +82,66 @@ export function useAuth() {
 
   const signIn = useCallback(
     async (email: string, password: string) => {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-      if (!error && data.user) {
-        await fetch('/api/auth/merge-chat', { method: 'POST' }).catch(() => null)
+      // Check if account is locked before attempting login
+      const lockCheckResponse = await fetch(
+        `/api/auth/login-attempt?email=${encodeURIComponent(email)}`
+      ).catch(() => null)
+      
+      if (lockCheckResponse?.ok) {
+        const lockStatus = await lockCheckResponse.json().catch(() => ({}))
+        if (lockStatus.locked) {
+          const lockedUntil = lockStatus.lockedUntil ? new Date(lockStatus.lockedUntil) : null
+          const minutesRemaining = lockedUntil
+            ? Math.ceil((lockedUntil.getTime() - Date.now()) / 60000)
+            : 30
+          
+          return {
+            data: null,
+            error: new Error(
+              `Account is temporarily locked due to multiple failed login attempts. Please try again in ${minutesRemaining} minute${minutesRemaining !== 1 ? 's' : ''}.`
+            ),
+          }
+        }
       }
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      
+      if (!error && data.user) {
+        // Successful login - reset login attempts
+        await fetch('/api/auth/login-attempt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, success: true }),
+        }).catch(() => null)
+        
+        await fetch('/api/auth/merge-chat', { method: 'POST' }).catch(() => null)
+      } else if (error) {
+        // Failed login - increment attempts
+        const attemptResponse = await fetch('/api/auth/login-attempt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, success: false }),
+        }).catch(() => null)
+        
+        if (attemptResponse?.status === 423) {
+          const attemptData = await attemptResponse.json().catch(() => ({}))
+          return {
+            data: null,
+            error: new Error(attemptData.message || 'Account is temporarily locked.'),
+          }
+        }
+        
+        if (attemptResponse?.ok) {
+          const attemptData = await attemptResponse.json().catch(() => ({}))
+          if (attemptData.message) {
+            return {
+              data: null,
+              error: new Error(`${error.message}. ${attemptData.message}`),
+            }
+          }
+        }
+      }
+      
       return { data, error }
     },
     [supabase]
@@ -118,6 +174,24 @@ export function useAuth() {
         },
       })
 
+      // Supabase returns a user with empty identities when email already exists
+      // (when email confirmation is enabled). Handle this explicitly.
+      if (
+        !error &&
+        data?.user &&
+        Array.isArray(data.user.identities) &&
+        data.user.identities.length === 0
+      ) {
+        return {
+          data: null,
+          error: new Error(
+            'This email is already registered. Go to Login and sign in with this email. If it is not verified yet, the Resend Verification button will appear there.'
+          ),
+        }
+      }
+
+      // These specific error messages from Supabase indicate email send failures,
+      // not that the email is already registered.
       if (
         error?.message.toLowerCase().includes('recovery email') ||
         error?.message.toLowerCase().includes('confirmation email')
@@ -125,7 +199,7 @@ export function useAuth() {
         return {
           data,
           error: new Error(
-            'This email may already be registered or email delivery failed. Try logging in, continue with Google, or reset your password.'
+            'Failed to send confirmation email. Please try again in a moment or contact support.'
           ),
         }
       }

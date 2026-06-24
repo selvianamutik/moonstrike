@@ -23,7 +23,6 @@ Moon Strike has moved past the static prototype phase. The current working surfa
 - Chat: persisted support/order tickets, protected API polling/local events, unread badges, image/shared-link attachments, lazy loading, and cleanup cron are wired.
 
 **Still pending / mock-backed:**
-- Google Sheets sync.
 - Dedicated `/hot-offers` route and final CMS polish for all landing blocks.
 
 **Current route direction:**
@@ -1000,7 +999,7 @@ const {data: settings} = await supabase.from('system_settings').select('*').eq('
 ### Current Implementation Audit (2026-05-31)
 
 - Verification: `npm.cmd run lint` passes after the current auth/admin/CMS/service updates.
-- Data/integration state: Supabase-backed auth, admin session, games CMS, genres CMS, service categories, service CMS, service images, CMS-backed `/services`, CMS-backed Quick Select, browser-session cart APIs, and real-cart checkout UI are implemented. NowPayments, chat persistence, Google Sheets, refund gateway handling, and full order lifecycle automation remain pending or mock-backed.
+- Data/integration state: Supabase-backed auth, admin session, games CMS, genres CMS, service categories, service CMS, service images, CMS-backed `/services`, CMS-backed Quick Select, browser-session cart APIs, real-cart checkout UI, NowPayments, chat persistence, notifications, and Google Sheets sync are implemented. Refund gateway handling and full order lifecycle automation remain in-progress.
 - Routing state: canonical service routes are `/:game-slug/:category-slug/:service-slug`. Admin service edit/preview uses `/admin/services/[...servicePath]` and supports slug URLs like `/admin/services/:game-slug/:service-slug/edit`.
 - Generated/seed data: `npm run catalog:seed` seeds games, genres, service categories, services, and representative `options_schema` entries.
 
@@ -1078,7 +1077,7 @@ const {data: settings} = await supabase.from('system_settings').select('*').eq('
 | Refund router | in-progress | Admin can choose automatic provider refund or manual refund recording. Stripe supports automatic + manual. NOWPayments is manual-only; automatic attempts are rejected with a warning and do not mark the order refunded. Future providers should declare refund capabilities behind the same interface. |
 | Rate limiting | in-progress | Auth/admin login/password-reset/register limits exist. Broader API limits pending. |
 | Audit log (admin/system/customer actions) | in-progress | Covers admin auth/CMS/settings/order actions plus checkout creation/block/failure, payment webhook signature/fulfillment outcomes, refund success/failure/block, customer refund requests, customer completion confirmation, and auto-complete cron outcomes. |
-| Google Sheets integration | not-started | Orders + Transactions tabs pending. |
+| Google Sheets integration | in-progress | Orders + Transactions tabs are wired through service-account auth, admin manual sync buttons, queued `sheets_sync_jobs`, and `/api/cron/sheets/sync`. Orders include selected option and item breakdown columns for readable operations review. |
 | Real-time chat | in-progress | Uses fast protected API refresh and local update events instead of exposing private message payloads through browser-side table subscriptions. Active chats, ticket previews, and unread badges update without manual reload. |
 | Admin second factor | removed | Extra login factors intentionally out of scope. |
 | Anonymous cart API routes | in-progress | Browser-session cart uses `ms_cart_session` and server-side service role routes for add/list/remove plus checkout readout. |
@@ -1829,52 +1828,62 @@ Resend is used in two ways:
 1. Go to Google Cloud Console - Create a project (or use existing)
 2. Enable the Google Sheets API
 3. Create a Service Account - generate a JSON key - download it
-4. Add the key to env: `GOOGLE_SERVICE_ACCOUNT_JSON` (the full JSON as a string)
+4. Add the key to env: `GOOGLE_SERVICE_ACCOUNT_JSON` (the full JSON as a compact string). Local development can alternatively use `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` pointing at an ignored JSON file.
 5. Create your Google Spreadsheet - Share it with the service account's email (Editor access)
 6. Copy the Spreadsheet ID from the URL - add to env: `GOOGLE_SHEET_ID`
 
-One spreadsheet, two tabs. Written on order events only.
+One spreadsheet, two tabs. The app rewrites the exported tab contents instead of appending duplicate rows, so Sheets stays a readable mirror of current order and transaction state.
 
-Not written to Sheets: user registrations, admin actions, failed payments.
+Not written to Sheets: user registrations, admin actions unrelated to orders/transactions, failed payments that never become a paid checkout.
 
-**Orders tab** - one row per order, updated in place on status change:
-
-| Column | Notes |
-|---|---|
-| `order_id` | Anchor key - used to find and update the row |
-| `user_id` | FK reference |
-| `username` | Denormalized for readability |
-| `email` | Denormalized |
-| `service` | Service name at purchase time |
-| `options_snapshot` | e.g. `{"difficulty":"Mythic","loot_traders":2}` |
-| `status` | Updated in place on every state transition |
-| `created_at` | Set once on order creation |
-| `delivered_at` | Set when status hits `delivered` |
-
-**Transactions tab** - one row per payment, `refund_status` updated in place (no new row for refunds):
+**Orders tab** - one row per order:
 
 | Column | Notes |
 |---|---|
-| `transaction_id` | Anchor key |
-| `order_id` | FK reference |
-| `user_id` / `username` | Denormalized |
-| `amount` | Positive value for payments |
-| `currency` | USD or EUR |
-| `provider` | `stripe` or `nowpayments` |
-| `payment_status` | `paid` or `failed` |
-| `refund_status` | Updated in place - `refunded` or `denied` when resolved |
-| `created_at` | Set once |
-| `refunded_at` | Set when refund approved |
+| `Order ID` | Internal readable order reference, e.g. `MS-20260621-AB12CD` |
+| `Customer` / `Customer Email` | Denormalized for spreadsheet review |
+| `Created At` / `Updated At` | Lifecycle timestamps |
+| `Status` | Current order status |
+| `Items` | Number of services in the order |
+| `Services` / `Games` | Comma-separated readable service and game names |
+| `Selected Options` | Human-readable option selections copied from order item snapshots |
+| `Item Breakdown` | One line per item with service, game, price, and options |
+| `Amount` / `Currency` | Order item totals summed from `order_items` |
+| `Payment Provider` | Provider from the related transaction |
+| `Transaction ID` | Internal readable transaction reference |
+| `Checkout Session` | Internal checkout session key |
 
-**Write triggers:**
+**Transactions tab** - one row per confirmed payment:
+
+| Column | Notes |
+|---|---|
+| `Transaction ID` | Internal readable transaction reference |
+| `Customer` / `Customer Email` | Denormalized for spreadsheet review |
+| `Created At` | Transaction creation time |
+| `Amount` / `Currency` | Payment amount and checkout currency |
+| `Provider` | `stripe`, `nowpayments`, or future provider key |
+| `Status` | Current transaction status, usually `success` or `refunded` |
+| `Checkout Session` | Internal checkout session key |
+
+**Sync triggers:**
 
 | Event | Action |
 |---|---|
-| Payment webhook fires - order enters `pending` | Append new row to Orders tab + Transactions tab |
-| Order status changes to any subsequent state | Update existing Orders row by `order_id` |
-| Refund resolved | Update `refund_status` + `refunded_at` on Transactions row |
+| Payment webhook fulfills a checkout | Enqueue `all` so Orders and Transactions both refresh |
+| Admin updates order status | Enqueue Orders, or `all` when refund status affects transactions |
+| Customer confirms completion | Enqueue Orders |
+| Customer requests refund | Enqueue Orders |
+| Admin resolves refund | Enqueue `all` |
+| Auto-complete cron completes delivered orders | Enqueue Orders |
+| Admin clicks Sync Orders / Sync Transactions | Run an immediate protected sync for that tab |
+| `/api/cron/sheets/sync` runs | Processes pending `sheets_sync_jobs` and clears successful jobs |
 
-> "Order enters `pending`" = payment confirmed by webhook. This is the first write. Do not wait for admin to set `confirmed` - that would miss orders admin never acknowledges.
+Pending jobs are collapsed by target. If three order changes happen before cron runs, the cron may report one processed `orders` job because the final export rewrites the whole Orders tab with the latest state.
+
+**Important rules:**
+- Google service account JSON files are secrets. Keep them ignored and use env vars in Vercel.
+- `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` is only a local convenience. Production should use `GOOGLE_SERVICE_ACCOUNT_JSON`.
+- Sheets sync is best-effort reporting. Checkout/order writes should not depend on Google Sheets being available.
 
 ---
 
@@ -2300,7 +2309,8 @@ Follow these during development - not as a post-launch fix.
 | `RESEND_API_KEY` | Backend | Runtime | From resend.com dashboard. Used by MoonStrike app transactional emails. Supabase Auth email may also use Resend SMTP from Supabase dashboard config. |
 | `RESEND_FROM_EMAIL` | Backend | Runtime | Sender address for app transactional emails. Use `onboarding@resend.dev` only for local testing; production should use a verified domain sender. |
 | `EMAIL_TEST_TO` | Seed/test script | Local testing | Recipient used by `npm run email:test`. |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | Backend | Runtime | Full JSON key file contents as a string. From Google Cloud Console - Service Accounts. Used for Sheets writes. |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Backend | Runtime | Full service account JSON key contents as a compact string. From Google Cloud Console - Service Accounts. Preferred for production/Vercel Sheets writes. |
+| `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` | Backend | Local testing | Optional local-only fallback path to an ignored service account JSON file. Do not use this in Vercel unless the file is intentionally present at runtime. |
 | `GOOGLE_SHEET_ID` | Backend | Runtime | Spreadsheet ID from the Google Sheets URL. The sheet must be shared with the service account email. |
 | `NEXT_PUBLIC_CLOUDFLARE_IMAGES_ACCOUNT_HASH` | Frontend | Build + Runtime | From Cloudflare Images dashboard. Used to construct CDN image URLs. |
 
@@ -2337,6 +2347,7 @@ RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=MoonStrike <noreply@yourdomain.com>
 EMAIL_TEST_TO=you@example.com
 GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"..."}
+GOOGLE_SERVICE_ACCOUNT_JSON_PATH=moonstrike-test-service-account.json
 GOOGLE_SHEET_ID=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms
 NEXT_PUBLIC_CLOUDFLARE_IMAGES_ACCOUNT_HASH=abc123xyz
 ```
