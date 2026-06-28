@@ -7,10 +7,10 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { gameServices, trustMetrics } from "@/lib/catalog";
 import { listActiveCatalogGames } from "@/lib/cms/games";
-import { getActiveLandingCms, getActiveHeroSlides } from "@/lib/cms/landing";
+import { getActiveHeroSlides, getActiveLandingCms } from "@/lib/cms/landing";
 
 export default async function Home() {
-  const [{ benefits }, heroes, gameCards] = await Promise.all([
+  const [{ benefits, steps }, heroes, gameCards] = await Promise.all([
     getActiveLandingCms(),
     getActiveHeroSlides(),
     listActiveCatalogGames(),
@@ -21,12 +21,7 @@ export default async function Home() {
       <SiteHeader />
 
       <section className="ms-shell py-20">
-        <p className="mono text-sm font-black uppercase tracking-[0.2em] text-[var(--ms-body)]">
-          {heroes[0]?.label || "Featured Recommended"}
-        </p>
-        <div className="relative mt-6">
-          <HeroCarousel heroes={heroes} />
-        </div>
+        <HeroCarousel heroes={heroes} />
       </section>
 
       <section className="ms-shell py-10">
@@ -58,7 +53,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <Frame18Sections benefits={benefits} />
+      <Frame18Sections benefits={benefits} steps={steps} />
 
       <SiteFooter />
     </main>

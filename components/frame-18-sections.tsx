@@ -3,16 +3,9 @@
 import Image from "next/image";
 import { PlaceholderAsset } from "@/components/asset-image";
 import { TrustpilotReviewCollector } from "@/components/trustpilot-review-collector";
-import type { LandingBenefitsData } from "@/lib/cms/landing";
+import type { LandingBenefitsData, LandingStepsData } from "@/lib/cms/landing";
 
-const steps = [
-  ["1. Choose Your Service", "Pick the boost, coaching, raid, or item service that matches your goal."],
-  ["2. Configure Options", "Select run size, delivery speed, and other service-specific options."],
-  ["3. Track Progress", "Follow order updates and use support chat for questions or extra instructions."],
-  ["4. Enjoy the Result", "Log back in after delivery and review the completed work."],
-];
-
-export function Frame18Sections({ benefits }: { benefits: LandingBenefitsData }) {
+export function Frame18Sections({ benefits, steps }: { benefits: LandingBenefitsData; steps: LandingStepsData }) {
   return (
     <section id="about" className="ms-shell mt-24 text-[var(--ms-heading)]">
       <h2 className="font-display text-center text-4xl font-black tracking-[-0.04em]">
@@ -34,28 +27,32 @@ export function Frame18Sections({ benefits }: { benefits: LandingBenefitsData })
         />
       )}
 
-      <div className="mx-auto mt-6 grid max-w-6xl gap-6 md:grid-cols-3">
-        {benefits.items.map((item) => (
-          <article key={item.title} className="ms-card ms-card-hover rounded-lg p-7">
-            <span className="mono flex h-12 w-12 items-center justify-center rounded-full border border-[var(--ms-gradient-end)] text-lg font-bold text-[var(--ms-gradient-end)]">
-              {item.icon}
-            </span>
-            <h3 className="mt-5 text-xl font-bold text-[var(--ms-heading)]">{item.title}</h3>
-            <p className="mt-3 text-sm leading-6 text-[var(--ms-body)]">{item.detail}</p>
-          </article>
-        ))}
+      <div className="mx-auto mt-6 grid max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {benefits.items.length > 0 ? (
+          benefits.items.map((item) => (
+            <article key={item.title} className="ms-card ms-card-hover rounded-lg p-7">
+              <span className="mono flex h-12 w-12 items-center justify-center rounded-full border border-[var(--ms-gradient-end)] text-lg font-bold text-[var(--ms-gradient-end)]">
+                {item.icon}
+              </span>
+              <h3 className="mt-5 text-xl font-bold text-[var(--ms-heading)]">{item.title}</h3>
+              <p className="mt-3 text-sm leading-6 text-[var(--ms-body)]">{item.detail}</p>
+            </article>
+          ))
+        ) : (
+          <p className="col-span-full py-8 text-center text-sm text-[var(--ms-body)]">Benefits content is not yet configured.</p>
+        )}
       </div>
 
       <div className="mt-24 text-center">
         <h2 className="font-display text-4xl font-black tracking-[-0.04em]">
-          Up and Running in <span className="section-accent">4 Simple Steps</span>
+          {steps.title} <span className="section-accent">{steps.accent}</span>
         </h2>
-        <p className="mt-3 text-[var(--ms-body)]">A short path from service choice to completed result.</p>
+        <p className="mt-3 text-[var(--ms-body)]">{steps.subtitle}</p>
       </div>
 
       <div className="mx-auto mt-10 grid max-w-4xl grid-cols-1 overflow-hidden rounded-xl border border-[var(--ms-border)] md:grid-cols-2">
-        {steps.map(([title, body], index) => (
-          <article key={title} className="relative min-h-56 overflow-hidden bg-[var(--ms-bg-card)] p-8">
+        {steps.items.map((step, index) => (
+          <article key={step.title} className="relative min-h-56 overflow-hidden bg-[var(--ms-bg-card)] p-8">
             <div
               className={`absolute h-72 w-72 rounded-full bg-[var(--primary)] opacity-70 shadow-[0_0_22px_rgba(139,92,246,0.45)] ${
                 index === 0
@@ -68,8 +65,8 @@ export function Frame18Sections({ benefits }: { benefits: LandingBenefitsData })
               }`}
             />
             <div className={`relative z-10 ${index === 3 ? "ml-auto max-w-56 text-right" : "max-w-72"}`}>
-              <h3 className="font-bold text-[var(--ms-heading)]">{title}</h3>
-              <p className="mt-3 leading-6 text-[var(--ms-body)]">{body}</p>
+              <h3 className="font-bold text-[var(--ms-heading)]">{step.title}</h3>
+              <p className="mt-3 leading-6 text-[var(--ms-body)]">{step.description}</p>
             </div>
           </article>
         ))}

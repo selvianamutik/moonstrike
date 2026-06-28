@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
     typeof formData.get('slug') === 'string'
       ? safeFilePart(String(formData.get('slug')))
       : 'game'
+  const usage = formData.get('usage') === 'hero' ? 'hero' : 'card'
 
   if (!(image instanceof File)) {
     return NextResponse.json({ error: 'Image file is required.' }, { status: 400 })
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
   await ensureBucket()
 
   const supabase = createAdminClient()
-  const imagePath = `games/${slug}-${Date.now()}.webp`
+  const imagePath = `games/${slug}-${usage}-${Date.now()}.webp`
   const { error } = await supabase.storage
     .from(CMS_MEDIA_BUCKET)
     .upload(imagePath, image, {
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
     .getPublicUrl(imagePath)
 
   await writeAuditLog({
-    action: `Uploaded game image for ${slug}`,
+    action: `Uploaded ${usage === 'hero' ? 'game hero image' : 'game image'} for ${slug}`,
     status: 'success',
     request,
     admin,

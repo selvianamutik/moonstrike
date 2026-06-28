@@ -1,5 +1,5 @@
 import React from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getAdminContentBlock } from "@/lib/cms/landing";
 import { ContentEditForm } from "./ContentEditForm";
 
@@ -7,7 +7,8 @@ export default async function ContentEditPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const content = await getAdminContentBlock(id);
   if (!content) notFound();
-  if (content.type !== "hero" && content.type !== "benefits_section") notFound();
+  if (content.type === "hero") redirect("/admin/content");
+  if (content.type !== "benefits_section" && content.type !== "steps_section") notFound();
 
   return <ContentEditForm content={content} />;
 }

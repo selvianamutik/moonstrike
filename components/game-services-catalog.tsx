@@ -75,6 +75,7 @@ export function GameServicesCatalog({
   const activeLabel = tabs.find((tab) => tab.slug === activeSlug)?.label ?? "All";
   const filteredServices = services.filter((service) => matchesQuery(service, query));
   const visibleServices = filteredServices.slice(0, visible);
+  const heroImage = game.heroImage || game.image;
   const fixedTabs: ScrollingTabItem[] = [];
   const scrollingTabs: ScrollingTabItem[] = tabs.map((tab) => ({
     href: tab.href,
@@ -92,50 +93,65 @@ export function GameServicesCatalog({
         </div>
       </div>
 
-      <PlaceholderAsset
-        isHidden={false}
-        alt={`${game.name} boosting service banner`}
-        className="mt-8 flex min-h-72 flex-col items-start justify-between gap-8 rounded-md px-8 py-10 md:flex-row md:items-center md:px-16"
-        imageClassName="p-16"
-        priority
-      >
-        <div className="relative z-10 max-w-xl">
-          <p className="mono text-xs uppercase tracking-[0.24em] text-[var(--ms-gradient-end)]">Selected game</p>
-          <h2 className="font-display mt-4 text-3xl font-black tracking-[-0.04em] md:text-4xl">
-            {game.name} Boost Catalog
-          </h2>
-          <p className="mt-4 max-w-lg text-sm leading-6 text-[var(--ms-body)]">
-            Browse active offers, compare service categories, and pick the run that matches your current goal.
-          </p>
-        </div>
-        <div className="relative z-10 text-left md:text-center">
-          <div className="inline-flex rounded-full border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-1">
-            <button
-              type="button"
-              onClick={() => setCurrency("USD")}
-              className={`h-9 rounded-full px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] transition ${
-                currency === "USD"
-                  ? "bg-[var(--primary)] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]"
-                  : "text-[var(--ms-body)] hover:text-[var(--ms-heading)]"
-              }`}
-            >
-              USD
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrency("EUR")}
-              className={`h-9 rounded-full px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] transition ${
-                currency === "EUR"
-                  ? "bg-[var(--primary)] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]"
-                  : "text-[var(--ms-body)] hover:text-[var(--ms-heading)]"
-              }`}
-            >
-              EUR
-            </button>
+      <div className="relative mt-8 flex min-h-72 overflow-hidden rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-card)]">
+        {heroImage ? (
+          <img
+            src={heroImage}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            loading="eager"
+          />
+        ) : (
+          <PlaceholderAsset
+            isHidden={false}
+            alt={`${game.name} boosting service banner`}
+            className="absolute inset-0"
+            imageClassName="p-16"
+            priority
+          />
+        )}
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(8,10,22,0.94)_0%,rgba(8,10,22,0.78)_45%,rgba(8,10,22,0.32)_100%)]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/25" />
+
+        <div className="relative z-10 flex w-full flex-col items-start justify-between gap-8 px-8 py-10 md:flex-row md:items-center md:px-16">
+          <div className="max-w-xl">
+            <p className="mono text-xs uppercase tracking-[0.24em] text-[var(--ms-gradient-end)]">Selected game</p>
+            <h2 className="font-display mt-4 text-3xl font-black tracking-[-0.04em] md:text-4xl">
+              {game.name} Boost Catalog
+            </h2>
+            <p className="mt-4 max-w-lg text-sm leading-6 text-white/78">
+              Browse active offers, compare service categories, and pick the run that matches your current goal.
+            </p>
           </div>
-          <p className="mt-3 text-sm text-[var(--ms-gradient-end)]">{currency} pricing view</p>
+          <div className="text-left md:text-center">
+            <div className="inline-flex rounded-full border border-white/15 bg-black/45 p-1 backdrop-blur">
+              <button
+                type="button"
+                onClick={() => setCurrency("USD")}
+                className={`h-9 rounded-full px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] transition ${
+                  currency === "USD"
+                    ? "bg-[var(--primary)] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]"
+                    : "text-white/72 hover:text-white"
+                }`}
+              >
+                USD
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrency("EUR")}
+                className={`h-9 rounded-full px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] transition ${
+                  currency === "EUR"
+                    ? "bg-[var(--primary)] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]"
+                    : "text-white/72 hover:text-white"
+                }`}
+              >
+                EUR
+              </button>
+            </div>
+            <p className="mt-3 text-sm text-[var(--ms-gradient-end)]">{currency} pricing view</p>
+          </div>
         </div>
-      </PlaceholderAsset>
+      </div>
 
       <div className="mt-8">
         <ScrollingTabList

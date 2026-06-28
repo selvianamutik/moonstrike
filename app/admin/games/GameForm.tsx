@@ -74,18 +74,22 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
   const [platform, setPlatform] = useState(game?.platforms[0] ?? GAME_PLATFORMS[0]);
   const [description, setDescription] = useState(game?.description ?? "");
   const [image, setImage] = useState(game?.image ?? "");
+  const [heroImage, setHeroImage] = useState(game?.hero_image ?? "");
   const [status, setStatus] = useState(game?.status ?? "active");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [draftImageFile, setDraftImageFile] = useState<File | null>(null);
   const [draftImagePreview, setDraftImagePreview] = useState("");
+  const [draftHeroImageFile, setDraftHeroImageFile] = useState<File | null>(null);
+  const [draftHeroImagePreview, setDraftHeroImagePreview] = useState("");
 
   useEffect(() => {
     return () => {
       if (draftImagePreview) URL.revokeObjectURL(draftImagePreview);
+      if (draftHeroImagePreview) URL.revokeObjectURL(draftHeroImagePreview);
     };
-  }, [draftImagePreview]);
+  }, [draftHeroImagePreview, draftImagePreview]);
 
   function selectImage(file: File) {
     setError("");
@@ -94,13 +98,21 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
     setDraftImagePreview(URL.createObjectURL(file));
   }
 
-  async function uploadImage(file: File) {
+  function selectHeroImage(file: File) {
+    setError("");
+    if (draftHeroImagePreview) URL.revokeObjectURL(draftHeroImagePreview);
+    setDraftHeroImageFile(file);
+    setDraftHeroImagePreview(URL.createObjectURL(file));
+  }
+
+  async function uploadImage(file: File, usage: "card" | "hero") {
     setIsUploading(true);
 
     try {
-      const compressed = await resizeToWebp(file, 1200, 0.82);
+      const compressed = await resizeToWebp(file, usage === "hero" ? 1920 : 1200, 0.82);
       const formData = new FormData();
       formData.set("slug", slug || slugify(name) || "game");
+      formData.set("usage", usage);
       formData.set("image", compressed);
 
       const response = await fetch("/api/admin/games/image", {
@@ -132,15 +144,22 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
     e.preventDefault();
     setError("");
     setIsSaving(true);
-    let uploadedImagePath = "";
+    const uploadedPaths: string[] = [];
 
     try {
       let nextImage = image;
+      let nextHeroImage = heroImage;
 
       if (draftImageFile) {
-        const uploadedImage = await uploadImage(draftImageFile);
+        const uploadedImage = await uploadImage(draftImageFile, "card");
         nextImage = uploadedImage.imageUrl;
-        uploadedImagePath = uploadedImage.storagePath;
+        if (uploadedImage.storagePath) uploadedPaths.push(uploadedImage.storagePath);
+      }
+
+      if (draftHeroImageFile) {
+        const uploadedHeroImage = await uploadImage(draftHeroImageFile, "hero");
+        nextHeroImage = uploadedHeroImage.imageUrl;
+        if (uploadedHeroImage.storagePath) uploadedPaths.push(uploadedHeroImage.storagePath);
       }
 
       const response = await fetch(isEditing ? `/api/admin/games/${game?.id}` : "/api/admin/games", {
@@ -153,6 +172,7 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
           platform,
           description,
           image: nextImage,
+          heroImage: nextHeroImage,
           status,
         }),
       });
@@ -161,19 +181,23 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
       } | null;
 
       if (!response.ok) {
-        if (uploadedImagePath) void cleanupUploadedMedia([uploadedImagePath]);
+        if (uploadedPaths.length > 0) void cleanupUploadedMedia(uploadedPaths);
         setError(result?.error ?? "Unable to save game.");
         return;
       }
 
       setImage(nextImage);
+      setHeroImage(nextHeroImage);
       if (draftImagePreview) URL.revokeObjectURL(draftImagePreview);
+      if (draftHeroImagePreview) URL.revokeObjectURL(draftHeroImagePreview);
       setDraftImageFile(null);
       setDraftImagePreview("");
+      setDraftHeroImageFile(null);
+      setDraftHeroImagePreview("");
       router.push("/admin/games");
       router.refresh();
     } catch (saveError) {
-      if (uploadedImagePath) void cleanupUploadedMedia([uploadedImagePath]);
+      if (uploadedPaths.length > 0) void cleanupUploadedMedia(uploadedPaths);
       setError(saveError instanceof Error ? saveError.message : "Unable to reach the games CMS endpoint.");
     } finally {
       setIsSaving(false);
@@ -202,7 +226,7 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
           />
         </AdminFormField>
         <AdminFormField label="Slug">
-          <input className={adminInputClass + (isEditing ? " opacity-60" : "")} value={slug} onChange={(e) => setSlug(slugify(e.target.value))} readOnly={isEditing} required />
+          <input className={adminInputClass} value={slug} onChange={(e) => setSlug(slugify(e.target.value))} required />
         </AdminFormField>
         <AdminFormField label="Genre / Type">
           <select className={adminSelectClass} value={genreId} onChange={(e) => setGenreId(e.target.value)} required>
@@ -243,6 +267,26 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
             </p>
           </div>
         </AdminFormField>
+        <AdminFormField label="Hero banner image">
+          <div className="space-y-3">
+            {(draftHeroImagePreview || heroImage || image) && (
+              <img src={draftHeroImagePreview || heroImage || image} alt="" className="h-36 w-full rounded-lg object-cover" />
+            )}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className={adminInputClass}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) selectHeroImage(file);
+                e.target.value = "";
+              }}
+            />
+            <p className="text-xs text-[var(--ms-text-secondary)]">
+              Optional. Recommended: 1920 x 720 px or wider landscape artwork. If empty, the game image is used.
+            </p>
+          </div>
+        </AdminFormField>
         <AdminFormField label="Status">
           <select className={adminSelectClass} value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
             <option value="active">active</option>
@@ -266,6 +310,7 @@ export function GameForm({ game, genres }: { game?: GameRow; genres: GenreRow[] 
             variant="secondary"
             onClick={() => {
               if (draftImagePreview) URL.revokeObjectURL(draftImagePreview);
+              if (draftHeroImagePreview) URL.revokeObjectURL(draftHeroImagePreview);
               router.push("/admin/games");
             }}
           >

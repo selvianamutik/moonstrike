@@ -4,6 +4,7 @@ import {
   getSupabasePublishableKey,
   getSupabaseUrl,
 } from '@/lib/supabase/env'
+import { heroBannerToHeroSlide, listActiveHeroBanners } from '@/lib/cms/hero-banners'
 
 export type LandingHeroData = {
   label: string
@@ -12,6 +13,7 @@ export type LandingHeroData = {
   ctaText: string
   ctaHref: string
   badgeVariant: 'new' | 'featured' | 'hot'
+  badges?: string[]
   imageUrl: string
   thumbnailUrl: string
   storagePath: string
@@ -47,9 +49,34 @@ export type ContentBlockRow = {
   created_by: string
 }
 
+export type LandingStepsData = {
+  title: string
+  accent: string
+  subtitle: string
+  items: LandingStepItem[]
+}
+
+export type LandingStepItem = {
+  title: string
+  description: string
+}
+
+export const DEFAULT_LANDING_STEPS: LandingStepsData = {
+  title: 'Up and Running in',
+  accent: '4 Simple Steps',
+  subtitle: 'A short path from service choice to completed result.',
+  items: [
+    { title: 'Choose Your Service', description: 'Pick the boost, coaching, raid, or item service that matches your goal.' },
+    { title: 'Configure Options', description: 'Select run size, delivery speed, and other service-specific options.' },
+    { title: 'Track Progress', description: 'Follow order updates and use support chat for questions or extra instructions.' },
+    { title: 'Enjoy the Result', description: 'Log back in after delivery and review the completed work.' },
+  ],
+}
+
 export const CONTENT_BLOCK_SLUGS = {
   hero: 'landing-hero',
   benefits_section: 'why-choose-us',
+  steps_section: 'how-it-works',
 } as const
 
 export const DEFAULT_LANDING_HERO: LandingHeroData = {
@@ -104,20 +131,22 @@ function stringValue(value: unknown, fallback: string) {
 
 function normalizeBenefitItems(value: unknown) {
   const items = Array.isArray(value) ? value : []
-  const normalized = items.slice(0, 3).map((item, index) => {
+  const normalized = items.map((item, index) => {
     const record = item && typeof item === 'object' ? item as Record<string, unknown> : {}
     const fallback = DEFAULT_LANDING_BENEFITS.items[index]
 
     return {
-      icon: stringValue(record.icon, fallback.icon),
-      title: stringValue(record.title, fallback.title),
-      detail: stringValue(record.detail, fallback.detail),
+      icon: stringValue(record.icon, fallback?.icon ?? 'MS'),
+      title: stringValue(record.title, fallback?.title ?? `Benefit ${index + 1}`),
+      detail: stringValue(record.detail, fallback?.detail ?? ''),
     } satisfies LandingBenefitItem
   })
 
-  return DEFAULT_LANDING_BENEFITS.items.map(
-    (fallback, index) => normalized[index] ?? fallback
-  )
+  if (normalized.length === 0) {
+    return [DEFAULT_LANDING_BENEFITS.items[0]!]
+  }
+
+  return normalized
 }
 
 export function normalizeLandingHeroData(data: unknown): LandingHeroData {
@@ -131,6 +160,9 @@ export function normalizeLandingHeroData(data: unknown): LandingHeroData {
     subtext: stringValue(record.subtext, DEFAULT_LANDING_HERO.subtext),
     ctaText: stringValue(record.ctaText, DEFAULT_LANDING_HERO.ctaText),
     ctaHref: stringValue(record.ctaHref, DEFAULT_LANDING_HERO.ctaHref),
+    badges: Array.isArray(record.badges)
+      ? record.badges.map((badge) => (typeof badge === 'string' ? badge.trim() : '')).filter(Boolean)
+      : undefined,
     imageUrl: stringValue(record.imageUrl, DEFAULT_LANDING_HERO.imageUrl),
     thumbnailUrl: stringValue(
       record.thumbnailUrl,
@@ -182,22 +214,13 @@ function createPublicClient() {
   })
 }
 
-export async function getActiveLandingHero() {
-  const supabase = createPublicClient()
-
-  const { data } = await supabase
-    .from('content_blocks')
-    .select('data')
-    .eq('type', 'hero')
-    .eq('status', 'active')
-    .order('modified_at', { ascending: false })
-    .limit(1)
-    .maybeSingle<{ data: unknown }>()
-
-  return normalizeLandingHeroData(data?.data)
-}
-
 export async function getActiveHeroSlides() {
+  const heroBanners = await listActiveHeroBanners()
+
+  if (heroBanners.length > 0) {
+    return heroBanners.map(heroBannerToHeroSlide)
+  }
+
   const supabase = createPublicClient()
 
   const { data } = await supabase
@@ -217,26 +240,100 @@ export async function getActiveHeroSlides() {
 
 export async function getActiveLandingBenefits() {
   const supabase = createPublicClient()
+  const now = new Date().toISOString()
 
   const { data } = await supabase
     .from('content_blocks')
-    .select('data')
+    .select('data, status, scheduled_at')
     .eq('type', 'benefits_section')
-    .eq('status', 'active')
+    .in('status', ['active', 'scheduled'])
     .order('modified_at', { ascending: false })
-    .limit(1)
-    .maybeSingle<{ data: unknown }>()
+    .returns<{ data: unknown; status?: string; scheduled_at?: string | null }[]>()
 
-  return normalizeLandingBenefitsData(data?.data)
+  const visible = (data ?? []).find((row) => row.status === 'active' || Boolean(row.scheduled_at && row.scheduled_at <= now))
+
+  return normalizeLandingBenefitsData(visible?.data)
+}
+
+export function normalizeLandingStepsData(data: unknown): LandingStepsData {
+  const value = data && typeof data === 'object' ? data : {}
+  const record = value as Record<string, unknown>
+  const rawItems = Array.isArray(record.items) ? record.items : []
+
+  const items: LandingStepItem[] = rawItems.length > 0
+    ? rawItems.map((item, index) => {
+        const r = item && typeof item === 'object' ? item as Record<string, unknown> : {}
+        const fallback = DEFAULT_LANDING_STEPS.items[index]
+        return {
+          title: stringValue(r.title, fallback?.title ?? `Step ${index + 1}`),
+          description: stringValue(r.description, fallback?.description ?? ''),
+        }
+      })
+    : DEFAULT_LANDING_STEPS.items
+
+  return {
+    title: stringValue(record.title, DEFAULT_LANDING_STEPS.title),
+    accent: stringValue(record.accent, DEFAULT_LANDING_STEPS.accent),
+    subtitle: stringValue(record.subtitle, DEFAULT_LANDING_STEPS.subtitle),
+    items,
+  }
+}
+
+export async function getActiveLandingSteps() {
+  const supabase = createPublicClient()
+  const now = new Date().toISOString()
+
+  const { data } = await supabase
+    .from('content_blocks')
+    .select('data, status, scheduled_at')
+    .eq('type', 'steps_section')
+    .in('status', ['active', 'scheduled'])
+    .order('modified_at', { ascending: false })
+    .returns<{ data: unknown; status?: string; scheduled_at?: string | null }[]>()
+    .limit(1)
+    .maybeSingle()
+
+  if (!data) return DEFAULT_LANDING_STEPS
+
+  const isVisible = data.status === 'active' || Boolean(data.scheduled_at && data.scheduled_at <= now)
+  return isVisible ? normalizeLandingStepsData(data.data) : DEFAULT_LANDING_STEPS
+}
+
+export async function ensureLandingStepsBlock(adminId: string) {
+  const supabase = createAdminClient()
+  const { data: existing, error: existingError } = await supabase
+    .from('content_blocks')
+    .select('id')
+    .eq('type', 'steps_section')
+    .limit(1)
+    .maybeSingle<{ id: string }>()
+
+  if (existingError) throw existingError
+  if (existing) return existing
+
+  const { data, error } = await supabase
+    .from('content_blocks')
+    .insert({
+      name: 'How It Works',
+      type: 'steps_section',
+      status: 'active',
+      data: DEFAULT_LANDING_STEPS,
+      created_by: adminId,
+    })
+    .select('id')
+    .single<{ id: string }>()
+
+  if (error) throw error
+  return data
 }
 
 export async function getActiveLandingCms() {
-  const [hero, benefits] = await Promise.all([
-    getActiveLandingHero(),
+  const [benefits, steps] = await Promise.all([
     getActiveLandingBenefits(),
+    getActiveLandingSteps(),
   ])
 
-  return { hero, benefits }
+  return { benefits, steps }
 }
 
 export async function listAdminContentBlocks() {
