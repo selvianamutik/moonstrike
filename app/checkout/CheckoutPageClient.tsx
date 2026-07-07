@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Lock, CreditCard, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { Lock, CreditCard, Check, AlertCircle, Loader2, Coins, Bitcoin } from 'lucide-react';
 import { OrderSummary } from '@/components/order-summary';
 import { SiteFooter } from '@/components/site-footer';
 import { useCart } from '@/context/CartContext';
@@ -145,6 +145,96 @@ export function CheckoutPageClient() {
     clearCart();
   };
 
+  const handlePayPalCheckout = async () => {
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const response = await fetch('/api/checkout/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider: 'paypal',
+          currency: 'USD',
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create PayPal checkout');
+      }
+
+      const data = await response.json();
+
+      if (data.redirectTo) {
+        // Open PayPal in new window
+        const paypalWindow = window.open(data.redirectTo, 'paypal-checkout', 'width=800,height=700,scrollbars=yes');
+        
+        if (!paypalWindow) {
+          // Popup blocked, fallback to redirect
+          setSubmitError('Please allow pop-ups for this site to open PayPal in a new window.');
+          setTimeout(() => {
+            window.location.href = data.redirectTo;
+          }, 2000);
+        } else {
+          setIsSubmitting(false);
+        }
+      } else {
+        throw new Error('No redirect URL received from PayPal');
+      }
+    } catch (error) {
+      setIsSubmitting(false);
+      setSubmitError(error instanceof Error ? error.message : 'An error occurred. Please try again.');
+    }
+  };
+
+  const handleCryptoCheckout = async () => {
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const response = await fetch('/api/checkout/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider: 'nowpayments',
+          currency: 'USD',
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create crypto checkout');
+      }
+
+      const data = await response.json();
+
+      if (data.redirectTo) {
+        // Open crypto payment in new window
+        const cryptoWindow = window.open(data.redirectTo, 'crypto-checkout', 'width=800,height=700,scrollbars=yes');
+        
+        if (!cryptoWindow) {
+          // Popup blocked, fallback to redirect
+          setSubmitError('Please allow pop-ups for this site to open payment in a new window.');
+          setTimeout(() => {
+            window.location.href = data.redirectTo;
+          }, 2000);
+        } else {
+          setIsSubmitting(false);
+        }
+      } else {
+        throw new Error('No redirect URL received');
+      }
+    } catch (error) {
+      setIsSubmitting(false);
+      setSubmitError(error instanceof Error ? error.message : 'An error occurred. Please try again.');
+    }
+  };
+
   if (isSubmitted) {
     return (
       <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
@@ -219,8 +309,8 @@ export function CheckoutPageClient() {
             {(
               [
                 { id: 'credit_card', label: 'Credit Card', icon: CreditCard },
-                { id: 'paypal', label: 'PayPal', icon: CreditCard },
-                { id: 'crypto', label: 'Crypto', icon: CreditCard },
+                { id: 'paypal', label: 'PayPal', icon: Coins },
+                { id: 'crypto', label: 'Crypto', icon: Bitcoin },
               ] as const
             ).map(({ id, label, icon: Icon }) => (
               <button
@@ -390,22 +480,65 @@ export function CheckoutPageClient() {
             </form>
           )}
 
-          {(selectedPayment === 'paypal' || selectedPayment === 'crypto') && (
-            <div className="ms-card mt-12 rounded-xl p-8 text-center">
-              <p className="text-[var(--ms-body)]">
-                {selectedPayment === 'paypal'
-                  ? 'You will be redirected to PayPal to complete your payment.'
-                  : 'You will be redirected to complete your cryptocurrency payment.'}
+          {selectedPayment === 'paypal' && (
+            <div className="ms-card mt-12 rounded-xl p-8">
+              <h2 className="text-xl font-medium">PayPal Checkout</h2>
+              <p className="mt-4 text-[var(--ms-body)]">
+                You will be redirected to PayPal to complete your payment securely.
               </p>
+              
+              {submitError && (
+                <div role="alert" className="mt-6 rounded-lg border border-[var(--ms-danger)] bg-[var(--ms-danger)]/10 p-4">
+                  <p className="flex items-center gap-2 text-[var(--ms-danger)]">
+                    <AlertCircle className="h-5 w-5" />
+                    {submitError}
+                  </p>
+                </div>
+              )}
+
               <button
-                onClick={() => {
-                  setIsSubmitting(true);
-                  setTimeout(() => {
-                    setIsSubmitting(false);
-                    setIsSubmitted(true);
-                    clearCart();
-                  }, 2000);
-                }}
+                onClick={handlePayPalCheckout}
+                disabled={isSubmitting}
+                className="ms-button mt-6 flex h-14 w-full items-center justify-center gap-3 rounded-md text-lg font-black disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Redirecting to PayPal...
+                  </>
+                ) : (
+                  <>
+                    <Lock className="h-5 w-5" />
+                    Continue to PayPal
+                  </>
+                )}
+              </button>
+              
+              <div className="mt-6 flex items-center justify-center gap-2 text-xs text-[var(--ms-body)]">
+                <Lock className="h-3 w-3" />
+                <span>Secured by PayPal</span>
+              </div>
+            </div>
+          )}
+
+          {selectedPayment === 'crypto' && (
+            <div className="ms-card mt-12 rounded-xl p-8">
+              <h2 className="text-xl font-medium">Cryptocurrency Payment</h2>
+              <p className="mt-4 text-[var(--ms-body)]">
+                You will be redirected to complete your cryptocurrency payment via NOWPayments.
+              </p>
+              
+              {submitError && (
+                <div role="alert" className="mt-6 rounded-lg border border-[var(--ms-danger)] bg-[var(--ms-danger)]/10 p-4">
+                  <p className="flex items-center gap-2 text-[var(--ms-danger)]">
+                    <AlertCircle className="h-5 w-5" />
+                    {submitError}
+                  </p>
+                </div>
+              )}
+
+              <button
+                onClick={handleCryptoCheckout}
                 disabled={isSubmitting}
                 className="ms-button mt-6 flex h-14 w-full items-center justify-center gap-3 rounded-md text-lg font-black disabled:cursor-not-allowed disabled:opacity-70"
               >
@@ -417,10 +550,15 @@ export function CheckoutPageClient() {
                 ) : (
                   <>
                     <Lock className="h-5 w-5" />
-                    Continue to {selectedPayment === 'paypal' ? 'PayPal' : 'Payment'}
+                    Continue to Payment
                   </>
                 )}
               </button>
+              
+              <div className="mt-6 flex items-center justify-center gap-2 text-xs text-[var(--ms-body)]">
+                <Lock className="h-3 w-3" />
+                <span>Powered by NOWPayments</span>
+              </div>
             </div>
           )}
         </div>

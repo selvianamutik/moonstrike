@@ -40,7 +40,7 @@ export function CheckoutPageClient() {
   const { currency } = useCurrency();
   const [items, setItems] = useState<CheckoutCartItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [submittingProvider, setSubmittingProvider] = useState<"stripe" | "nowpayments" | null>(null);
+  const [submittingProvider, setSubmittingProvider] = useState<"stripe" | "nowpayments" | "paypal" | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -120,6 +120,45 @@ export function CheckoutPageClient() {
     }
   }
 
+  async function handlePayPalCheckout() {
+    setSubmittingProvider("paypal");
+    setError("");
+
+    try {
+      const response = await fetch("/api/checkout/paypal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currency }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setError(payload.error ?? "Unable to create PayPal checkout.");
+        return;
+      }
+
+      if (!payload.redirectTo) {
+        setError("PayPal did not return a checkout URL.");
+        return;
+      }
+
+      // Open PayPal in new window
+      const paypalWindow = window.open(payload.redirectTo, "paypal-checkout", "width=800,height=700,scrollbars=yes");
+      
+      if (!paypalWindow) {
+        // Popup blocked, fallback to redirect
+        setError("Please allow pop-ups for this site to open PayPal in a new window.");
+        setTimeout(() => {
+          window.location.href = payload.redirectTo;
+        }, 2000);
+      }
+    } catch {
+      setError("Unable to reach PayPal checkout service.");
+    } finally {
+      setSubmittingProvider(null);
+    }
+  }
+
   async function handleCryptoCheckout() {
     setSubmittingProvider("nowpayments");
     setError("");
@@ -142,7 +181,16 @@ export function CheckoutPageClient() {
         return;
       }
 
-      window.location.href = payload.redirectTo;
+      // Open crypto payment in new window
+      const cryptoWindow = window.open(payload.redirectTo, "crypto-checkout", "width=800,height=700,scrollbars=yes");
+      
+      if (!cryptoWindow) {
+        // Popup blocked, fallback to redirect
+        setError("Please allow pop-ups for this site to open payment in a new window.");
+        setTimeout(() => {
+          window.location.href = payload.redirectTo;
+        }, 2000);
+      }
     } catch {
       setError("Unable to reach crypto checkout service.");
     } finally {
@@ -189,7 +237,7 @@ export function CheckoutPageClient() {
             <>
               <h2 className="mt-12 text-2xl font-black">Payment Method</h2>
               <div className="ms-card mt-6 rounded-xl p-8">
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-rows-3">
                 <div className="rounded-md border border-[var(--primary)] bg-[var(--ms-hover-bg)] p-5 shadow-[0_0_22px_rgba(136,82,255,0.22)]">
                   <h3 className="text-xl font-black">Stripe Checkout</h3>
                   <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">
@@ -202,6 +250,21 @@ export function CheckoutPageClient() {
                     className="ms-button mt-5 h-12 w-full text-sm font-black disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {submittingProvider === "stripe" ? "Opening Stripe..." : "Pay with Stripe Sandbox"}
+                  </button>
+                </div>
+
+                <div className="rounded-md border border-[var(--ms-border)] bg-[var(--ms-field)] p-5">
+                  <h3 className="text-xl font-black">PayPal Checkout</h3>
+                  <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">
+                    Continue to PayPal's hosted sandbox checkout to complete payment securely.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={submittingProvider !== null}
+                    onClick={handlePayPalCheckout}
+                    className="mt-5 h-12 w-full rounded-md border border-[var(--ms-border)] px-5 text-sm font-black text-[var(--ms-heading)] hover:border-[var(--ms-gradient-end)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {submittingProvider === "paypal" ? "Opening PayPal..." : "Pay with PayPal Sandbox"}
                   </button>
                 </div>
 

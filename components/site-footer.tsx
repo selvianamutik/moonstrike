@@ -48,7 +48,8 @@ export function SiteFooter() {
         <div className="grid gap-12 lg:grid-cols-[1.25fr_1fr]">
           <div>
             <Link href="/" className="font-display text-5xl font-black tracking-[-0.06em] sm:text-7xl">
-              <span className="brand-gradient">Moon Strike</span>
+              {/* <span className="brand-gradient">Moon Strike</span> */}
+              <img src={'/logo/logo.png'} width={600}/>
             </Link>
             <p className="mt-5 max-w-xl text-lg leading-8">
               Dominate the Game. Premium boosting, coaching, progression, and item services for competitive players.

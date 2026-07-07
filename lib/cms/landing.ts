@@ -4,7 +4,7 @@ import {
   getSupabasePublishableKey,
   getSupabaseUrl,
 } from '@/lib/supabase/env'
-import { heroBannerToHeroSlide, listActiveHeroBanners } from '@/lib/cms/hero-banners'
+import { heroBannerToHeroSlide, listActiveHeroBanners, listUpcomingHeroBanners } from '@/lib/cms/hero-banners'
 
 export type LandingHeroData = {
   label: string
@@ -236,6 +236,11 @@ export async function getActiveHeroSlides() {
   }
 
   return data.map((row) => normalizeLandingHeroData(row.data))
+}
+
+export async function getUpcomingHeroSlides(limit = 3) {
+  const heroBanners = await listUpcomingHeroBanners(limit)
+  return heroBanners.map(heroBannerToHeroSlide)
 }
 
 export async function getActiveLandingBenefits() {

@@ -5,16 +5,20 @@ import { LandingGamesSection } from "@/components/landing-games-section";
 import { ServiceCard } from "@/components/service-card";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { gameServices, trustMetrics } from "@/lib/catalog";
+import { trustMetrics } from "@/lib/catalog";
 import { listActiveCatalogGames } from "@/lib/cms/games";
 import { getActiveHeroSlides, getActiveLandingCms } from "@/lib/cms/landing";
+import { listActiveHotOffers, serviceRowToCatalogService } from "@/lib/cms/services";
 
 export default async function Home() {
-  const [{ benefits, steps }, heroes, gameCards] = await Promise.all([
+  const [{ benefits, steps }, heroes, gameCards, hotOfferRows] = await Promise.all([
     getActiveLandingCms(),
     getActiveHeroSlides(),
     listActiveCatalogGames(),
+    listActiveHotOffers(4),
   ]);
+
+  const hotOffers = hotOfferRows.map(serviceRowToCatalogService);
 
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
@@ -34,9 +38,13 @@ export default async function Home() {
           </Link>
         </div>
         <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-          {gameServices.slice(0, 4).map((service) => (
-            <ServiceCard key={`${service.gameSlug}-${service.slug}`} service={service} />
-          ))}
+          {hotOffers.length > 0 ? (
+            hotOffers.map((service) => (
+              <ServiceCard key={`${service.gameSlug}-${service.slug}`} service={service} />
+            ))
+          ) : (
+            <p className="col-span-full text-center text-[var(--ms-body)]">No hot offers available at the moment.</p>
+          )}
         </div>
       </section>
 

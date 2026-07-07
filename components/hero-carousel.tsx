@@ -80,9 +80,9 @@ export function HeroCarousel({ heroes }: HeroCarouselProps) {
           ) : (
             <PlaceholderAsset alt="Hero banner" className="min-h-[450px]" priority imageClassName="p-20" isHidden={true} />
           )}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
+          <div className="absolute inset-0" style={{ background: "var(--ms-hero-gradient)" }} />
 
-          <div className="absolute bottom-8 left-8 z-20 max-w-xl pr-16">
+          <div className="absolute bottom-16 left-24 z-20 max-w-xl pr-16">
             <div className="flex max-w-lg flex-wrap gap-2">
               {currentHero.badges?.length ? (
                 currentHero.badges.map((badge) => (
@@ -142,16 +142,39 @@ export function HeroCarousel({ heroes }: HeroCarouselProps) {
         </div>
 
         <aside className="border-l border-[var(--ms-border)] p-5">
-          <p className="mono text-sm uppercase tracking-[0.18em] text-[var(--ms-body)]">Coming Soon</p>
-          {["Elite Trials Return", "Mythic+ Cache Update", "Ranked Climb Events"].map((item) => (
-            <div key={item} className="mt-5 flex gap-4">
-              <PlaceholderAsset alt={`${item} preview`} className="h-12 w-20 rounded" imageClassName="p-3" isHidden={false} />
-              <p className="text-sm leading-4">
-                <Badge variant="featured" />
-                <span className="mt-2 block text-[var(--ms-body)]">{item}</span>
-              </p>
-            </div>
-          ))}
+          <p className="mono text-sm uppercase tracking-[0.18em] text-[var(--ms-body)]">Preview</p>
+          {heroes.length > 1 ? (
+            heroes
+              .filter((_, index) => index !== currentIndex)
+              .slice(0, 3)
+              .map((hero) => (
+                <div key={hero.headline} className="mt-5 flex gap-4">
+                  {hero.thumbnailUrl ? (
+                    <div className="relative h-12 w-20 flex-shrink-0 overflow-hidden rounded">
+                      <Image
+                        src={hero.thumbnailUrl}
+                        alt={`${hero.headline} preview`}
+                        fill
+                        sizes="80px"
+                        className="object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <PlaceholderAsset alt={`${hero.headline} preview`} className="h-12 w-20 rounded" imageClassName="p-3" isHidden={false} />
+                  )}
+                  <p className="text-sm leading-4">
+                    {hero.badges?.length ? (
+                      <Badge variant="featured">{hero.badges[0]}</Badge>
+                    ) : (
+                      <Badge variant={hero.badgeVariant} />
+                    )}
+                    <span className="mt-2 block text-[var(--ms-body)]">{hero.headline}</span>
+                  </p>
+                </div>
+              ))
+          ) : (
+            <p className="mt-5 text-sm text-[var(--ms-body)]">No preview</p>
+          )}
         </aside>
         </div>
       </div>

@@ -4,7 +4,7 @@ import path from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 
 function loadLocalEnv() {
-  const envPath = path.join(process.cwd(), '.env.local')
+  const envPath = path.join(process.cwd(), '.env')
   if (!fs.existsSync(envPath)) return
 
   const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/)

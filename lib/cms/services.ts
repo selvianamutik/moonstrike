@@ -236,3 +236,25 @@ export async function getActiveServiceByGameAndSlug(gameSlug: string, serviceSlu
   const services = await listActiveServicesForGame(gameSlug)
   return services.find((service) => service.slug === serviceSlug) ?? null
 }
+
+export async function listActiveHotOffers(limit?: number) {
+  const supabase = createAdminClient()
+  let query = supabase
+    .from('services')
+    .select(SERVICE_SELECT)
+    .eq('status', 'active')
+    .eq('is_hot_offer', true)
+    .order('hot_offer_at', { ascending: false, nullsFirst: false })
+    .order('updated_at', { ascending: false })
+    .returns<RawServiceRow[]>()
+
+  if (limit) {
+    query = query.limit(limit)
+  }
+
+  const { data, error } = await query
+
+  if (error) throw error
+
+  return (data ?? []).map(rawServiceToRow)
+}

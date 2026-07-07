@@ -20,9 +20,9 @@ export function ServiceCard({ service }: { service: GameService }) {
   const price = currency === "EUR" ? service.startingPriceEUR ?? service.startingPrice : service.startingPrice;
 
   return (
-    <Link href={href} className="group block h-full rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ms-gradient-end)]">
-      <article className="ms-card ms-card-hover h-full overflow-hidden rounded-lg">
-        <div className="relative h-48 overflow-hidden bg-[var(--ms-bg-card)]">
+    <Link href={href} className="group block rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ms-gradient-end)]">
+      <article className="ms-card ms-card-hover flex h-full flex-col overflow-hidden rounded-lg">
+        <div className="relative h-48 flex-shrink-0 overflow-hidden bg-[var(--ms-bg-card)]">
           {service.image ? (
             <>
               <img src={service.image} alt={`${service.name} preview`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
@@ -33,14 +33,14 @@ export function ServiceCard({ service }: { service: GameService }) {
           )}
           {service.isHotOffer ? <span className="absolute left-3 top-3"><Badge variant="hot" /></span> : null}
         </div>
-        <div className="flex h-[calc(100%-12rem)] flex-col p-6">
+        <div className="flex flex-1 flex-col p-6">
           <div className="flex flex-wrap gap-2">
             <Badge variant="featured">{service.serviceCategory}</Badge>
           </div>
           <h3 className="mt-4 text-lg font-bold text-[var(--ms-heading)] group-hover:text-[var(--ms-gradient-end)]">
             {service.offerTitle ?? service.name}
           </h3>
-          <p className="mt-3 min-h-12 text-sm leading-6 text-[var(--ms-body)]">{service.description}</p>
+          <p className="mt-3 line-clamp-3 text-sm leading-6 text-[var(--ms-body)]">{service.description}</p>
           <div className="mt-auto flex items-center justify-between gap-3 pt-6">
             <span className="mono text-base font-bold text-[var(--ms-price)]">{formatMoney(price, currency)}</span>
             <span className="ms-button inline-flex h-10 items-center px-5 mono text-sm">

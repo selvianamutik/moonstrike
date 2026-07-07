@@ -27,7 +27,7 @@ export function Frame18Sections({ benefits, steps }: { benefits: LandingBenefits
         />
       )}
 
-      <div className="mx-auto mt-6 grid max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="mx-auto mt-6 grid max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
         {benefits.items.length > 0 ? (
           benefits.items.map((item) => (
             <article key={item.title} className="ms-card ms-card-hover rounded-lg p-7">

@@ -101,7 +101,7 @@ export async function listActiveHeroBanners() {
     .from("hero_banners")
     .select(HERO_BANNER_SELECT)
     .in("status", ["active", "scheduled"])
-    .order("updated_at", { ascending: false })
+    .order("sort_order", { ascending: true })
     .returns<HeroBannerRow[]>();
 
   if (error) throw error;
@@ -113,6 +113,23 @@ export async function listActiveHeroBanners() {
     const hasNotEnded = !banner.ends_at || banner.ends_at > now;
     return hasStarted && hasNotEnded;
   });
+}
+
+export async function listUpcomingHeroBanners(limit = 3) {
+  const supabase = createAdminClient();
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("hero_banners")
+    .select(HERO_BANNER_SELECT)
+    .eq("status", "scheduled")
+    .gt("starts_at", now)
+    .order("starts_at", { ascending: true })
+    .limit(limit)
+    .returns<HeroBannerRow[]>();
+
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function tickHeroBannerStatusTransitions() {
