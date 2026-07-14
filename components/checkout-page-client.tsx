@@ -164,30 +164,31 @@ export function CheckoutPageClient() {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-7xl gap-12 px-10 py-20 lg:grid-cols-[1fr_450px]">
-        <div>
-          <h1 className="font-display text-4xl font-black">Secure Checkout</h1>
-          <p className="mt-4 text-[var(--ms-body)]">Complete your transaction to dominate the game.</p>
+      <section className="mx-auto max-w-7xl px-10 py-20">
+        <h1 className="font-display text-4xl font-black">Secure Checkout</h1>
+        <p className="mt-4 text-[var(--ms-body)]">Complete your transaction to dominate the game.</p>
 
-          {error ? (
-            <p className="mt-8 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-              {error}
-            </p>
-          ) : null}
+        {error ? (
+          <p className="mt-8 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            {error}
+          </p>
+        ) : null}
 
-          {isLoading ? (
-            <CheckoutSkeleton />
-          ) : items.length === 0 ? (
-            <div className="ms-card mt-12 rounded-xl p-8">
-              <h2 className="text-2xl font-black">Your cart is empty</h2>
-              <p className="mt-3 text-[var(--ms-body)]">Add a configured service before checkout.</p>
-              <Link href="/games" className="ms-button mt-8 inline-flex h-12 items-center px-6 mono">
-                Browse Games
-              </Link>
-            </div>
-          ) : (
-            <>
-              <h2 className="mt-12 text-2xl font-black">Payment Method</h2>
+        <div className="mt-12 grid gap-12 lg:grid-cols-[1fr_450px] lg:items-start">
+          <div>
+            {isLoading ? (
+              <CheckoutSkeleton />
+            ) : items.length === 0 ? (
+              <div className="ms-card rounded-xl p-8">
+                <h2 className="text-2xl font-black">Your cart is empty</h2>
+                <p className="mt-3 text-[var(--ms-body)]">Add a configured service before checkout.</p>
+                <Link href="/games" className="ms-button mt-8 inline-flex h-12 items-center px-6 mono">
+                  Browse Games
+                </Link>
+              </div>
+            ) : (
+              <>
+                <h2 className="text-2xl font-black">Payment Method</h2>
               <div className="ms-card mt-6 rounded-xl p-8">
                 <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-md border border-[var(--primary)] bg-[var(--ms-hover-bg)] p-5 shadow-[0_0_22px_rgba(136,82,255,0.22)]">
@@ -248,17 +249,18 @@ export function CheckoutPageClient() {
                   You will be redirected to the selected provider's hosted checkout.
                 </p>
               </div>
-            </>
-          )}
-        </div>
+              </>
+            )}
+          </div>
 
-        <OrderSummary
-          items={summaryItems}
-          rows={[]}
-          serviceName={`${items.length} configured services`}
-          serviceMeta={`Checkout priced in ${currency}`}
-          total={formatMoney(total, currency)}
-        />
+          <OrderSummary
+            items={summaryItems}
+            rows={[]}
+            serviceName={`${items.length} configured services`}
+            serviceMeta={`Checkout priced in ${currency}`}
+            total={formatMoney(total, currency)}
+          />
+        </div>
       </section>
     </main>
   );

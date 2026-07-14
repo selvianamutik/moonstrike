@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
@@ -209,235 +209,232 @@ export function CheckoutPageClient() {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-7xl gap-12 px-10 py-20 lg:grid-cols-[1fr_450px]">
-        <div>
-          <h1 className="font-display text-4xl font-black">Secure Checkout</h1>
-          <p className="mt-4 text-[var(--ms-body)]">Complete your transaction to dominate the game.</p>
+      <section className="mx-auto max-w-7xl px-10 py-20">
+        <h1 className="font-display text-4xl font-black">Secure Checkout</h1>
+        <p className="mt-4 text-[var(--ms-body)]">Complete your transaction to dominate the game.</p>
 
-          <h2 className="mt-12 text-2xl font-black">Payment Method</h2>
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {(
-              [
-                { id: 'credit_card', label: 'Credit Card', icon: CreditCard },
-                { id: 'paypal', label: 'PayPal', icon: CreditCard },
-                { id: 'crypto', label: 'Crypto', icon: CreditCard },
-              ] as const
-            ).map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => setSelectedPayment(id)}
-                aria-pressed={selectedPayment === id}
-                className={`flex h-24 flex-col items-center justify-center gap-2 rounded-md border mono text-sm uppercase transition-all ${
-                  selectedPayment === id
-                    ? 'border-[var(--ms-gradient-end)] bg-[var(--ms-hover-bg)] shadow-[0_0_22px_rgba(165,97,202,0.35)]'
-                    : 'border-[var(--ms-border)] bg-[var(--ms-bg-card)] text-[var(--ms-body)] hover:border-[var(--ms-body)]'
-                }`}
-              >
-                <Icon className="h-6 w-6" />
-                <span>{label}</span>
-              </button>
-            ))}
-          </div>
+        <div className="mt-12 grid gap-12 lg:grid-cols-[1fr_450px] lg:items-start">
+          <div>
+            <h2 className="text-2xl font-black">Payment Method</h2>
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              {(
+                [
+                  { id: 'credit_card', label: 'Credit Card', icon: CreditCard },
+                  { id: 'paypal', label: 'PayPal', icon: CreditCard },
+                  { id: 'crypto', label: 'Crypto', icon: CreditCard },
+                ] as const
+              ).map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => setSelectedPayment(id)}
+                  aria-pressed={selectedPayment === id}
+                  className={`flex h-24 flex-col items-center justify-center gap-2 rounded-md border mono text-sm uppercase transition-all ${selectedPayment === id
+                      ? 'border-[var(--ms-gradient-end)] bg-[var(--ms-hover-bg)] shadow-[0_0_22px_rgba(165,97,202,0.35)]'
+                      : 'border-[var(--ms-border)] bg-[var(--ms-bg-card)] text-[var(--ms-body)] hover:border-[var(--ms-body)]'
+                    }`}
+                >
+                  <Icon className="h-6 w-6" />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
 
-          {selectedPayment === 'credit_card' && (
-            <form onSubmit={handleSubmit} className="ms-card mt-12 rounded-xl p-8" noValidate>
-              <h2 className="text-xl font-medium">Card Details</h2>
+            {selectedPayment === 'credit_card' && (
+              <form onSubmit={handleSubmit} className="ms-card mt-12 rounded-xl p-8" noValidate>
+                <h2 className="text-xl font-medium">Card Details</h2>
 
-              <div className="mt-8">
-                <label htmlFor="cardName" className="block mono text-xs uppercase text-[var(--ms-body)]">
-                  Name on Card
-                </label>
-                <input
-                  type="text"
-                  id="cardName"
-                  name="cardName"
-                  value={formData.cardName}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  placeholder="John Doe"
-                  autoComplete="cc-name"
-                  aria-describedby={errors.cardName ? 'cardName-error' : undefined}
-                  aria-invalid={touched.cardName && !!errors.cardName}
-                  className={`mt-2 h-13 w-full rounded-md border bg-[var(--ms-field)] px-4 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ms-primary)] ${
-                    touched.cardName && errors.cardName
-                      ? 'border-[var(--ms-danger)]'
-                      : 'border-[var(--ms-border)]'
-                  }`}
-                />
-                {touched.cardName && errors.cardName && (
-                  <p id="cardName-error" role="alert" className="mt-2 flex items-center gap-2 text-sm text-[var(--ms-danger)]">
-                    <AlertCircle className="h-4 w-4" />
-                    {errors.cardName}
-                  </p>
-                )}
-              </div>
-
-              <div className="mt-6">
-                <label htmlFor="cardNumber" className="block mono text-xs uppercase text-[var(--ms-body)]">
-                  Card Number
-                </label>
-                <input
-                  type="text"
-                  id="cardNumber"
-                  name="cardNumber"
-                  value={formData.cardNumber}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  placeholder="0000 0000 0000 0000"
-                  inputMode="numeric"
-                  autoComplete="cc-number"
-                  aria-describedby={errors.cardNumber ? 'cardNumber-error' : undefined}
-                  aria-invalid={touched.cardNumber && !!errors.cardNumber}
-                  className={`mt-2 h-13 w-full rounded-md border bg-[var(--ms-field)] px-4 font-mono tracking-wider transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ms-primary)] ${
-                    touched.cardNumber && errors.cardNumber
-                      ? 'border-[var(--ms-danger)]'
-                      : 'border-[var(--ms-border)]'
-                  }`}
-                />
-                {touched.cardNumber && errors.cardNumber && (
-                  <p id="cardNumber-error" role="alert" className="mt-2 flex items-center gap-2 text-sm text-[var(--ms-danger)]">
-                    <AlertCircle className="h-4 w-4" />
-                    {errors.cardNumber}
-                  </p>
-                )}
-              </div>
-
-              <div className="mt-6 grid gap-6 md:grid-cols-2">
-                <div>
-                  <label htmlFor="expiryDate" className="block mono text-xs uppercase text-[var(--ms-body)]">
-                    Expiry Date
+                <div className="mt-8">
+                  <label htmlFor="cardName" className="block mono text-xs uppercase text-[var(--ms-body)]">
+                    Name on Card
                   </label>
                   <input
                     type="text"
-                    id="expiryDate"
-                    name="expiryDate"
-                    value={formData.expiryDate}
+                    id="cardName"
+                    name="cardName"
+                    value={formData.cardName}
                     onChange={handleChange}
                     onBlur={handleBlur}
-                    placeholder="MM/YY"
-                    inputMode="numeric"
-                    autoComplete="cc-exp"
-                    aria-describedby={errors.expiryDate ? 'expiryDate-error' : undefined}
-                    aria-invalid={touched.expiryDate && !!errors.expiryDate}
-                    className={`mt-2 h-13 w-full rounded-md border bg-[var(--ms-field)] px-4 text-center font-mono transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ms-primary)] ${
-                      touched.expiryDate && errors.expiryDate
+                    placeholder="John Doe"
+                    autoComplete="cc-name"
+                    aria-describedby={errors.cardName ? 'cardName-error' : undefined}
+                    aria-invalid={touched.cardName && !!errors.cardName}
+                    className={`mt-2 h-13 w-full rounded-md border bg-[var(--ms-field)] px-4 transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ms-primary)] ${touched.cardName && errors.cardName
                         ? 'border-[var(--ms-danger)]'
                         : 'border-[var(--ms-border)]'
-                    }`}
+                      }`}
                   />
-                  {touched.expiryDate && errors.expiryDate && (
-                    <p id="expiryDate-error" role="alert" className="mt-2 flex items-center gap-2 text-sm text-[var(--ms-danger)]">
+                  {touched.cardName && errors.cardName && (
+                    <p id="cardName-error" role="alert" className="mt-2 flex items-center gap-2 text-sm text-[var(--ms-danger)]">
                       <AlertCircle className="h-4 w-4" />
-                      {errors.expiryDate}
+                      {errors.cardName}
                     </p>
                   )}
                 </div>
-                <div>
-                  <label htmlFor="cvc" className="block mono text-xs uppercase text-[var(--ms-body)]">
-                    CVC
+
+                <div className="mt-6">
+                  <label htmlFor="cardNumber" className="block mono text-xs uppercase text-[var(--ms-body)]">
+                    Card Number
                   </label>
                   <input
                     type="text"
-                    id="cvc"
-                    name="cvc"
-                    value={formData.cvc}
+                    id="cardNumber"
+                    name="cardNumber"
+                    value={formData.cardNumber}
                     onChange={handleChange}
                     onBlur={handleBlur}
-                    placeholder="123"
+                    placeholder="0000 0000 0000 0000"
                     inputMode="numeric"
-                    autoComplete="cc-csc"
-                    aria-describedby={errors.cvc ? 'cvc-error' : undefined}
-                    aria-invalid={touched.cvc && !!errors.cvc}
-                    className={`mt-2 h-13 w-full rounded-md border bg-[var(--ms-field)] px-4 text-center font-mono transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ms-primary)] ${
-                      touched.cvc && errors.cvc ? 'border-[var(--ms-danger)]' : 'border-[var(--ms-border)]'
-                    }`}
+                    autoComplete="cc-number"
+                    aria-describedby={errors.cardNumber ? 'cardNumber-error' : undefined}
+                    aria-invalid={touched.cardNumber && !!errors.cardNumber}
+                    className={`mt-2 h-13 w-full rounded-md border bg-[var(--ms-field)] px-4 font-mono tracking-wider transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ms-primary)] ${touched.cardNumber && errors.cardNumber
+                        ? 'border-[var(--ms-danger)]'
+                        : 'border-[var(--ms-border)]'
+                      }`}
                   />
-                  {touched.cvc && errors.cvc && (
-                    <p id="cvc-error" role="alert" className="mt-2 flex items-center gap-2 text-sm text-[var(--ms-danger)]">
+                  {touched.cardNumber && errors.cardNumber && (
+                    <p id="cardNumber-error" role="alert" className="mt-2 flex items-center gap-2 text-sm text-[var(--ms-danger)]">
                       <AlertCircle className="h-4 w-4" />
-                      {errors.cvc}
+                      {errors.cardNumber}
                     </p>
                   )}
                 </div>
-              </div>
 
-              {submitError && (
-                <div role="alert" className="mt-6 rounded-lg border border-[var(--ms-danger)] bg-[var(--ms-danger)]/10 p-4">
-                  <p className="flex items-center gap-2 text-[var(--ms-danger)]">
-                    <AlertCircle className="h-5 w-5" />
-                    {submitError}
-                  </p>
+                <div className="mt-6 grid gap-6 md:grid-cols-2">
+                  <div>
+                    <label htmlFor="expiryDate" className="block mono text-xs uppercase text-[var(--ms-body)]">
+                      Expiry Date
+                    </label>
+                    <input
+                      type="text"
+                      id="expiryDate"
+                      name="expiryDate"
+                      value={formData.expiryDate}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      placeholder="MM/YY"
+                      inputMode="numeric"
+                      autoComplete="cc-exp"
+                      aria-describedby={errors.expiryDate ? 'expiryDate-error' : undefined}
+                      aria-invalid={touched.expiryDate && !!errors.expiryDate}
+                      className={`mt-2 h-13 w-full rounded-md border bg-[var(--ms-field)] px-4 text-center font-mono transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ms-primary)] ${touched.expiryDate && errors.expiryDate
+                          ? 'border-[var(--ms-danger)]'
+                          : 'border-[var(--ms-border)]'
+                        }`}
+                    />
+                    {touched.expiryDate && errors.expiryDate && (
+                      <p id="expiryDate-error" role="alert" className="mt-2 flex items-center gap-2 text-sm text-[var(--ms-danger)]">
+                        <AlertCircle className="h-4 w-4" />
+                        {errors.expiryDate}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label htmlFor="cvc" className="block mono text-xs uppercase text-[var(--ms-body)]">
+                      CVC
+                    </label>
+                    <input
+                      type="text"
+                      id="cvc"
+                      name="cvc"
+                      value={formData.cvc}
+                      onChange={handleChange}
+                      onBlur={handleBlur}
+                      placeholder="123"
+                      inputMode="numeric"
+                      autoComplete="cc-csc"
+                      aria-describedby={errors.cvc ? 'cvc-error' : undefined}
+                      aria-invalid={touched.cvc && !!errors.cvc}
+                      className={`mt-2 h-13 w-full rounded-md border bg-[var(--ms-field)] px-4 text-center font-mono transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ms-primary)] ${touched.cvc && errors.cvc ? 'border-[var(--ms-danger)]' : 'border-[var(--ms-border)]'
+                        }`}
+                    />
+                    {touched.cvc && errors.cvc && (
+                      <p id="cvc-error" role="alert" className="mt-2 flex items-center gap-2 text-sm text-[var(--ms-danger)]">
+                        <AlertCircle className="h-4 w-4" />
+                        {errors.cvc}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              )}
 
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="ms-button mt-8 flex h-14 w-full items-center justify-center gap-3 rounded-md text-lg font-black disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Lock className="h-5 w-5" />
-                    Complete Purchase
-                  </>
+                {submitError && (
+                  <div role="alert" className="mt-6 rounded-lg border border-[var(--ms-danger)] bg-[var(--ms-danger)]/10 p-4">
+                    <p className="flex items-center gap-2 text-[var(--ms-danger)]">
+                      <AlertCircle className="h-5 w-5" />
+                      {submitError}
+                    </p>
+                  </div>
                 )}
-              </button>
-            </form>
-          )}
 
-          {(selectedPayment === 'paypal' || selectedPayment === 'crypto') && (
-            <div className="ms-card mt-12 rounded-xl p-8 text-center">
-              <p className="text-[var(--ms-body)]">
-                {selectedPayment === 'paypal'
-                  ? 'You will be redirected to PayPal to complete your payment.'
-                  : 'You will be redirected to complete your cryptocurrency payment.'}
-              </p>
-              <button
-                onClick={() => {
-                  setIsSubmitting(true);
-                  setTimeout(() => {
-                    setIsSubmitting(false);
-                    setIsSubmitted(true);
-                    clearCart();
-                  }, 2000);
-                }}
-                disabled={isSubmitting}
-                className="ms-button mt-6 flex h-14 w-full items-center justify-center gap-3 rounded-md text-lg font-black disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Redirecting...
-                  </>
-                ) : (
-                  <>
-                    <Lock className="h-5 w-5" />
-                    Continue to {selectedPayment === 'paypal' ? 'PayPal' : 'Payment'}
-                  </>
-                )}
-              </button>
-            </div>
-          )}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="ms-button mt-8 flex h-14 w-full items-center justify-center gap-3 rounded-md text-lg font-black disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="h-5 w-5" />
+                      Complete Purchase
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {(selectedPayment === 'paypal' || selectedPayment === 'crypto') && (
+              <div className="ms-card mt-12 rounded-xl p-8 text-center">
+                <p className="text-[var(--ms-body)]">
+                  {selectedPayment === 'paypal'
+                    ? 'You will be redirected to PayPal to complete your payment.'
+                    : 'You will be redirected to complete your cryptocurrency payment.'}
+                </p>
+                <button
+                  onClick={() => {
+                    setIsSubmitting(true);
+                    setTimeout(() => {
+                      setIsSubmitting(false);
+                      setIsSubmitted(true);
+                      clearCart();
+                    }, 2000);
+                  }}
+                  disabled={isSubmitting}
+                  className="ms-button mt-6 flex h-14 w-full items-center justify-center gap-3 rounded-md text-lg font-black disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Redirecting...
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="h-5 w-5" />
+                      Continue to {selectedPayment === 'paypal' ? 'PayPal' : 'Payment'}
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <OrderSummary
+            ctaHref="/profile/orders/MS-2401"
+            ctaLabel="Complete Purchase"
+            rows={[
+              { label: 'Subtotal', value: `$${totals.subtotal.toFixed(2)}` },
+              { label: 'Service Fee', value: `$${totals.serviceFee.toFixed(2)}` },
+              { label: 'Discount', value: `-$${totals.discount.toFixed(2)}` },
+              { label: 'Taxes', value: `$${totals.taxes.toFixed(2)}` },
+            ]}
+            serviceName={`${items.length} configured service${items.length !== 1 ? 's' : ''}`}
+            serviceMeta="Immediate Start"
+            total={`$${totals.total.toFixed(2)}`}
+          />
         </div>
-
-        <OrderSummary
-          ctaHref="/profile/orders/MS-2401"
-          ctaLabel="Complete Purchase"
-          rows={[
-            { label: 'Subtotal', value: `$${totals.subtotal.toFixed(2)}` },
-            { label: 'Service Fee', value: `$${totals.serviceFee.toFixed(2)}` },
-            { label: 'Discount', value: `-$${totals.discount.toFixed(2)}` },
-            { label: 'Taxes', value: `$${totals.taxes.toFixed(2)}` },
-          ]}
-          serviceName={`${items.length} configured service${items.length !== 1 ? 's' : ''}`}
-          serviceMeta="Immediate Start"
-          total={`$${totals.total.toFixed(2)}`}
-        />
       </section>
       <SiteFooter />
     </main>
