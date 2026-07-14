@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 :root {
   --ms-primary: #050816;
@@ -208,7 +208,6 @@ html[data-theme="light"] select:autofill {
   align-items: center;
   justify-content: center;
   gap: 0.55rem;
-  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 7px;
   background: var(--ms-cta-bg);
   box-shadow: 0 0 22px rgba(136, 82, 255, 0.45);
