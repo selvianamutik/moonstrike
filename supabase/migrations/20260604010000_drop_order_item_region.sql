@@ -13,9 +13,6 @@ ALTER TABLE promo_banners
 ALTER TABLE orders
   DROP COLUMN IF EXISTS region;
 
-ALTER TABLE services
-  DROP COLUMN IF EXISTS region;  
-
 DO $$
 BEGIN
   IF NOT EXISTS (
