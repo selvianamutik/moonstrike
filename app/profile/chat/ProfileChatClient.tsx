@@ -609,7 +609,7 @@ export function ProfileChatClient({ initialTickets, chatOrders, initialMessages,
                       className={`max-w-[82%] rounded-xl px-4 py-3 text-sm leading-6 ${
                         mine
                           ? "bg-[linear-gradient(135deg,var(--ms-gradient-start),var(--ms-gradient-end))] text-white"
-                          : "border border-[var(--ms-border)] bg-[var(--ms-hover-bg)] text-[var(--ms-body)]"
+                          : "border border-[var(--ms-border)] bg-[var(--ms-hover-bg)] text-white"
                       }`}
                     >
                       {message.content ? <p>{message.content}</p> : null}
