@@ -174,7 +174,7 @@ export function CheckoutPageClient() {
           </p>
         ) : null}
 
-        <div className="mt-12 grid gap-12 lg:grid-cols-[1fr_450px] lg:items-start">
+        <div className="mt-6 grid gap-12 lg:grid-cols-[1fr_450px] lg:items-start">
           <div>
             {isLoading ? (
               <CheckoutSkeleton />
@@ -188,8 +188,8 @@ export function CheckoutPageClient() {
               </div>
             ) : (
               <>
-                <h2 className="text-2xl font-black">Payment Method</h2>
-              <div className="ms-card mt-6 rounded-xl p-8">
+              <div className="ms-card rounded-xl p-8">
+                <h2 className="mb-6 text-2xl font-black">Payment Method</h2>
                 <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-md border border-[var(--primary)] bg-[var(--ms-hover-bg)] p-5 shadow-[0_0_22px_rgba(136,82,255,0.22)]">
                   <h3 className="text-xl font-black">Stripe Checkout</h3>

@@ -53,3 +53,9 @@ Elemen `<h1>` dan subtitle dikeluarkan dari dalam Grid dan dijadikan elemen mand
   </div>
 </section>
 ```
+
+## Repositioning & Spacing (Semantic Refactoring)
+Berdasarkan tinjauan visual lanjutan, layout dirapatkan dan dirapikan lebih lanjut:
+1. **Global Spacing:** Margin atas dari grid pembungkus diturunkan dari `mt-12` menjadi `mt-6` agar seluruh area form dan order summary lebih merapat ke arah header "Secure Checkout".
+2. **Header Enclosure:** Judul `<h2>Payment Method</h2>` yang sebelumnya berada bebas di luar, kini dimasukkan ke dalam container `<div className="ms-card rounded-xl p-8">`. Hal ini membuat judul memiliki *enclosure* border yang sama dengan opsi pembayarannya, menciptakan grup visual yang lebih padat dan premium. Class `mt-6` pada container dihapus dan diganti menjadi `mb-6` pada `<h2>` tersebut.
+
