@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faInstagram, faTiktok, faTwitter, faYoutube } from "@fortawesome/free-brands-svg-icons";
 
@@ -45,7 +45,7 @@ export function SiteFooter() {
   return (
     <footer className="mt-24 border-t border-[var(--ms-border)] bg-[var(--ms-bg-card)] py-20 text-[var(--ms-body)]">
       <div className="ms-shell">
-        <div className="grid gap-12 lg:grid-cols-[1.25fr_1fr]">
+        <div className="grid gap-12 lg:grid-cols-2">
           <div>
             <Link href="/" className="font-display text-5xl font-black tracking-[-0.06em] sm:text-7xl">
               <span className="brand-gradient">Moon Strike</span>
@@ -71,7 +71,7 @@ export function SiteFooter() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-8 md:grid-cols-3">
+          <div className="grid grid-cols-2 gap-8">
             {columns.map((column) => (
               <div key={column.title}>
                 <h3 className="mono text-sm font-bold uppercase tracking-[0.2em] text-[var(--ms-heading)]">
