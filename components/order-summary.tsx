@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { PlaceholderAsset } from "@/components/asset-image";
 
 type OrderSummaryProps = {
@@ -27,7 +28,19 @@ export function OrderSummary({ ctaHref, ctaLabel, items, rows, serviceName, serv
     <aside className="ms-card h-fit rounded-xl p-8 shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
       <h2 className="border-b border-[var(--ms-border)] pb-5 text-2xl font-black">Order Summary</h2>
       <div className="flex gap-4 border-b border-[var(--ms-border)] py-7">
-        <PlaceholderAsset isHidden={false} alt="Order item preview" className="h-20 w-20 rounded-md" imageClassName="p-3" />
+        {items && items.length > 0 && items[0].image ? (
+          <div className="relative h-20 w-20 overflow-hidden rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-card)]">
+            <Image
+              src={items[0].image}
+              alt={items[0].name || "Order item preview"}
+              fill
+              sizes="80px"
+              className="object-cover"
+            />
+          </div>
+        ) : (
+          <PlaceholderAsset isHidden={false} alt="Order item preview" className="h-20 w-20 rounded-md" imageClassName="p-3" />
+        )}
         <div className="flex-1">
           <h3 className="font-bold">{serviceName}</h3>
           <p className="mono mt-1 text-xs text-[var(--ms-price)]">{serviceMeta}</p>
