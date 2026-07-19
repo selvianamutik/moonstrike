@@ -85,7 +85,6 @@ export function QuickSelectMenu() {
   }, [filteredServices]);
 
   const gameTabs: ScrollingTabItem[] = [
-    { key: "all", label: "All", onClick: () => setActiveGame("all") },
     ...catalog.games.map((g) => ({
       key: g.slug,
       label: g.name,
