@@ -24,11 +24,11 @@ export default async function Home() {
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
       <SiteHeader />
 
-      <section className="ms-shell py-20">
+      <section className="ms-shell pt-6 pb-8">
         <HeroCarousel heroes={heroes} />
       </section>
 
-      <section className="ms-shell py-10">
+      <section className="ms-shell pt-4 pb-10">
         <div className="flex items-end justify-between gap-6">
           <h2 className="font-display text-3xl font-black tracking-[-0.04em]">
             Hot <span className="section-accent">Offers</span>
