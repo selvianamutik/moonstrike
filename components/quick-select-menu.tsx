@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useState } from "react";
-import { ScrollingTabList, type ScrollingTabItem } from "@/components/scrolling-tab-list";
-import { getServiceDetailHref, type GameCatalogItem, type GameService } from "@/lib/catalog";
+import { type GameCatalogItem, type GameService } from "@/lib/catalog";
 import { faBars } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
@@ -17,7 +16,7 @@ const GAMES_PER_PAGE = 4;
 const ANIM_DURATION = 240;
 
 export function QuickSelectMenu() {
-  const [activeGame, setActiveGame] = useState("all");
+  const [activeGame, setActiveGame] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [catalog, setCatalog] = useState<QuickSelectCatalog>({ games: [], services: [] });
@@ -66,6 +65,7 @@ export function QuickSelectMenu() {
   }, [hasLoadedCatalog, isOpen]);
 
   const filteredServices = useMemo(() => {
+    if (!activeGame) return [];
     const q = query.trim().toLowerCase();
     return catalog.services.filter((s) => {
       const matchGame = activeGame === "all" || s.gameSlug === activeGame;
@@ -84,13 +84,6 @@ export function QuickSelectMenu() {
     return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredServices]);
 
-  const gameTabs: ScrollingTabItem[] = [
-    ...catalog.games.map((g) => ({
-      key: g.slug,
-      label: g.name,
-      onClick: () => setActiveGame(g.slug),
-    })),
-  ];
 
   return (
     <>
@@ -136,47 +129,54 @@ export function QuickSelectMenu() {
                   </button>
                 </div>
 
-                <div className="mt-6 px-6">
-                  <ScrollingTabList
-                    activeKey={activeGame}
-                    ariaLabel="Filter by game"
-                    fixedTabs={[]}
-                    scrollingTabs={gameTabs}
-                  />
-                </div>
-
-            {isLoadingCatalog ? (
-              <div className="min-h-0 flex-1 px-2 py-12 text-center text-sm text-[var(--ms-body)]">
-                Loading services...
-              </div>
-            ) : serviceColumns.length > 0 ? (
-              <div className="mt-8 grid min-h-0 flex-1 gap-x-12 gap-y-10 overflow-y-auto px-2 pb-8 pr-3 sm:grid-cols-2 lg:grid-cols-4">
-                {serviceColumns.map(([category, services]) => (
-                  <div key={category}>
-                    <h3 className="mono border-b border-[var(--ms-border)] pb-2 text-xl font-bold uppercase tracking-[0.08em] text-[var(--ms-heading)]">
-                      {category}
-                    </h3>
-                    <ul className="mt-4 space-y-3 text-sm text-[var(--ms-body)]">
-                      {services.map((service) => (
-                        <li key={`${service.gameSlug}-${service.slug}`}>
-                          <Link
-                            href={getServiceDetailHref(service)}
-                            onClick={() => setIsOpen(false)}
-                            className="hover:text-[var(--ms-gradient-end)]"
-                          >
-                            {activeGame === "all" ? `${service.gameName} - ${service.name}` : service.name}
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
+                <div className="flex min-h-[400px] flex-1 border-t border-[var(--ms-border)] overflow-hidden">
+                  {/* SIDEBAR KIRI (Daftar Game) */}
+                  <div className="w-[240px] shrink-0 border-r border-[var(--ms-border)] overflow-y-auto p-4 flex flex-col gap-1">
+                    {catalog.games.map((g) => (
+                      <button
+                        key={g.slug}
+                        onClick={() => setActiveGame(g.slug)}
+                        className={`text-left px-3 py-2 rounded-md text-sm font-semibold transition-colors ${
+                          activeGame === g.slug 
+                            ? 'bg-[var(--ms-gradient-end)] text-white' 
+                            : 'text-[var(--ms-body)] hover:bg-[var(--ms-hover-bg)] hover:text-white'
+                        }`}
+                      >
+                        {g.name}
+                      </button>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="min-h-0 flex-1 px-2 py-12 text-center text-sm text-[var(--ms-body)]">
-                No services found for {query}.
-              </div>
-            )}
+
+                  {/* PANEL KANAN (Daftar Kategori - Skycoach Style) */}
+                  <div className="flex-1 overflow-y-auto p-6">
+                    {!activeGame ? (
+                      <div className="flex h-full items-center justify-center text-[var(--ms-body)]">
+                        <p className="text-sm">Select a game from the left menu to view categories</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                        {serviceColumns.map(([category, services]) => {
+                          const categorySlug = services[0]?.serviceCategorySlug;
+                          const targetHref = categorySlug
+                            ? `/${activeGame}/${categorySlug}`
+                            : `/${activeGame}`;
+
+                          return (
+                            <Link
+                              key={category}
+                              href={targetHref}
+                              onClick={() => setIsOpen(false)}
+                              className="group flex cursor-pointer items-center gap-3"
+                            >
+                              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ms-gradient-end)]"></span>
+                              <h3 className="text-sm font-semibold text-white transition-colors group-hover:text-[var(--ms-gradient-end)]">{category}</h3>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
           </section>
         </div>,
         portalTarget,
