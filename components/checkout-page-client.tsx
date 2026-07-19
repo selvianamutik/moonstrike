@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { OrderSummary } from "@/components/order-summary";
 import { CheckoutSkeleton } from "@/components/storefront-skeletons";
@@ -15,6 +16,12 @@ type CheckoutCartItem = {
     image: string;
     gameName: string;
   } | null;
+};
+
+const DISPLAY_TAX_RATES = {
+  stripe: 0.5,
+  paypal: 5,
+  crypto: 0.5,
 };
 
 const supportedPaymentMethods = [
@@ -42,6 +49,13 @@ export function CheckoutPageClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [submittingProvider, setSubmittingProvider] = useState<"stripe" | "nowpayments" | "paypal" | null>(null);
   const [error, setError] = useState("");
+  const [selectedPayment, setSelectedPayment] = useState<'stripe' | 'paypal' | 'crypto'>('stripe');
+
+  const handlePrimaryCheckout = () => {
+    if (selectedPayment === 'stripe') handleStripeCheckout();
+    if (selectedPayment === 'paypal') handlePayPalCheckout();
+    if (selectedPayment === 'crypto') handleCryptoCheckout();
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -238,52 +252,80 @@ export function CheckoutPageClient() {
               <>
               <div className="ms-card rounded-xl p-8">
                 <h2 className="mb-6 text-2xl font-black">Payment Method</h2>
-                <div className="grid gap-4 md:grid-rows-3">
-                <div className="rounded-md border border-[var(--primary)] bg-[var(--ms-hover-bg)] p-5 shadow-[0_0_22px_rgba(136,82,255,0.22)]">
-                  <h3 className="text-xl font-black">Stripe Checkout</h3>
-                  <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">
-                    Continue to Stripe's hosted test checkout to complete payment securely.
-                  </p>
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  {/* 1. Stripe Button */}
                   <button
                     type="button"
-                    disabled={submittingProvider !== null}
-                    onClick={handleStripeCheckout}
-                    className="ms-button mt-5 h-12 w-full text-sm font-black disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={() => setSelectedPayment('stripe')}
+                    className={`relative flex flex-col items-center justify-center rounded-md border p-5 transition-all duration-200 h-24 ${
+                      selectedPayment === 'stripe'
+                        ? 'border-[var(--primary)] bg-[var(--ms-hover-bg)] shadow-[0_0_15px_rgba(136,82,255,0.25)]'
+                        : 'border-[var(--ms-border)] bg-[var(--ms-field)] hover:bg-[var(--ms-hover-bg)]'
+                    }`}
                   >
-                    {submittingProvider === "stripe" ? "Opening Stripe..." : "Pay with Stripe Sandbox"}
+                    <Image 
+                      src="/payment/stripe.svg" 
+                      alt="Stripe" 
+                      width={80} 
+                      height={30} 
+                      className="object-contain h-8 w-auto brightness-100 dark:brightness-100" 
+                    />
+                    <span className="text-[10px] text-[var(--ms-body)] font-medium mt-1 block">
+                      +{DISPLAY_TAX_RATES.stripe}% tax
+                    </span>
+                  </button>
+
+                  {/* 2. PayPal Button (+5% tax) */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPayment('paypal')}
+                    className={`relative flex flex-col items-center justify-center rounded-md border p-5 transition-all duration-200 h-24 ${
+                      selectedPayment === 'paypal'
+                        ? 'border-[var(--primary)] bg-[var(--ms-hover-bg)] shadow-[0_0_15px_rgba(136,82,255,0.25)]'
+                        : 'border-[var(--ms-border)] bg-[var(--ms-field)] hover:bg-[var(--ms-hover-bg)]'
+                    }`}
+                  >
+                    <Image 
+                      src="/payment/paypal.svg" 
+                      alt="PayPal" 
+                      width={80} 
+                      height={30} 
+                      className="object-contain h-8 w-auto" 
+                    />
+                    <span className="text-[10px] md:text-xs font-semibold text-red-500 mt-1">
+                      +{DISPLAY_TAX_RATES.paypal}% tax
+                    </span>
+                  </button>
+
+                  {/* 3. Crypto Button */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPayment('crypto')}
+                    className={`relative flex flex-col items-center justify-center rounded-md border p-5 transition-all duration-200 h-24 ${
+                      selectedPayment === 'crypto'
+                        ? 'border-[var(--primary)] bg-[var(--ms-hover-bg)] shadow-[0_0_15px_rgba(136,82,255,0.25)]'
+                        : 'border-[var(--ms-border)] bg-[var(--ms-field)] hover:bg-[var(--ms-hover-bg)]'
+                    }`}
+                  >
+                    <span className="text-sm font-black tracking-wide text-white">
+                      CRYPTO
+                    </span>
+                    <span className="text-[10px] text-[var(--ms-body)] font-medium mt-1 block">
+                      +{DISPLAY_TAX_RATES.crypto}% tax
+                    </span>
                   </button>
                 </div>
 
-                <div className="rounded-md border border-[var(--ms-border)] bg-[var(--ms-field)] p-5">
-                  <h3 className="text-xl font-black">PayPal Checkout</h3>
-                  <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">
-                    Continue to PayPal's hosted sandbox checkout to complete payment securely.
-                  </p>
-                  <button
-                    type="button"
-                    disabled={submittingProvider !== null}
-                    onClick={handlePayPalCheckout}
-                    className="mt-5 h-12 w-full rounded-md border border-[var(--ms-border)] px-5 text-sm font-black text-[var(--ms-heading)] hover:border-[var(--ms-gradient-end)] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {submittingProvider === "paypal" ? "Opening PayPal..." : "Pay with PayPal Sandbox"}
-                  </button>
-                </div>
-
-                <div className="rounded-md border border-[var(--ms-border)] bg-[var(--ms-field)] p-5">
-                  <h3 className="text-xl font-black">Crypto Payment</h3>
-                  <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">
-                    Continue to NOWPayments hosted checkout and pay with supported cryptocurrencies.
-                  </p>
-                  <button
-                    type="button"
-                    disabled={submittingProvider !== null}
-                    onClick={handleCryptoCheckout}
-                    className="mt-5 h-12 w-full rounded-md border border-[var(--ms-border)] px-5 text-sm font-black text-[var(--ms-heading)] hover:border-[var(--ms-gradient-end)] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {submittingProvider === "nowpayments" ? "Opening Crypto..." : "Pay with Crypto"}
-                  </button>
-                </div>
-                </div>
+                {/* Tombol Eksekusi Pembayaran Utama */}
+                <button
+                  disabled={submittingProvider !== null}
+                  onClick={handlePrimaryCheckout}
+                  className="w-full rounded-md bg-[var(--primary)] py-4 text-center text-sm font-bold text-white transition-all hover:bg-[var(--primary-hover)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {selectedPayment === 'stripe' && (submittingProvider === 'stripe' ? 'Opening Stripe...' : 'Pay with Stripe Sandbox')}
+                  {selectedPayment === 'paypal' && (submittingProvider === 'paypal' ? 'Opening PayPal...' : 'Pay with PayPal Sandbox')}
+                  {selectedPayment === 'crypto' && (submittingProvider === 'nowpayments' ? 'Opening Crypto...' : 'Pay with Crypto')}
+                </button>
                 <div className="mt-6">
                   <p className="mono text-xs uppercase tracking-[0.18em] text-[var(--ms-body)]">
                     Eligible methods may include
