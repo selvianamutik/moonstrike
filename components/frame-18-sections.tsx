@@ -64,7 +64,7 @@ export function Frame18Sections({ benefits, steps }: { benefits: LandingBenefits
                       : "-bottom-28 -left-28"
               }`}
             />
-            <div className={`relative z-10 ${index === 3 ? "ml-auto max-w-56 text-right" : "max-w-72"}`}>
+            <div className="relative z-10 max-w-72">
               <h3 className="font-bold text-[var(--ms-heading)]">{step.title}</h3>
               <p className="mt-3 leading-6 text-[var(--ms-body)]">{step.description}</p>
             </div>

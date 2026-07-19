@@ -72,7 +72,7 @@ export function SiteFooter() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-8">
+          <div className="grid grid-cols-2 gap-12 lg:gap-24 lg:justify-self-end">
             {columns.map((column) => (
               <div key={column.title}>
                 <h3 className="mono text-sm font-bold uppercase tracking-[0.2em] text-[var(--ms-heading)]">
