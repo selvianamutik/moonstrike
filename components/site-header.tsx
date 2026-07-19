@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { LogIn, Search, ShoppingCart, User, Gamepad2, CircleUserRound } from "lucide-react";
@@ -42,33 +42,43 @@ export function SiteHeader() {
         </div>
 
         <nav className="ml-auto flex items-center gap-8 text-sm font-semibold text-[var(--ms-heading)] sm:gap-6">
-          <Link href="/games" className="hidden text-center hover:text-[var(--ms-gradient-end)] sm:block">
-            <Gamepad2 size={22} className="mt-1 mx-auto" aria-hidden="true" />
-            Games
+          {/* Menu Games */}
+          <Link className="group hidden flex-col items-center text-center text-xs transition-colors duration-200 hover:text-[var(--ms-gradient-end)] sm:flex" href="/games">
+            <div className="flex h-10 w-10 items-center justify-center">
+              <Gamepad2 aria-hidden="true" className="transition-colors duration-200 group-hover:text-[var(--ms-gradient-end)]" size={22} />
+            </div>
+            <span>Games</span>
           </Link>
 
-          <Link href="/cart" className="flex flex-col items-center hover:text-[var(--ms-gradient-end)]" aria-label="Cart">
-            <ShoppingCart size={22} className="mt-1" aria-hidden="true" />
-            Cart
+          {/* Menu Cart */}
+          <Link aria-label="Cart" className="group flex flex-col items-center text-center text-xs transition-colors duration-200 hover:text-[var(--ms-gradient-end)]" href="/cart">
+            <div className="flex h-10 w-10 items-center justify-center">
+              <ShoppingCart aria-hidden="true" className="transition-colors duration-200 group-hover:text-[var(--ms-gradient-end)]" size={22} />
+            </div>
+            <span>Cart</span>
           </Link>
 
+          {/* Menu Notif */}
           {isLoggedIn ? (
-            <div className="hidden flex-col items-center text-center hover:text-[var(--ms-gradient-end)] sm:flex">
-              <NotificationBell mode="customer" iconSize={22} label="Notifications" />
-              <span>Notif</span>
+            <div className="hidden flex-col items-center text-center text-xs transition-colors duration-200 hover:text-[var(--ms-gradient-end)] sm:flex">
+              <NotificationBell iconSize={22} label="Notifications" mode="customer" />
+              <span className="mt-0.5">Notif</span>
             </div>
           ) : null}
 
+          {/* Menu User / Login */}
           {loading ? (
             <div className="h-11 w-11 animate-pulse rounded bg-white/5" />
           ) : isLoggedIn ? (
-            <Link href="/profile" className="flex flex-col items-center hover:text-[var(--ms-gradient-end)]" aria-label="Profile">
-              <CircleUserRound size={23} className="mt-1" aria-hidden="true" />
-              User
+            <Link aria-label="Profile" className="group flex flex-col items-center text-center text-xs transition-colors duration-200 hover:text-[var(--ms-gradient-end)]" href="/profile">
+              <div className="flex h-10 w-10 items-center justify-center">
+                <CircleUserRound aria-hidden="true" className="transition-colors duration-200 group-hover:text-[var(--ms-gradient-end)]" size={23} />
+              </div>
+              <span>User</span>
             </Link>
           ) : (
-            <Link href="/login" className="ms-button h-11 px-3 mono text-xs uppercase tracking-[0.16em] md:px-4">
-              <LogIn size={16} aria-hidden="true" />
+            <Link className="ms-button h-11 px-3 mono text-xs uppercase tracking-[0.16em] md:px-4" href="/login">
+              <LogIn aria-hidden="true" size={16} />
               <span className="hidden sm:inline">Login</span>
             </Link>
           )}
