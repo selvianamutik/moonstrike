@@ -12,6 +12,7 @@ export type GameRow = {
   name: string
   slug: string
   image: string
+  hero_image: string
   genre_id: string
   genre: string
   platforms: string[]
@@ -27,7 +28,7 @@ type RawGameRow = Omit<GameRow, 'genre'> & {
 }
 
 const GAME_SELECT =
-  'id, name, slug, image, genre_id, genres(id, name, slug, created_at), platforms, description, status, created_at, updated_at'
+  'id, name, slug, image, hero_image, genre_id, genres(id, name, slug, created_at), platforms, description, status, created_at, updated_at'
 
 function genreGroupFromGenre(genre: string) {
   const value = genre.toLowerCase()
@@ -52,6 +53,7 @@ function rawGameRowToGameRow(row: RawGameRow): GameRow {
     name: row.name,
     slug: row.slug,
     image: row.image,
+    hero_image: row.hero_image,
     genre_id: row.genre_id,
     genre: normalizeGameGenre(relationGenreName(row)),
     platforms: row.platforms,
@@ -73,6 +75,7 @@ export function gameRowToCatalogItem(row: GameRow): GameCatalogItem {
     platform: row.platforms[0] ?? 'Cross-play',
     description: row.description,
     image: row.image,
+    heroImage: row.hero_image || row.image,
     isTopTitle: row.status === 'active',
   }
 }
@@ -152,6 +155,7 @@ export async function ensureDefaultGames() {
         name: game.name,
         slug: game.slug,
         image: '',
+        hero_image: '',
         genre_id: genreByName.get(normalizeGameGenre(game.genre))?.id ?? fallbackGenre.id,
         platforms: [game.platform],
         description: game.description,

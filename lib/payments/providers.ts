@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "crypto";
 import { cartItemToCheckoutProduct } from "@/lib/checkout/product";
 import { snapshotFromCartItem } from "@/lib/checkout/snapshot";
 import { createNowPaymentsInvoice } from "@/lib/nowpayments";
+import { createPayPalOrder, refundPayPalCapture, isPayPalConfigured } from "@/lib/paypal";
 import { getStripeClient } from "@/lib/stripe";
 import type {
   PaymentCheckoutInput,
@@ -166,6 +167,119 @@ async function refundStripe(input: ProviderRefundInput): Promise<ProviderRefundR
   };
 }
 
+async function createPayPalCheckout(input: PaymentCheckoutInput): Promise<PaymentCheckoutResult> {
+  if (!isPayPalConfigured()) {
+    throw new Error("PayPal is not configured. Please set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET.");
+  }
+
+  const checkoutSessionId = `pp_${randomUUID()}`;
+
+  const { error: snapshotError } = await input.supabase.from("checkout_sessions").upsert({
+    id: checkoutSessionId,
+    cart_id: input.cartId,
+    user_id: input.user.id,
+    currency: input.currency,
+    provider: "paypal",
+    status: "creating_order",
+    items: input.snapshotItems,
+  });
+
+  if (snapshotError) throw snapshotError;
+
+  let order;
+
+  try {
+    order = await createPayPalOrder({
+      items: input.snapshotItems.map((item) => {
+        const price = input.currency === "EUR" ? item.priceEUR : item.priceUSD;
+        const priceValue = typeof price === 'number' && !isNaN(price) ? price : 0;
+        
+        return {
+          name: item.product.name,
+          description: item.product.description || undefined,
+          quantity: "1",
+          unit_amount: {
+            currency_code: input.currency,
+            value: priceValue.toFixed(2),
+          },
+        };
+      }),
+      currency: input.currency,
+      returnUrl: `${input.origin}/order-confirmed?session=${checkoutSessionId}`,
+      cancelUrl: `${input.origin}/checkout?canceled=1`,
+      metadata: {
+        checkoutSessionId,
+        cartId: input.cartId,
+        userId: input.user.id,
+      },
+    });
+  } catch (error) {
+    await input.supabase.from("checkout_sessions").update({ status: "order_failed" }).eq("id", checkoutSessionId);
+    throw error;
+  }
+
+  const approvalUrl = order.links.find((link) => link.rel === "approve")?.href;
+
+  if (!approvalUrl) {
+    throw new Error("PayPal did not return an approval URL. Please check PayPal configuration.");
+  }
+
+  const { error: updateError } = await input.supabase
+    .from("checkout_sessions")
+    .update({ status: "created" })
+    .eq("id", checkoutSessionId);
+
+  if (updateError) throw updateError;
+
+  return {
+    checkoutSessionId,
+    providerSessionId: order.id,
+    redirectTo: approvalUrl,
+  };
+}
+
+async function refundPayPal(input: ProviderRefundInput): Promise<ProviderRefundResult> {
+  if (input.mode === "manual") {
+    return refundManually(input, "paypal");
+  }
+
+  if (!input.transaction.rawProviderPayload) {
+    throw new ProviderRefundError(
+      "Cannot process automatic PayPal refund: missing transaction payload. Use manual refund instead.",
+      400,
+    );
+  }
+
+  const captureId = (input.transaction.rawProviderPayload as { capture_id?: string }).capture_id;
+
+  if (!captureId) {
+    throw new ProviderRefundError(
+      "Cannot process automatic PayPal refund: missing capture ID. Use manual refund instead.",
+      400,
+    );
+  }
+
+  const refund = await refundPayPalCapture({
+    captureId,
+    amount: {
+      currency_code: input.transaction.currency,
+      value: input.amount.toFixed(2),
+    },
+    note_to_payer: "Refund requested by customer",
+  });
+
+  return {
+    providerRefundId: refund.id,
+    manual: false,
+    payload: {
+      id: refund.id,
+      amount: refund.amount.value,
+      currency: refund.amount.currency_code,
+      status: refund.status,
+    },
+  };
+}
+
 async function refundManually(input: ProviderRefundInput, provider: PaymentProviderId): Promise<ProviderRefundResult> {
   return {
     providerRefundId: null,
@@ -207,6 +321,16 @@ export const paymentProviders: Record<PaymentProviderId, PaymentProvider> = {
 
       return refundManually(input, "nowpayments");
     },
+  },
+  paypal: {
+    id: "paypal",
+    label: "PayPal",
+    refundCapabilities: {
+      automatic: true,
+      manual: true,
+    },
+    createCheckout: createPayPalCheckout,
+    refund: refundPayPal,
   },
 };
 

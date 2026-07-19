@@ -6,11 +6,12 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { requireVerifiedUser } from "@/lib/auth/session";
 import { fulfillStripeCheckoutSession } from "@/lib/checkout/stripe-fulfillment";
+import { fulfillPayPalCheckoutSession } from "@/lib/checkout/paypal-fulfillment";
 import { formatOrderMoney, formatOrderOptionValue, getCustomerOrderByCheckoutSession, type CustomerOrder } from "@/lib/orders";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type OrderConfirmedPageProps = {
-  searchParams: Promise<{ session?: string }>;
+  searchParams: Promise<{ session?: string; token?: string }>;
 };
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ type ResolveConfirmedOrderResult =
   | { order: null; pendingProvider: string }
   | { order: null; pendingProvider?: never };
 
-async function resolveConfirmedOrder(userId: string, session: string): Promise<ResolveConfirmedOrderResult> {
+async function resolveConfirmedOrder(userId: string, session: string, paypalToken?: string): Promise<ResolveConfirmedOrderResult> {
   let order = await getCustomerOrderByCheckoutSession(userId, session);
 
   if (order) {
@@ -56,6 +57,26 @@ async function resolveConfirmedOrder(userId: string, session: string): Promise<R
     return { order: null, pendingProvider: "nowpayments" };
   }
 
+  if (checkoutSession?.provider === "paypal") {
+    if (paypalToken) {
+      try {
+        await fulfillPayPalCheckoutSession(session, paypalToken);
+        order = await getCustomerOrderByCheckoutSession(userId, session);
+        if (order) return { order };
+      } catch (error) {
+        // Fulfillment failed, continue to retry loop
+      }
+    }
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      order = await getCustomerOrderByCheckoutSession(userId, session);
+      if (order) return { order };
+      await wait(1200);
+    }
+
+    return { order: null, pendingProvider: "paypal" };
+  }
+
   if (!session.startsWith("cs_")) {
     return { order: null };
   }
@@ -84,13 +105,13 @@ async function resolveConfirmedOrder(userId: string, session: string): Promise<R
 
 export default async function OrderConfirmedPage({ searchParams }: OrderConfirmedPageProps) {
   const user = await requireVerifiedUser("/order-confirmed");
-  const { session } = await searchParams;
+  const { session, token } = await searchParams;
 
   if (!session) {
     notFound();
   }
 
-  const result = await resolveConfirmedOrder(user.id, session);
+  const result = await resolveConfirmedOrder(user.id, session, token);
   const order = result.order;
 
   if (!order) {
@@ -105,6 +126,33 @@ export default async function OrderConfirmedPage({ searchParams }: OrderConfirme
               <h1 className="font-display mt-4 text-4xl font-black tracking-[-0.05em]">Waiting for blockchain confirmation</h1>
               <p className="mx-auto mt-5 max-w-2xl text-[var(--ms-body)]">
                 NOWPayments has not sent a finished payment confirmation yet. Crypto payments can take a few minutes depending on the network.
+              </p>
+              <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
+                <Link href="/profile/orders" className="ms-button flex h-12 items-center px-6 mono text-xs uppercase tracking-[0.14em]">
+                  View Orders
+                </Link>
+                <Link href="/checkout" className="flex h-12 items-center rounded-md border border-[var(--ms-border)] px-6 mono text-xs uppercase tracking-[0.14em] text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
+                  Back to Checkout
+                </Link>
+              </div>
+            </div>
+          </section>
+          <SiteFooter />
+        </main>
+      );
+    }
+
+    if (result.pendingProvider === "paypal") {
+      return (
+        <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
+          <LivePageRefresh intervalMs={3_000} />
+          <SiteHeader />
+          <section className="ms-shell py-16">
+            <div className="mx-auto max-w-3xl rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-8 text-center">
+              <p className="mono text-xs uppercase tracking-[0.28em] text-[var(--ms-gradient-end)]">PayPal Payment Processing</p>
+              <h1 className="font-display mt-4 text-4xl font-black tracking-[-0.05em]">Processing your payment</h1>
+              <p className="mx-auto mt-5 max-w-2xl text-[var(--ms-body)]">
+                We're capturing your PayPal payment. This usually takes just a few seconds.
               </p>
               <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <Link href="/profile/orders" className="ms-button flex h-12 items-center px-6 mono text-xs uppercase tracking-[0.14em]">

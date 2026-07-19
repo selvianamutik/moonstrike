@@ -20,7 +20,8 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 border-b border-[var(--ms-border)] bg-[var(--ms-bg-navbar)]/95 backdrop-blur">
       <div className="top-nav-user flex min-h-24 items-center gap-12 py-0">
         <Link href="/" className="font-display shrink-0 text-2xl font-black tracking-[-0.03em] sm:text-3xl">
-          <span className="brand-gradient">Moon Strike</span>
+          {/* <span className="brand-gradient">Moon Strike</span> */}
+          <img src={'/logo/logo.png'} width={200}/>
         </Link>
 
         <QuickSelectMenu />

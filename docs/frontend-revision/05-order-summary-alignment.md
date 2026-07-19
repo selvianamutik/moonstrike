@@ -53,3 +53,9 @@ Elemen `<h1>` dan subtitle dikeluarkan dari dalam Grid dan dijadikan elemen mand
   </div>
 </section>
 ```
+
+## Post-Script: Resolusi Merge Conflict
+Setelah *refactor* ini diimplementasikan, terjadi *merge conflict* dengan `origin/development` yang membawa fitur **PayPal Checkout**. Konflik telah diselesaikan secara struktural dengan:
+1. **Mempertahankan** arsitektur DOM lokal (`HEAD`): Kerangka Grid tetap bersih, `<h1>` tetap di luar, dan `<h2>Payment Method</h2>` tetap di dalam container *card*.
+2. **Mengadopsi** UI/Logika dari server: Sistem grid form pembayaran diubah menjadi susunan vertikal 3 kotak (`md:grid-rows-3`) untuk merangkul Stripe, PayPal, dan Crypto tanpa merusak layout responsif.
+

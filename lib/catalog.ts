@@ -24,6 +24,7 @@ export type GameCatalogItem = {
   platform: string;
   description: string;
   image?: string;
+  heroImage?: string;
   isTopTitle: boolean;
 };
 

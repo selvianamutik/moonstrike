@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { writeAuditLog } from '@/lib/admin/audit'
 import { getAdminSession } from '@/lib/admin/session'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { revalidatePath } from 'next/cache'
 
 const STATUSES = new Set(['active', 'draft', 'archived'])
 
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
   const description =
     typeof body?.description === 'string' ? body.description.trim() : ''
   const image = typeof body?.image === 'string' ? body.image.trim() : ''
+  const heroImage = typeof body?.heroImage === 'string' ? body.heroImage.trim() : ''
   const status =
     typeof body?.status === 'string' && STATUSES.has(body.status)
       ? body.status
@@ -47,6 +49,7 @@ export async function POST(request: NextRequest) {
       name,
       slug,
       image,
+      hero_image: heroImage,
       genre_id: genreId,
       platforms: [platform],
       description,
@@ -66,6 +69,11 @@ export async function POST(request: NextRequest) {
     request,
     admin,
   })
+
+  revalidatePath('/')
+  revalidatePath('/games')
+  revalidatePath(`/${data.slug}`)
+  revalidatePath('/admin/games')
 
   return NextResponse.json({ game: data })
 }
