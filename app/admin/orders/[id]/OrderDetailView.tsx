@@ -157,7 +157,14 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
               </div>
               <div>
                 <p className="text-[var(--ms-text-secondary)] text-xs uppercase mb-1">Amount</p>
-                <p className="text-[#22D3EE] font-medium">{order.amount}</p>
+                {order.refundAmount > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <p className="text-[#64748B] line-through">{order.amount}</p>
+                    <p className="text-[#22D3EE] font-medium">{new Intl.NumberFormat("en-US", { style: "currency", currency: order.currency }).format(order.total - order.refundAmount)}</p>
+                  </div>
+                ) : (
+                  <p className="text-[#22D3EE] font-medium">{order.amount}</p>
+                )}
               </div>
             </div>
 
@@ -216,7 +223,22 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
                 ))}
               </div>
             </div>
+            <div className="mt-4 grid grid-cols-3 gap-4 rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] p-4 text-sm">
+                <div>
+                  <p className="text-[#64748B] text-xs uppercase mb-1">Base Price</p>
+                  <p className="text-white">{new Intl.NumberFormat("en-US", { style: "currency", currency: order.currency }).format(order.basePrice)}</p>
+                </div>
+                <div>
+                  <p className="text-[#64748B] text-xs uppercase mb-1">Tax ({order.taxAmount > 0 ? (order.taxAmount / (order.basePrice || 1) * 100).toFixed(2) : 0}%)</p>
+                  <p className="text-white">{new Intl.NumberFormat("en-US", { style: "currency", currency: order.currency }).format(order.taxAmount)}</p>
+                </div>
+                <div>
+                  <p className="text-[#64748B] text-xs uppercase mb-1">Refunded</p>
+                  <p className="text-red-400 font-medium">{order.refundAmount > 0 ? new Intl.NumberFormat("en-US", { style: "currency", currency: order.currency }).format(order.refundAmount) : "0"}</p>
+                </div>
+              </div>
           </section>
+
 
           <section className="bg-[var(--ms-secondary)] border border-[var(--ms-accent)] rounded-xl p-6">
             <h2 className="text-lg font-bold text-white mb-4">Order Timeline</h2>

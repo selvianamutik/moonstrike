@@ -1,11 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { AtSign, Eye, EyeOff, Lock, LogIn, Shield, ShieldCheck } from "lucide-react";
 
 export default function AdminLogin() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("admin@moonstrike.io");
@@ -34,8 +33,7 @@ export default function AdminLogin() {
         return;
       }
 
-      router.replace(searchParams.get("next") || "/admin/dashboard");
-      router.refresh();
+      window.location.href = searchParams.get("next") || "/admin/dashboard";
     } catch {
       setError("Unable to reach the admin login service.");
     } finally {

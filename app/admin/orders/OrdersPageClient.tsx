@@ -169,7 +169,7 @@ export function OrdersPageClient({ orders }: { orders: AdminOrderRecord[] }) {
       />
 
       <AdminDataTable
-        columns={["ORDER ID", "CUSTOMER", "DATE", "AMOUNT", "STATUS", "ACTIONS"]}
+        columns={["ORDER ID", "CUSTOMER", "DATE", "AMOUNT", "REFUNDED", "STATUS", "ACTIONS"]}
         footer={
           <AdminPagination
             showingFrom={showingFrom}
@@ -188,7 +188,7 @@ export function OrdersPageClient({ orders }: { orders: AdminOrderRecord[] }) {
       >
         {filtered.length === 0 ? (
           <tr>
-            <td className="px-6 py-8 text-center text-[var(--ms-text-secondary)]" colSpan={6}>
+            <td className="px-6 py-8 text-center text-[var(--ms-text-secondary)]" colSpan={7}>
               No orders found.
             </td>
           </tr>
@@ -201,7 +201,14 @@ export function OrdersPageClient({ orders }: { orders: AdminOrderRecord[] }) {
                 <div className="text-xs text-[#64748B]">{order.customerEmail}</div>
               </td>
               <td className="px-6 py-4">{order.createdAt}</td>
-              <td className="px-6 py-4 font-medium text-[#22D3EE]">{order.amount}</td>
+              <td className="px-6 py-4 font-medium text-[#22D3EE]">{order.refundAmount > 0 ? new Intl.NumberFormat("en-US", { style: "currency", currency: order.currency }).format(order.total - order.refundAmount) : order.amount}</td>
+              <td className="px-6 py-4">
+                {order.refundAmount > 0 ? (
+                  <span className="text-red-400 font-medium">{new Intl.NumberFormat("en-US", { style: "currency", currency: order.currency }).format(order.refundAmount)}</span>
+                ) : (
+                  <span className="text-[#64748B]">0</span>
+                )}
+              </td>
               <td className="px-6 py-4">
                 <StatusBadge status={order.status as AdminOrderStatus} />
               </td>

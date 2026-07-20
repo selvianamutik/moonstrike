@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useTransition, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AlertTriangle, ArrowRight, CheckCircle2, CreditCard, MessageSquareWarning, RotateCcw, Sparkles, Users } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
@@ -16,6 +17,18 @@ const periodOptions: Array<{ value: AdminDashboardPeriodDays; label: string }> =
   { value: 90, label: "Last 90 days" },
   { value: 180, label: "Last 180 days" },
 ];
+
+function UnauthorizedAlert() {
+  const searchParams = useSearchParams();
+  const isUnauthorized = searchParams.get("error") === "unauthorized";
+  if (!isUnauthorized) return null;
+  return (
+    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300 flex items-center gap-2">
+      <AlertTriangle size={16} className="text-amber-400 shrink-0" />
+      <span>You do not have permission to access that feature. Please contact your system administrator.</span>
+    </div>
+  );
+}
 
 export function DashboardClient({ initialDashboard }: { initialDashboard: AdminDashboardData }) {
   const [dashboard, setDashboard] = useState(initialDashboard);
@@ -42,6 +55,9 @@ export function DashboardClient({ initialDashboard }: { initialDashboard: AdminD
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-8">
+      <Suspense fallback={null}>
+        <UnauthorizedAlert />
+      </Suspense>
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <div className="mb-1 flex items-center gap-2 text-xs font-medium text-[#94A3B8]">

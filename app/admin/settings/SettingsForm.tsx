@@ -7,8 +7,12 @@ import { AdminFormField, adminInputClass, adminSelectClass } from "@/components/
 import type { AdminSettings } from "@/lib/admin/settings";
 import { cleanupUploadedMedia } from "@/lib/cms/client-media-cleanup";
 
+import type { PaymentSettingRow } from "@/lib/admin/payment-settings";
+import { CreditCard } from "lucide-react";
+
 type SettingsFormProps = {
   initialSettings: AdminSettings;
+  initialPaymentSettings?: PaymentSettingRow[];
 };
 
 function Section({
@@ -74,8 +78,9 @@ async function resizeToWebp(file: File, maxWidth: number, quality: number) {
   return new File([blob], "admin-avatar.webp", { type: "image/webp" });
 }
 
-export function SettingsForm({ initialSettings }: SettingsFormProps) {
+export function SettingsForm({ initialSettings, initialPaymentSettings = [] }: SettingsFormProps) {
   const [settings, setSettings] = useState(initialSettings);
+  const [paymentSettings, setPaymentSettings] = useState(initialPaymentSettings);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -100,6 +105,10 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
 
   function updateSetting<K extends keyof AdminSettings>(key: K, value: AdminSettings[K]) {
     setSettings((current) => ({ ...current, [key]: value }));
+  }
+
+  function updatePayment(method: string, key: keyof PaymentSettingRow, value: any) {
+    setPaymentSettings((prev) => prev.map((p) => (p.method === method ? { ...p, [key]: value } : p)));
   }
 
   function resetMessages() {
@@ -132,6 +141,16 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
       body: JSON.stringify(nextSettings),
     });
     const payload = await response.json().catch(() => null);
+
+    // Save payment settings sequentially
+    for (const p of paymentSettings) {
+      await fetch("/api/admin/payment-settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method: p.method, tax_rate: p.tax_rate, tax_label: p.tax_label, enabled: p.enabled }),
+      });
+    }
+
     setIsSaving(false);
 
     if (!response.ok) {
@@ -300,6 +319,48 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                   <option value={14}>After 14 days</option>
                 </select>
               </AdminFormField>
+            </div>
+          </Section>
+
+          <Section icon={<CreditCard size={16} className="text-[#22D3EE]" />} title="Payment Methods & Taxes">
+            <div className="grid gap-4 md:grid-cols-2">
+              {paymentSettings.map((payment) => (
+                <div key={payment.method} className="flex flex-col gap-2 rounded-lg border border-[var(--ms-accent)] bg-[#050816] p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white uppercase">{payment.method}</span>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <span className="text-xs text-[var(--ms-text-secondary)]">{payment.enabled ? "Enabled" : "Disabled"}</span>
+                      <input 
+                        type="checkbox" 
+                        checked={payment.enabled} 
+                        onChange={(e) => updatePayment(payment.method, "enabled", e.target.checked)} 
+                        className="h-4 w-4 rounded border-[#172554] bg-[#0F172A] accent-[#8B5CF6]"
+                      />
+                    </label>
+                  </div>
+                  <AdminFormField label="Tax Rate (%)">
+                    <input 
+                      className={adminInputClass} 
+                      type="number" 
+                      step="0.01" 
+                      value={payment.tax_rate * 100} 
+                      onChange={(e) => updatePayment(payment.method, "tax_rate", Number(e.target.value) / 100)} 
+                    />
+                  </AdminFormField>
+                  <AdminFormField label="Tax Label">
+                    <input 
+                      className={adminInputClass} 
+                      type="text" 
+                      value={payment.tax_label} 
+                      onChange={(e) => updatePayment(payment.method, "tax_label", e.target.value)} 
+                      placeholder="e.g. VAT, Service Tax"
+                    />
+                  </AdminFormField>
+                </div>
+              ))}
+              {paymentSettings.length === 0 && (
+                <p className="text-sm text-[var(--ms-text-secondary)]">No payment methods configured in database.</p>
+              )}
             </div>
           </Section>
 

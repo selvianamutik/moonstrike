@@ -20,6 +20,7 @@ type AdminUserRow = {
   display_name: string
   email: string
   password_hash: string
+  role: 'super_admin' | 'admin' | 'support'
   status: 'active' | 'suspended' | 'banned'
   failed_login_attempts: number
   last_failed_login: string | null
@@ -102,11 +103,27 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createAdminClient()
+  let adminRole: AdminUserRow['role'] = 'admin'
   const { data: admin, error } = await supabase
     .from('admin_users')
     .select('id, display_name, email, password_hash, status, failed_login_attempts, last_failed_login, locked_until')
     .eq('email', email)
-    .maybeSingle<AdminUserRow>()
+    .maybeSingle<Omit<AdminUserRow, 'role'>>()
+
+  // Try to read role column (may not exist if migration hasn't run)
+  if (admin) {
+    const { data: roleData } = await supabase
+      .from('admin_users')
+      .select('role')
+      .eq('id', admin.id)
+      .maybeSingle<{ role: string }>()
+    if (roleData?.role) {
+      const normalized = roleData.role.toLowerCase()
+      if (['super_admin', 'admin', 'support'].includes(normalized)) {
+        adminRole = normalized as AdminUserRow['role']
+      }
+    }
+  }
 
   if (error || !admin || admin.status !== 'active') {
     await writeAuditLog({
@@ -184,7 +201,7 @@ export async function POST(request: NextRequest) {
   let token: string
 
   try {
-    token = signAdminToken(admin, maxAge)
+    token = signAdminToken({ ...admin, role: adminRole }, maxAge)
   } catch {
     await writeAuditLog({
       action: 'Admin login failed because JWT_SECRET is missing or invalid',
@@ -221,6 +238,7 @@ export async function POST(request: NextRequest) {
       id: admin.id,
       email: admin.email,
       displayName: admin.display_name,
+      role: adminRole,
     },
   })
 
@@ -229,6 +247,7 @@ export async function POST(request: NextRequest) {
       id: admin.id,
       email: admin.email,
       displayName: admin.display_name,
+      role: adminRole,
     },
   })
 }

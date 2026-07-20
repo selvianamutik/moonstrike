@@ -18,10 +18,11 @@ type CheckoutCartItem = {
   } | null;
 };
 
-const DISPLAY_TAX_RATES = {
-  stripe: 0.5,
-  paypal: 5,
-  crypto: 0.5,
+type PaymentSetting = {
+  method: string;
+  tax_rate: number;
+  tax_label: string;
+  enabled: boolean;
 };
 
 const supportedPaymentMethods = [
@@ -46,6 +47,7 @@ function formatMoney(value: number, currency: "USD" | "EUR") {
 export function CheckoutPageClient() {
   const { currency } = useCurrency();
   const [items, setItems] = useState<CheckoutCartItem[]>([]);
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSetting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [submittingProvider, setSubmittingProvider] = useState<"stripe" | "nowpayments" | "paypal" | null>(null);
   const [error, setError] = useState("");
@@ -65,15 +67,22 @@ export function CheckoutPageClient() {
       setError("");
 
       try {
-        const response = await fetch("/api/cart", { cache: "no-store" });
-        const payload = await response.json().catch(() => ({}));
+        const [cartRes, settingsRes] = await Promise.all([
+          fetch("/api/cart", { cache: "no-store" }),
+          fetch("/api/payment-settings", { cache: "no-store" }),
+        ]);
 
-        if (!response.ok) {
-          if (isMounted) setError(payload.error ?? "Unable to load cart.");
+        const cartPayload = await cartRes.json().catch(() => ({}));
+        if (!cartRes.ok) {
+          if (isMounted) setError(cartPayload.error ?? "Unable to load cart.");
           return;
         }
 
-        if (isMounted) setItems(Array.isArray(payload.items) ? payload.items : []);
+        if (isMounted) {
+          setItems(Array.isArray(cartPayload.items) ? cartPayload.items : []);
+          const settings = await settingsRes.json().catch(() => []);
+          setPaymentSettings(Array.isArray(settings) ? settings : []);
+        }
       } catch {
         if (isMounted) setError("Unable to reach the cart service.");
       } finally {
@@ -103,6 +112,12 @@ export function CheckoutPageClient() {
       })),
     [currency, items],
   );
+
+  function getTaxInfo(method: string) {
+    const setting = paymentSettings.find((p) => p.method === method);
+    if (!setting || !setting.enabled || !setting.tax_rate) return null;
+    return { rate: setting.tax_rate, label: setting.tax_label || "Tax" };
+  }
 
   async function handleStripeCheckout() {
     setSubmittingProvider("stripe");
@@ -236,24 +251,34 @@ export function CheckoutPageClient() {
           </p>
         ) : null}
 
-        <div className="mt-6 grid gap-12 lg:grid-cols-[1fr_450px] lg:items-start">
-          <div>
-            {isLoading ? (
-              <CheckoutSkeleton />
-            ) : items.length === 0 ? (
-              <div className="ms-card rounded-xl p-8">
-                <h2 className="text-2xl font-black">Your cart is empty</h2>
-                <p className="mt-3 text-[var(--ms-body)]">Add a configured service before checkout.</p>
-                <Link href="/games" className="ms-button mt-8 inline-flex h-12 items-center px-6 mono">
-                  Browse Games
-                </Link>
-              </div>
-            ) : (
-              <>
-              <div className="ms-card rounded-xl p-8">
-                <h2 className="mb-6 text-2xl font-black">Payment Method</h2>
-                <div className="grid grid-cols-3 gap-4 mb-6">
-                  {/* 1. Stripe Button */}
+          {isLoading ? (
+            <CheckoutSkeleton />
+          ) : items.length === 0 ? (
+            <div className="ms-card mt-12 rounded-xl p-8">
+              <h2 className="text-2xl font-black">Your cart is empty</h2>
+              <p className="mt-3 text-[var(--ms-body)]">Add a configured service before checkout.</p>
+              <Link href="/games" className="ms-button mt-8 inline-flex h-12 items-center px-6 mono">
+                Browse Games
+              </Link>
+            </div>
+          ) : (
+            <>
+              <h2 className="mt-12 text-2xl font-black">Payment Method</h2>
+              <div className="ms-card mt-6 rounded-xl p-8">
+                <div className="grid gap-4 md:grid-rows-3">
+                <div className="rounded-md border border-[var(--primary)] bg-[var(--ms-hover-bg)] p-5 shadow-[0_0_22px_rgba(136,82,255,0.22)]">
+                  <h3 className="text-xl font-black">Stripe Checkout</h3>
+                  <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">
+                    Continue to Stripe's hosted test checkout to complete payment securely.
+                  </p>
+                  {(() => {
+                    const tax = getTaxInfo("stripe");
+                    return tax ? (
+                      <p className="mt-2 text-xs text-[var(--ms-body)]">
+                        Includes {tax.label} ({(tax.rate * 100).toFixed(1)}%)
+                      </p>
+                    ) : null;
+                  })()}
                   <button
                     type="button"
                     onClick={() => setSelectedPayment('stripe')}
@@ -274,8 +299,21 @@ export function CheckoutPageClient() {
                       +{DISPLAY_TAX_RATES.stripe}% tax
                     </span>
                   </button>
+                </div>
 
-                  {/* 2. PayPal Button (+5% tax) */}
+                <div className="rounded-md border border-[var(--ms-border)] bg-[var(--ms-field)] p-5">
+                  <h3 className="text-xl font-black">PayPal Checkout</h3>
+                  <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">
+                    Continue to PayPal's hosted sandbox checkout to complete payment securely.
+                  </p>
+                  {(() => {
+                    const tax = getTaxInfo("paypal");
+                    return tax ? (
+                      <p className="mt-2 text-xs text-[var(--ms-body)]">
+                        Includes {tax.label} ({(tax.rate * 100).toFixed(1)}%)
+                      </p>
+                    ) : null;
+                  })()}
                   <button
                     type="button"
                     onClick={() => setSelectedPayment('paypal')}
@@ -296,8 +334,21 @@ export function CheckoutPageClient() {
                       +{DISPLAY_TAX_RATES.paypal}% tax
                     </span>
                   </button>
+                </div>
 
-                  {/* 3. Crypto Button */}
+                <div className="rounded-md border border-[var(--ms-border)] bg-[var(--ms-field)] p-5">
+                  <h3 className="text-xl font-black">Crypto Payment</h3>
+                  <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">
+                    Continue to NOWPayments hosted checkout and pay with supported cryptocurrencies.
+                  </p>
+                  {(() => {
+                    const tax = getTaxInfo("nowpayments");
+                    return tax ? (
+                      <p className="mt-2 text-xs text-[var(--ms-body)]">
+                        Includes {tax.label} ({(tax.rate * 100).toFixed(1)}%)
+                      </p>
+                    ) : null;
+                  })()}
                   <button
                     type="button"
                     onClick={() => setSelectedPayment('crypto')}

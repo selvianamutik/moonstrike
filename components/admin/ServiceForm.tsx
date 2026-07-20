@@ -94,7 +94,7 @@ function emptyBenefit(): ServiceBenefit {
 }
 
 function emptyChoice() {
-  return { label: "", priceUSD: 0, priceEUR: 0 };
+  return { label: "", priceUSD: 0 };
 }
 
 function addEmptyRow<T>(current: T[], emptyValue: T) {
@@ -136,7 +136,7 @@ function optionPreview(option: ServiceOption) {
   }
 
   if (isUnitType(option.type)) {
-    return `${option.min ?? 1}-${option.max ?? 10}, USD ${option.pricePerUnitUSD ?? 0} / EUR ${option.pricePerUnitEUR ?? 0}`;
+    return `${option.min ?? 1}-${option.max ?? 10}, USD ${option.pricePerUnitUSD ?? 0}`;
   }
 
   if (isQuantityType(option.type)) {
@@ -144,7 +144,7 @@ function optionPreview(option: ServiceOption) {
   }
 
   if (option.type === "toggle") {
-    return `${option.disabledLabel ?? "No"} / ${option.enabledLabel ?? "Yes"}, USD ${option.priceUSD ?? 0} / EUR ${option.priceEUR ?? 0}`;
+    return `${option.disabledLabel ?? "No"} / ${option.enabledLabel ?? "Yes"}, USD ${option.priceUSD ?? 0}`;
   }
 
   return option.placeholder ? `placeholder: ${option.placeholder}` : "text input";
@@ -155,14 +155,16 @@ export function ServiceForm({
   games,
   service,
   services = [],
+  isClone = false,
 }: {
   categories: ServiceCategoryRow[];
   games: GameRow[];
   service?: ServiceRow;
   services?: ServiceRow[];
+  isClone?: boolean;
 }) {
   const router = useRouter();
-  const isEditing = Boolean(service);
+  const isEditing = Boolean(service) && !isClone;
   const [title, setTitle] = useState(service?.title ?? "");
   const [slug, setSlug] = useState(service?.slug ?? "");
   const [gameId, setGameId] = useState(service?.game_id ?? games[0]?.id ?? "");
@@ -172,7 +174,6 @@ export function ServiceForm({
   const [badges, setBadges] = useState<string[]>(service?.badges ?? []);
   const [description, setDescription] = useState(service?.description ?? "");
   const [basePriceUSD, setBasePriceUSD] = useState(String(service?.base_price_usd ?? 0));
-  const [basePriceEUR, setBasePriceEUR] = useState(String(service?.base_price_eur ?? 0));
   const [image, setImage] = useState(service?.image ?? "");
   const [requirements, setRequirements] = useState<ServiceRequirement[]>(
     service?.requirements.length ? service.requirements : [emptyServiceRequirement()],
@@ -204,7 +205,7 @@ export function ServiceForm({
   const availableCategories = useMemo(
     () =>
       categories
-        .filter((category) => category.game_id === gameId)
+        .filter((category) => category.game_id === gameId && category.slug !== "uncategorized")
         .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
     [categories, gameId],
   );
@@ -504,7 +505,6 @@ export function ServiceForm({
       requirements: requirements.filter((requirement) => requirement.text.trim()),
       whatYouGet: benefits.filter((benefit) => benefit.title.trim()),
       basePriceUSD: Number(basePriceUSD),
-      basePriceEUR: Number(basePriceEUR),
       optionsSchema,
     };
 
@@ -623,8 +623,8 @@ export function ServiceForm({
                 </select>
               </AdminFormField>
               <AdminFormField label="Service Category">
-                <select className={adminSelectClass} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                  <option value="">Uncategorised</option>
+                <select className={adminSelectClass} value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
+                  <option value="" disabled>Select Category</option>
                   {availableCategories.map((category) => (
                     <option key={category.id} value={category.id}>
                       {category.name} ({category.slug})
@@ -656,7 +656,7 @@ export function ServiceForm({
                 <input type="text" inputMode="decimal" className={adminInputClass} value={basePriceUSD} onChange={(e) => setBasePriceUSD(e.target.value)} />
               </AdminFormField>
               <AdminFormField label="Base Price (EUR)">
-                <input type="text" inputMode="decimal" className={adminInputClass} value={basePriceEUR} onChange={(e) => setBasePriceEUR(e.target.value)} />
+                <input type="text" inputMode="decimal" className={adminInputClass} value="" disabled placeholder="Auto-calculated on save" />
               </AdminFormField>
             </div>
           </section>
@@ -806,10 +806,9 @@ export function ServiceForm({
                           </button>
                         </div>
                         {(option.options ?? []).map((choice, choiceIndex) => (
-                          <div key={choiceIndex} className="grid gap-3 md:grid-cols-[1fr_140px_140px_auto] md:items-center">
+                          <div key={choiceIndex} className="grid gap-3 md:grid-cols-[1fr_140px_auto] md:items-center">
                             <input className={adminInputClass} value={choice.label} onChange={(e) => updateChoice(optionIndex, choiceIndex, { label: e.target.value })} placeholder="Choice label" />
                             <input type="text" inputMode="decimal" className={adminInputClass} value={choice.priceUSD} onChange={(e) => updateChoice(optionIndex, choiceIndex, { priceUSD: Number(e.target.value) })} placeholder="USD" />
-                            <input type="text" inputMode="decimal" className={adminInputClass} value={choice.priceEUR} onChange={(e) => updateChoice(optionIndex, choiceIndex, { priceEUR: Number(e.target.value) })} placeholder="EUR" />
                             <button
                               type="button"
                               onClick={() =>
@@ -832,7 +831,7 @@ export function ServiceForm({
                     ) : null}
 
                     {isUnitType(option.type) ? (
-                      <div className="mt-4 grid gap-3 md:grid-cols-4">
+                      <div className="mt-4 grid gap-3 md:grid-cols-3">
                         <AdminFormField label="Minimum">
                           <input type="text" inputMode="numeric" className={adminInputClass} value={option.min ?? 1} onChange={(e) => updateOption(optionIndex, { min: Number(e.target.value) })} />
                         </AdminFormField>
@@ -842,15 +841,12 @@ export function ServiceForm({
                         <AdminFormField label={option.type === "range" ? "USD / Value" : "USD / Count"}>
                           <input type="text" inputMode="decimal" className={adminInputClass} value={option.pricePerUnitUSD ?? 0} onChange={(e) => updateOption(optionIndex, { pricePerUnitUSD: Number(e.target.value) })} />
                         </AdminFormField>
-                        <AdminFormField label={option.type === "range" ? "EUR / Value" : "EUR / Count"}>
-                          <input type="text" inputMode="decimal" className={adminInputClass} value={option.pricePerUnitEUR ?? 0} onChange={(e) => updateOption(optionIndex, { pricePerUnitEUR: Number(e.target.value) })} />
-                        </AdminFormField>
                         {option.type === "number_stepper" ? (
-                          <p className="text-xs leading-5 text-[#94A3B8] md:col-span-4">
+                          <p className="text-xs leading-5 text-[#94A3B8] md:col-span-3">
                             Number stepper shows minus and plus controls on the service page. Each count adds the configured price to the total.
                           </p>
                         ) : (
-                          <p className="text-xs leading-5 text-[#94A3B8] md:col-span-4">
+                          <p className="text-xs leading-5 text-[#94A3B8] md:col-span-3">
                             Range slider shows a draggable slider. The selected value affects price.
                           </p>
                         )}
@@ -881,9 +877,6 @@ export function ServiceForm({
                         </AdminFormField>
                         <AdminFormField label="USD if enabled">
                           <input type="text" inputMode="decimal" className={adminInputClass} value={option.priceUSD ?? 0} onChange={(e) => updateOption(optionIndex, { priceUSD: Number(e.target.value) })} />
-                        </AdminFormField>
-                        <AdminFormField label="EUR if enabled">
-                          <input type="text" inputMode="decimal" className={adminInputClass} value={option.priceEUR ?? 0} onChange={(e) => updateOption(optionIndex, { priceEUR: Number(e.target.value) })} />
                         </AdminFormField>
                       </div>
                     ) : null}
@@ -1000,7 +993,7 @@ export function ServiceForm({
                                 </span>
                               </div>
                               <p className="mt-1 truncate text-xs text-[#64748B]">
-                                {linkedService.service_category_name ?? "Uncategorized"} / {linkedService.slug}
+                                {linkedService.service_category_name ? `${linkedService.service_category_name} / ` : ""}{linkedService.slug}
                               </p>
                             </button>
                           ))

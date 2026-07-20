@@ -413,36 +413,59 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
           <>
             <div className="grid gap-4 sm:grid-cols-2">
               <AdminFormField label="Section title">
-                <input className={adminInputClass} value={stepsTitle} onChange={(e) => setStepsTitle(e.target.value)} required />
+                <input className={adminInputClass} value={benefitsTitle} onChange={(e) => setBenefitsTitle(e.target.value)} required />
               </AdminFormField>
               <AdminFormField label="Accent words">
-                <input className={adminInputClass} value={stepsAccent} onChange={(e) => setStepsAccent(e.target.value)} required />
+                <input className={adminInputClass} value={benefitsAccent} onChange={(e) => setBenefitsAccent(e.target.value)} required />
               </AdminFormField>
             </div>
-            <AdminFormField label="Subtitle">
-              <input className={adminInputClass} value={stepsSubtitle} onChange={(e) => setStepsSubtitle(e.target.value)} required />
+            <AdminFormField label="Image alt text">
+              <input className={adminInputClass} value={imageAlt} onChange={(e) => setImageAlt(e.target.value)} required />
             </AdminFormField>
-            {stepItems.map((item, index) => (
+            <AdminFormField label="Section image">
+              <div className="space-y-3">
+                {(draftBenefitsImage?.previewUrl || thumbnailUrl) && (
+                  <img src={draftBenefitsImage?.previewUrl || thumbnailUrl} alt="" className="h-28 w-full rounded-lg object-cover" />
+                )}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className={adminInputClass}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) selectImage(file, "benefits");
+                    e.target.value = "";
+                  }}
+                />
+                <p className="text-xs text-[var(--ms-text-secondary)]">
+                  Recommended: 1200 x 600 px or wider. Uploads are compressed and a thumbnail is generated automatically.
+                </p>
+              </div>
+            </AdminFormField>
+            {benefitItems.map((item, index) => (
               <div key={index} className="rounded-lg border border-[var(--ms-accent)] p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold uppercase tracking-wide text-[var(--ms-text-secondary)]">Step {index + 1}</p>
-                  {stepItems.length > 1 ? (
-                    <button type="button" onClick={() => removeStep(index)} className="text-red-400 hover:text-red-300 transition-colors" aria-label={`Remove step ${index + 1}`}>
+                  <p className="text-xs font-bold uppercase tracking-wide text-[var(--ms-text-secondary)]">Item {index + 1}</p>
+                  {benefitItems.length > 1 ? (
+                    <button type="button" onClick={() => removeBenefit(index)} className="text-red-400 hover:text-red-300 transition-colors" aria-label={`Remove item ${index + 1}`}>
                       <Trash2 size={14} />
                     </button>
                   ) : null}
                 </div>
-                <AdminFormField label="Step title">
-                  <input className={adminInputClass} value={item.title} onChange={(e) => updateStep(index, "title", e.target.value)} required />
+                <AdminFormField label="Icon">
+                  <input className={adminInputClass} value={item.icon} onChange={(e) => updateBenefit(index, "icon", e.target.value)} placeholder="e.g. MS, PV, SC" required />
                 </AdminFormField>
-                <AdminFormField label="Description">
-                  <textarea className={adminTextareaClass} value={item.description} onChange={(e) => updateStep(index, "description", e.target.value)} rows={2} required />
+                <AdminFormField label="Title">
+                  <input className={adminInputClass} value={item.title} onChange={(e) => updateBenefit(index, "title", e.target.value)} required />
+                </AdminFormField>
+                <AdminFormField label="Detail">
+                  <textarea className={adminTextareaClass} value={item.detail} onChange={(e) => updateBenefit(index, "detail", e.target.value)} rows={2} required />
                 </AdminFormField>
               </div>
             ))}
-            <button type="button" onClick={addStep} className="flex items-center gap-2 rounded-lg border border-dashed border-[var(--ms-accent)] px-4 py-3 text-sm text-[var(--ms-text-secondary)] hover:border-[var(--ms-gradient-start)] hover:text-white transition-colors">
+            <button type="button" onClick={addBenefit} className="flex items-center gap-2 rounded-lg border border-dashed border-[var(--ms-accent)] px-4 py-3 text-sm text-[var(--ms-text-secondary)] hover:border-[var(--ms-gradient-start)] hover:text-white transition-colors">
               <Plus size={16} />
-              Add Step
+              Add Item
             </button>
           </>
         ) : null}

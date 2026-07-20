@@ -330,11 +330,13 @@ export function calculateConfiguredPrice(basePrice: number, selectedOptions: Car
   return selectedOptions.reduce((total, option) => total + option.priceModifier, basePrice);
 }
 
-export function calculateOrderTotals(subtotal: number) {
+export function calculateOrderTotals(subtotal: number, taxRate: number = 0) {
   const serviceFee = Number((subtotal * 0.055).toFixed(2));
   const discount = subtotal > 100 ? 10 : 0;
-  const taxes = 0;
-  const total = Number((subtotal + serviceFee + taxes - discount).toFixed(2));
+  
+  const amountBeforeTax = subtotal + serviceFee - discount;
+  const taxes = Number((amountBeforeTax * taxRate).toFixed(2));
+  const total = Number((amountBeforeTax + taxes).toFixed(2));
 
   return { subtotal, serviceFee, discount, taxes, total };
 }

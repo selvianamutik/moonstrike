@@ -3,6 +3,7 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { getAdminSession } from "@/lib/admin/session";
 import { getAdminSettings } from "@/lib/admin/settings";
 import { SettingsForm } from "./SettingsForm";
+import type { PaymentSettingRow } from "@/lib/admin/payment-settings";
 
 export default async function SettingsPage() {
   const admin = await getAdminSession();
@@ -12,6 +13,13 @@ export default async function SettingsPage() {
   }
 
   const settings = await getAdminSettings(admin.id);
+  const { getPaymentSettings } = await import("@/lib/admin/payment-settings");
+  let paymentSettings: PaymentSettingRow[] = [];
+  try {
+    paymentSettings = await getPaymentSettings();
+  } catch (e) {
+    console.error("Failed to load payment settings", e);
+  }
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -21,7 +29,7 @@ export default async function SettingsPage() {
         description="Manage operational settings, admin identity, and notification events."
       />
 
-      <SettingsForm initialSettings={settings} />
+      <SettingsForm initialSettings={settings} initialPaymentSettings={paymentSettings} />
     </div>
   );
 }

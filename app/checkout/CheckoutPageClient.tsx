@@ -1,6 +1,6 @@
-﻿'use client';
+'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { Lock, CreditCard, Check, AlertCircle, Loader2, Coins, Bitcoin } from 'lucide-react';
 import { OrderSummary } from '@/components/order-summary';
@@ -19,9 +19,21 @@ type FormErrors = {
 
 export function CheckoutPageClient() {
   const { items, subtotal, clearCart } = useCart();
-  const totals = calculateOrderTotals(subtotal);
+
+  const [paymentSettings, setPaymentSettings] = useState<{ method: string; tax_rate: number; enabled: boolean }[]>([]);
+  useEffect(() => {
+    fetch('/api/payment-settings')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setPaymentSettings(data);
+      })
+      .catch(console.error);
+  }, []);
 
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('credit_card');
+
+  const currentTaxRate = paymentSettings.find(p => p.method === selectedPayment)?.tax_rate || 0;
+  const totals = calculateOrderTotals(subtotal, currentTaxRate);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -312,7 +324,9 @@ export function CheckoutPageClient() {
                 { id: 'paypal', label: 'PayPal', icon: Coins },
                 { id: 'crypto', label: 'Crypto', icon: Bitcoin },
               ] as const
-            ).map(({ id, label, icon: Icon }) => (
+            )
+              .filter(opt => paymentSettings.length === 0 || paymentSettings.some(p => p.method === opt.id && p.enabled))
+              .map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() => setSelectedPayment(id)}

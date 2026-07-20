@@ -71,7 +71,7 @@ function calculateOptionTotal(option: ServiceOption, value: SelectionValue, curr
     const selected = Array.isArray(value) ? value : [];
     return (option.options ?? [])
       .filter((item) => selected.includes(item.label))
-      .reduce((total, item) => total + (currency === "EUR" ? item.priceEUR : item.priceUSD), 0);
+      .reduce((total, item) => total + (currency === "EUR" ? (item.priceEUR ?? 0) : item.priceUSD), 0);
   }
 
   if (option.type === "toggle") {
@@ -81,15 +81,15 @@ function calculateOptionTotal(option: ServiceOption, value: SelectionValue, curr
   if (!isChoice(option)) return 0;
 
   const selected = option.options?.find((item) => item.label === value);
-  return selected ? (currency === "EUR" ? selected.priceEUR : selected.priceUSD) : 0;
+  return selected ? (currency === "EUR" ? (selected.priceEUR ?? 0) : selected.priceUSD) : 0;
 }
 
 function optionPrice(option: ServiceOption, currency: Currency) {
   return currency === "EUR" ? option.priceEUR ?? 0 : option.priceUSD ?? 0;
 }
 
-function choicePrice(item: { priceUSD: number; priceEUR: number }, currency: Currency) {
-  return currency === "EUR" ? item.priceEUR : item.priceUSD;
+function choicePrice(item: { priceUSD: number; priceEUR?: number }, currency: Currency) {
+  return currency === "EUR" ? (item.priceEUR ?? 0) : item.priceUSD;
 }
 
 function ServiceOptions({
