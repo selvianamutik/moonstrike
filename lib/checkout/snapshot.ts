@@ -39,7 +39,7 @@ export function snapshotFromCartItem(
 ): CheckoutSnapshotItem {
   return {
     cartItemId: item.id,
-    serviceId: item.service_id,
+    serviceId: item.private_offer_id ?? item.service_id ?? "",
     selectedOptions: item.selected_options,
     selectedOptionsSnapshot: item.selected_options_snapshot,
     priceUSD: Number(item.price_usd),

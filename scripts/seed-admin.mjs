@@ -92,7 +92,7 @@ if (existingAdmin) {
     .update({
       display_name: displayName,
       password_hash: passwordHash,
-      role: 'ADMIN',
+      role: 'super_admin',
       status: 'active',
       avatar: '',
     })
@@ -104,7 +104,7 @@ if (existingAdmin) {
     display_name: displayName,
     email,
     password_hash: passwordHash,
-    role: 'ADMIN',
+    role: 'super_admin',
     status: 'active',
     avatar: '',
   })

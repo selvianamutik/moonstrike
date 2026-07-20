@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { getSupabasePublishableKey, getSupabaseUrl } from './lib/supabase/env'
+import { createAdminClient } from './lib/supabase/admin'
 
 const PROTECTED_ROUTES = ['/profile', '/checkout']
 const ADMIN_SESSION_COOKIE = 'ms_admin_session'
@@ -41,13 +42,13 @@ function bytesToBase64Url(bytes: ArrayBuffer) {
 }
 
 async function verifyAdminToken(token?: string) {
-  if (!token) return false
+  if (!token) return null
 
   const jwtSecret = process.env.JWT_SECRET
-  if (!jwtSecret || jwtSecret.length < 32) return false
+  if (!jwtSecret || jwtSecret.length < 32) return null
 
   const [header, payload, signature] = token.split('.')
-  if (!header || !payload || !signature) return false
+  if (!header || !payload || !signature) return null
 
   const key = await crypto.subtle.importKey(
     'raw',
@@ -64,21 +65,27 @@ async function verifyAdminToken(token?: string) {
     )
   )
 
-  if (expected !== signature) return false
+  if (expected !== signature) return null
 
   try {
     const parsed = JSON.parse(base64UrlToString(payload)) as {
       role?: string
       exp?: number
+      sub?: string
+      email?: string
+      name?: string
     }
 
-    return (
-      parsed.role === 'admin' &&
+    const isValid = (
+      parsed.role &&
+      ['admin', 'super_admin', 'support'].includes(parsed.role) &&
       typeof parsed.exp === 'number' &&
       parsed.exp > Math.floor(Date.now() / 1000)
     )
+
+    return isValid ? parsed : null
   } catch {
-    return false
+    return null
   }
 }
 
@@ -86,29 +93,6 @@ export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
   const { pathname } = request.nextUrl
   const returnTo = `${pathname}${request.nextUrl.search}`
-
-  if (pathname.startsWith('/admin')) {
-    const isLoginPage = pathname === '/admin/login'
-    const hasAdminSession = await verifyAdminToken(
-      request.cookies.get(ADMIN_SESSION_COOKIE)?.value
-    )
-
-    if (!isLoginPage && !hasAdminSession) {
-      const loginUrl = request.nextUrl.clone()
-      loginUrl.pathname = '/admin/login'
-      loginUrl.searchParams.set('next', returnTo)
-      return NextResponse.redirect(loginUrl)
-    }
-
-    if (isLoginPage && hasAdminSession) {
-      const dashboardUrl = request.nextUrl.clone()
-      dashboardUrl.pathname = '/admin/dashboard'
-      dashboardUrl.search = ''
-      return NextResponse.redirect(dashboardUrl)
-    }
-
-    return supabaseResponse
-  }
 
   const supabase = createServerClient(
     getSupabaseUrl(),
@@ -130,6 +114,62 @@ export async function proxy(request: NextRequest) {
       },
     }
   )
+
+  if (pathname.startsWith('/admin')) {
+    const isLoginPage = pathname === '/admin/login'
+    const adminSession = await verifyAdminToken(
+      request.cookies.get(ADMIN_SESSION_COOKIE)?.value
+    )
+
+    if (!isLoginPage && !adminSession) {
+      const loginUrl = request.nextUrl.clone()
+      loginUrl.pathname = '/admin/login'
+      loginUrl.searchParams.set('next', returnTo)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    if (isLoginPage && adminSession) {
+      const dashboardUrl = request.nextUrl.clone()
+      dashboardUrl.pathname = '/admin/dashboard'
+      dashboardUrl.search = ''
+      return NextResponse.redirect(dashboardUrl)
+    }
+
+    if (adminSession && adminSession.role !== 'super_admin') {
+      let requiredPerm = ''
+      if (pathname.startsWith('/admin/users')) requiredPerm = 'users'
+      else if (pathname.startsWith('/admin/games')) requiredPerm = 'games'
+      else if (pathname.startsWith('/admin/services')) requiredPerm = 'services'
+      else if (pathname.startsWith('/admin/private-offers')) requiredPerm = 'services'
+      else if (pathname.startsWith('/admin/orders')) requiredPerm = 'orders'
+      else if (pathname.startsWith('/admin/transactions')) requiredPerm = 'transactions'
+      else if (pathname.startsWith('/admin/content')) requiredPerm = 'content'
+      else if (pathname.startsWith('/admin/pages')) requiredPerm = 'content'
+      else if (pathname.startsWith('/admin/messages')) requiredPerm = 'messages'
+      else if (pathname.startsWith('/admin/logs')) requiredPerm = 'logs'
+      else if (pathname.startsWith('/admin/settings')) requiredPerm = 'settings'
+      else if (pathname.startsWith('/admin/admins')) requiredPerm = 'admins'
+
+      if (requiredPerm) {
+        const adminSupabase = createAdminClient()
+        const { data: rolePerm } = await adminSupabase
+          .from('role_permissions')
+          .select('permissions')
+          .eq('role', adminSession.role)
+          .single()
+
+        const permissions = (rolePerm?.permissions as string[]) || []
+        if (!permissions.includes(requiredPerm)) {
+          const dashboardUrl = request.nextUrl.clone()
+          dashboardUrl.pathname = '/admin/dashboard'
+          dashboardUrl.searchParams.set('error', 'unauthorized')
+          return NextResponse.redirect(dashboardUrl)
+        }
+      }
+    }
+
+    return supabaseResponse
+  }
 
   // IMPORTANT: Do not add any logic between createServerClient and
   // supabase.auth.getUser(). A simple mistake can cause session issues.

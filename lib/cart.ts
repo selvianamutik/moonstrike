@@ -22,16 +22,31 @@ export type CartServiceRow = {
   service_categories: { name: string; slug: string } | { name: string; slug: string }[] | null
 }
 
+export type PrivateOfferCartRow = {
+  id: string
+  title: string
+  slug: string
+  category: string
+  quantity: number
+  platform: string
+  additional_info: string
+  discount_percent: number
+  price_usd: number | string
+  games: { name: string; slug: string; image: string } | { name: string; slug: string; image: string }[] | null
+}
+
 export type CartItemRow = {
   id: string
   cart_id: string
-  service_id: string
+  service_id: string | null
+  private_offer_id: string | null
   selected_options: Record<string, SelectionValue>
   selected_options_snapshot: Record<string, { value: SelectionValue; priceUSD: number; priceEUR: number }>
   price_usd: number | string
   price_eur: number | string
   added_at: string
   services: CartServiceRow | CartServiceRow[] | null
+  private_offers: PrivateOfferCartRow | PrivateOfferCartRow[] | null
 }
 
 type CookieStore = Awaited<ReturnType<typeof cookies>>
@@ -42,6 +57,14 @@ function relationOne<T>(value: T | T[] | null | undefined) {
 
 export function getCartService(row: CartItemRow) {
   return relationOne(row.services)
+}
+
+export function getPrivateOffer(row: CartItemRow) {
+  return relationOne(row.private_offers)
+}
+
+export function getPrivateOfferGame(privateOffer: PrivateOfferCartRow | null | undefined) {
+  return relationOne(privateOffer?.games)
 }
 
 export function getServiceGame(service: CartServiceRow | null | undefined) {
@@ -179,7 +202,7 @@ function optionPrices(option: ServiceOption, value: SelectionValue) {
       .reduce(
         (total, item) => ({
           priceUSD: total.priceUSD + item.priceUSD,
-          priceEUR: total.priceEUR + item.priceEUR,
+          priceEUR: total.priceEUR + (item.priceEUR ?? 0),
         }),
         { priceUSD: 0, priceEUR: 0 },
       )
@@ -194,7 +217,7 @@ function optionPrices(option: ServiceOption, value: SelectionValue) {
   if (!isChoice(option)) return { priceUSD: 0, priceEUR: 0 }
 
   const selected = option.options?.find((item) => item.label === value)
-  return selected ? { priceUSD: selected.priceUSD, priceEUR: selected.priceEUR } : { priceUSD: 0, priceEUR: 0 }
+  return selected ? { priceUSD: selected.priceUSD, priceEUR: (selected.priceEUR ?? 0) } : { priceUSD: 0, priceEUR: 0 }
 }
 
 export function calculateCartSnapshot(

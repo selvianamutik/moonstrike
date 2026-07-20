@@ -1,5 +1,5 @@
-﻿import Link from "next/link";
-import { Pencil, Eye, EyeOff, Trash2, Ban, History } from "lucide-react";
+import Link from "next/link";
+import { Pencil, Eye, EyeOff, Trash2, Ban, History, Copy } from "lucide-react";
 import { ActionTooltip } from "@/components/common/ActionTooltip";
 
 type ActionIconsProps = {
@@ -9,14 +9,20 @@ type ActionIconsProps = {
   onBan?: () => void;
   historyHref?: string;
   previewHref?: string;
+  duplicateHref?: string;
 };
 
-export function ActionIcons({ editHref, onHide, onDelete, onBan, historyHref, previewHref }: ActionIconsProps) {
+export function ActionIcons({ editHref, onHide, onDelete, onBan, historyHref, previewHref, duplicateHref }: ActionIconsProps) {
   return (
     <div className="flex items-center gap-1">
       {editHref && (
         <Link href={editHref} className="p-2 text-[var(--ms-text-secondary)] hover:text-[#8B5CF6] transition-colors" aria-label="Edit">
           <Pencil size={16} />
+        </Link>
+      )}
+      {duplicateHref && (
+        <Link href={duplicateHref} className="p-2 text-[var(--ms-text-secondary)] hover:text-green-400 transition-colors" aria-label="Duplicate">
+          <Copy size={16} />
         </Link>
       )}
       {previewHref && (

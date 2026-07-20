@@ -46,6 +46,9 @@ export type CustomerOrderRow = {
   refund_previous_status: string | null;
   completed_at: string | null;
   delivered_at: string | null;
+  base_price: number | string | null;
+  tax_amount: number | string | null;
+  refund_amount: number | string | null;
   created_at: string;
   order_items: CustomerOrderItemRow[] | null;
 };
@@ -81,6 +84,9 @@ export type CustomerOrder = {
   orderReference: string;
   selectedOptionsSnapshot: OrderOptionSnapshot;
   total: number;
+  basePrice: number;
+  taxAmount: number;
+  refundAmount: number;
   currency: OrderCurrency;
   paymentProvider: string;
   transactionId: string;
@@ -134,6 +140,9 @@ function mapOrder(row: CustomerOrderRow, transaction?: CustomerOrderTransactionR
     orderReference: row.order_ref,
     selectedOptionsSnapshot: {},
     total,
+    basePrice: Number(row.base_price) || 0,
+    taxAmount: Number(row.tax_amount) || 0,
+    refundAmount: Number(row.refund_amount) || 0,
     currency,
     paymentProvider: transaction?.provider ?? "unknown",
     transactionId: transaction?.transaction_ref ?? row.checkout_session_id,
@@ -150,7 +159,7 @@ function mapOrder(row: CustomerOrderRow, transaction?: CustomerOrderTransactionR
 }
 
 const orderSelect =
-  "id, order_ref, checkout_session_id, status, refund_previous_status, completed_at, delivered_at, created_at, order_items(id, service_id, selected_options_snapshot, total, currency, services(title, image, description, games(name), service_categories(name)))";
+  "id, order_ref, checkout_session_id, status, refund_previous_status, completed_at, delivered_at, base_price, tax_amount, refund_amount, created_at, order_items(id, service_id, selected_options_snapshot, total, currency, services(title, image, description, games(name), service_categories(name)))";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -311,6 +320,10 @@ export function formatOrderDateTime(value: string) {
 export function formatPaymentProvider(value: string) {
   if (value === "stripe") return "Stripe";
   if (value === "nowpayments") return "NOWPayments";
+  if (value === "paypal") return "PayPal";
+  if (value === "skrill") return "Skrill";
+  if (value === "crypto") return "Crypto";
+  if (value === "qris") return "QRIS";
   if (value === "lemonsqueezy") return "Lemon Squeezy";
   if (value === "polar") return "Polar";
   if (value === "paddle") return "Paddle";

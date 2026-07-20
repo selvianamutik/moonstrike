@@ -75,8 +75,8 @@ export async function createServiceCategory({
     return { error: 'Game, category name, and slug are required.', status: 400 as const }
   }
 
-  if (normalizedSlug === 'hot-offers') {
-    return { error: 'hot-offers is reserved.', status: 400 as const }
+  if (normalizedSlug === 'hot-offers' || normalizedSlug === 'uncategorized') {
+    return { error: `${normalizedSlug} is reserved.`, status: 400 as const }
   }
 
   const supabase = createAdminClient()
@@ -161,8 +161,8 @@ export async function updateServiceCategory({
     return { error: 'Game, category name, and slug are required.', status: 400 as const }
   }
 
-  if (normalizedSlug === 'hot-offers') {
-    return { error: 'hot-offers is reserved.', status: 400 as const }
+  if (normalizedSlug === 'hot-offers' || normalizedSlug === 'uncategorized') {
+    return { error: `${normalizedSlug} is reserved.`, status: 400 as const }
   }
 
   const supabase = createAdminClient()
@@ -237,12 +237,16 @@ export async function deleteServiceCategory({
   const supabase = createAdminClient()
   const { data: category, error: lookupError } = await supabase
     .from('service_categories')
-    .select('id, name')
+    .select('id, name, slug')
     .eq('id', id)
-    .maybeSingle<{ id: string; name: string }>()
+    .maybeSingle<{ id: string; name: string; slug: string }>()
 
   if (lookupError) return { error: lookupError.message, status: 500 as const }
   if (!category) return { error: 'Service category not found.', status: 404 as const }
+
+  if (category.slug === 'uncategorized') {
+    return { error: 'Uncategorized cannot be deleted.', status: 400 as const }
+  }
 
   const { error } = await supabase.from('service_categories').delete().eq('id', id)
 

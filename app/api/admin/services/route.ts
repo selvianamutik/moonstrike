@@ -4,6 +4,7 @@ import { getAdminSession } from '@/lib/admin/session'
 import { serializeServiceRequirements } from '@/lib/cms/service-requirements'
 import { slugifyService } from '@/lib/cms/services'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { usdToEur } from '@/lib/currency/convert'
 import { revalidatePath } from 'next/cache'
 
 const STATUSES = new Set(['active', 'draft', 'archived'])
@@ -136,9 +137,40 @@ function parsePayload(body: any) {
     requirements: serializeServiceRequirements(body?.requirements),
     what_you_get: Array.isArray(body?.whatYouGet) ? body.whatYouGet : [],
     base_price_usd: Number(body?.basePriceUSD) || 0,
-    base_price_eur: Number(body?.basePriceEUR) || 0,
     options_schema: sanitizeOptionsSchema(body?.optionsSchema),
   }
+}
+
+async function convertPayloadPrices(payload: Record<string, unknown>) {
+  const usd = Number(payload.base_price_usd) || 0
+  payload.base_price_eur = await usdToEur(usd)
+
+  if (Array.isArray(payload.options_schema)) {
+    payload.options_schema = await Promise.all(
+      payload.options_schema.map(async (option: Record<string, unknown>) => {
+        if (option.type === 'toggle') {
+          option.priceEUR = await usdToEur(Number(option.priceUSD) || 0)
+        }
+
+        if (option.type === 'range' || option.type === 'number_stepper') {
+          option.pricePerUnitEUR = await usdToEur(Number(option.pricePerUnitUSD) || 0)
+        }
+
+        if (Array.isArray(option.options)) {
+          option.options = await Promise.all(
+            option.options.map(async (choice: Record<string, unknown>) => {
+              choice.priceEUR = await usdToEur(Number(choice.priceUSD) || 0)
+              return choice
+            })
+          )
+        }
+
+        return option
+      })
+    )
+  }
+
+  return payload
 }
 
 export async function POST(request: NextRequest) {
@@ -149,7 +181,8 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => null)
-  const payload = parsePayload(body)
+  const parsed = parsePayload(body)
+  const payload = await convertPayloadPrices(parsed)
 
   if (!payload.title || !payload.slug || !payload.game_id) {
     return NextResponse.json({ error: 'Title, slug, and game are required.' }, { status: 400 })

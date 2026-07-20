@@ -1,0 +1,1 @@
+ALTER TABLE custom_pages ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'page';

@@ -30,6 +30,11 @@ function checkoutTotal(input: PaymentCheckoutInput) {
   );
 }
 
+function applyTax(amount: number, input: PaymentCheckoutInput) {
+  if (!input.taxRate) return 0;
+  return Number((amount * input.taxRate).toFixed(2));
+}
+
 async function createStripeCheckout(input: PaymentCheckoutInput): Promise<PaymentCheckoutResult> {
   const stripe = getStripeClient();
   const cartFingerprint = [
@@ -42,22 +47,42 @@ async function createStripeCheckout(input: PaymentCheckoutInput): Promise<Paymen
   const checkoutSessionId = `co_${checkoutFingerprint.slice(0, 32)}`;
   const idempotencyKey = `checkout:${checkoutFingerprint}`;
 
+  const itemSubtotal = input.cartItems.reduce(
+    (sum, item) => sum + (input.currency === "EUR" ? Number(item.price_eur) : Number(item.price_usd)),
+    0,
+  );
+  const taxAmount = applyTax(itemSubtotal, input);
+  const lineItems = input.cartItems.map((item, index) => ({
+    quantity: 1,
+    price_data: {
+      currency: input.currency.toLowerCase(),
+      unit_amount: Math.max(
+        50,
+        Math.round((input.currency === "EUR" ? Number(item.price_eur) : Number(item.price_usd)) * 100),
+      ),
+      product_data: input.snapshotItems[index].product,
+    },
+  }));
+
+  if (taxAmount > 0) {
+    lineItems.push({
+      quantity: 1,
+      price_data: {
+        currency: input.currency.toLowerCase(),
+        unit_amount: Math.round(taxAmount * 100),
+        product_data: {
+          name: input.taxLabel ?? "Tax",
+        },
+      },
+    });
+  }
+
   const session = await stripe.checkout.sessions.create(
     {
       mode: "payment",
       customer_email: input.user.email ?? undefined,
       client_reference_id: input.user.id,
-      line_items: input.cartItems.map((item, index) => ({
-        quantity: 1,
-        price_data: {
-          currency: input.currency.toLowerCase(),
-          unit_amount: Math.max(
-            50,
-            Math.round((input.currency === "EUR" ? Number(item.price_eur) : Number(item.price_usd)) * 100),
-          ),
-          product_data: input.snapshotItems[index].product,
-        },
-      })),
+      line_items: lineItems,
       metadata: {
         cartId: input.cartId,
         checkoutSessionId,
@@ -93,7 +118,9 @@ async function createStripeCheckout(input: PaymentCheckoutInput): Promise<Paymen
 
 async function createNowPaymentsCheckout(input: PaymentCheckoutInput): Promise<PaymentCheckoutResult> {
   const checkoutSessionId = `np_${randomUUID()}`;
-  const total = checkoutTotal(input);
+  const subtotal = checkoutTotal(input);
+  const taxAmount = applyTax(subtotal, input);
+  const total = subtotal + taxAmount;
   const serviceNames = input.snapshotItems.map((item) => item.product.name).join(", ");
 
   const { error: snapshotError } = await input.supabase.from("checkout_sessions").upsert({
@@ -189,21 +216,40 @@ async function createPayPalCheckout(input: PaymentCheckoutInput): Promise<Paymen
   let order;
 
   try {
+    const itemTotal = input.snapshotItems.reduce(
+      (sum, item) => sum + (input.currency === "EUR" ? (item.priceEUR ?? 0) : (item.priceUSD ?? 0)),
+      0,
+    );
+    const taxAmount = applyTax(itemTotal, input);
+    const paypalItems = input.snapshotItems.map((item) => {
+      const price = input.currency === "EUR" ? item.priceEUR : item.priceUSD;
+      const priceValue = typeof price === 'number' && !isNaN(price) ? price : 0;
+      
+      return {
+        name: item.product.name,
+        description: item.product.description || undefined,
+        quantity: "1",
+        unit_amount: {
+          currency_code: input.currency,
+          value: priceValue.toFixed(2),
+        },
+      };
+    });
+
+    if (taxAmount > 0) {
+      paypalItems.push({
+        name: input.taxLabel ?? "Tax",
+        description: undefined,
+        quantity: "1",
+        unit_amount: {
+          currency_code: input.currency,
+          value: taxAmount.toFixed(2),
+        },
+      });
+    }
+
     order = await createPayPalOrder({
-      items: input.snapshotItems.map((item) => {
-        const price = input.currency === "EUR" ? item.priceEUR : item.priceUSD;
-        const priceValue = typeof price === 'number' && !isNaN(price) ? price : 0;
-        
-        return {
-          name: item.product.name,
-          description: item.product.description || undefined,
-          quantity: "1",
-          unit_amount: {
-            currency_code: input.currency,
-            value: priceValue.toFixed(2),
-          },
-        };
-      }),
+      items: paypalItems,
       currency: input.currency,
       returnUrl: `${input.origin}/order-confirmed?session=${checkoutSessionId}`,
       cancelUrl: `${input.origin}/checkout?canceled=1`,

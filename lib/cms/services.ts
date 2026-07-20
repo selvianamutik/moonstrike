@@ -22,7 +22,7 @@ export type ServiceOption = {
     | 'text'
     | 'textarea'
   required: boolean
-  options?: Array<{ label: string; priceUSD: number; priceEUR: number }>
+  options?: Array<{ label: string; priceUSD: number; priceEUR?: number }>
   min?: number
   max?: number
   step?: number

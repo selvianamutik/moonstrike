@@ -4,11 +4,13 @@ export const ADMIN_SESSION_COOKIE = 'ms_admin_session'
 export const ADMIN_SESSION_SECONDS = 8 * 60 * 60
 export const ADMIN_REMEMBER_SECONDS = 30 * 24 * 60 * 60
 
+export type AdminRole = 'super_admin' | 'admin' | 'support'
+
 type AdminTokenPayload = {
   sub: string
   email: string
   name: string
-  role: 'admin'
+  role: AdminRole
   iat: number
   exp: number
 }
@@ -58,7 +60,7 @@ export function verifyAdminPassword(password: string, storedHash: string) {
 }
 
 export function signAdminToken(
-  admin: { id: string; email: string; display_name: string },
+  admin: { id: string; email: string; display_name: string; role: AdminRole },
   maxAgeSeconds: number
 ) {
   const now = Math.floor(Date.now() / 1000)
@@ -68,7 +70,7 @@ export function signAdminToken(
       sub: admin.id,
       email: admin.email,
       name: admin.display_name,
-      role: 'admin',
+      role: admin.role,
       iat: now,
       exp: now + maxAgeSeconds,
     } satisfies AdminTokenPayload)
@@ -99,7 +101,6 @@ export function verifyAdminToken(token: string): AdminTokenPayload | null {
       Buffer.from(payload, 'base64url').toString('utf8')
     ) as AdminTokenPayload
 
-    if (parsed.role !== 'admin') return null
     if (parsed.exp <= Math.floor(Date.now() / 1000)) return null
 
     return parsed

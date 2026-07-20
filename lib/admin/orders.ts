@@ -35,6 +35,9 @@ type AdminOrderRow = {
   checkout_session_id: string;
   status: AdminOrderStatus;
   refund_previous_status: AdminOrderStatus | null;
+  base_price: number | string | null;
+  tax_amount: number | string | null;
+  refund_amount: number | string | null;
   created_at: string;
   updated_at: string;
   order_items: AdminOrderItemRow[] | null;
@@ -79,6 +82,9 @@ export type AdminOrderRecord = {
   updatedAt: string;
   amount: string;
   total: number;
+  basePrice: number;
+  taxAmount: number;
+  refundAmount: number;
   currency: "USD" | "EUR";
   status: AdminOrderStatus;
   paymentProvider: "stripe" | "nowpayments";
@@ -214,6 +220,9 @@ function mapOrder(row: AdminOrderRow, user: AdminCustomer | undefined, transacti
     updatedAt: formatDate(row.updated_at),
     amount: formatMoney(total, currency),
     total,
+    basePrice: Number(row.base_price ?? 0),
+    taxAmount: Number(row.tax_amount ?? 0),
+    refundAmount: Number(row.refund_amount ?? 0),
     currency,
     status: row.status,
     paymentProvider: transaction?.provider ?? "stripe",
@@ -231,8 +240,32 @@ function mapOrder(row: AdminOrderRow, user: AdminCustomer | undefined, transacti
   };
 }
 
-const orderSelect =
+const orderSelectFull =
+  "id, order_ref, user_id, checkout_session_id, status, refund_previous_status, base_price, tax_amount, refund_amount, created_at, updated_at, order_items(id, service_id, selected_options_snapshot, total, currency, services(title, image, games(name), service_categories(name)))";
+const orderSelectBase =
   "id, order_ref, user_id, checkout_session_id, status, refund_previous_status, created_at, updated_at, order_items(id, service_id, selected_options_snapshot, total, currency, services(title, image, games(name), service_categories(name)))";
+
+async function trySelectOrders(supabase: ReturnType<typeof createAdminClient>, select: string) {
+  const { data, error } = await supabase
+    .from("orders")
+    .select(select)
+    .order("created_at", { ascending: false })
+    .returns<AdminOrderRow[]>();
+
+  if (error && error.code === "42703") return null;
+  if (error) throw error;
+  return data ?? [];
+}
+
+async function trySelectOrder(supabase: ReturnType<typeof createAdminClient>, select: string, isUuid: boolean, id: string) {
+  let query = supabase.from("orders").select(select).limit(1);
+  const q = isUuid ? query.eq("id", id) : query.eq("order_ref", id);
+  const { data, error } = await q.maybeSingle<AdminOrderRow>();
+
+  if (error && error.code === "42703") return undefined;
+  if (error) throw error;
+  return data ?? null;
+}
 
 async function getTransactionsByCheckoutSession(checkoutSessionIds: string[]) {
   if (checkoutSessionIds.length === 0) return new Map<string, AdminOrderTransactionRow>();
@@ -252,13 +285,10 @@ export async function listAdminOrders() {
   await autoCompleteDeliveredOrders();
 
   const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from("orders")
-    .select(orderSelect)
-    .order("created_at", { ascending: false })
-    .returns<AdminOrderRow[]>();
-
-  if (error) throw error;
+  let data = await trySelectOrders(supabase, orderSelectFull);
+  if (data === null) {
+    data = await trySelectOrders(supabase, orderSelectBase);
+  }
 
   const customers = await getCustomersById((data ?? []).map((order) => order.user_id));
   const transactions = await getTransactionsByCheckoutSession((data ?? []).map((order) => order.checkout_session_id));
@@ -270,14 +300,12 @@ export async function getAdminOrder(id: string) {
 
   const supabase = createAdminClient();
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
-  const query = supabase
-    .from("orders")
-    .select(orderSelect)
-    .limit(1);
 
-  const { data, error } = await (isUuid ? query.eq("id", id) : query.eq("order_ref", id)).maybeSingle<AdminOrderRow>();
+  let data = await trySelectOrder(supabase, orderSelectFull, isUuid, id);
+  if (data === undefined) {
+    data = await trySelectOrder(supabase, orderSelectBase, isUuid, id);
+  }
 
-  if (error) throw error;
   if (!data) return null;
 
   const customers = await getCustomersById([data.user_id]);

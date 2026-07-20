@@ -15,6 +15,8 @@ export type PaymentCheckoutInput = {
   currency: CheckoutCurrency;
   origin: string;
   supabase: SupabaseClient;
+  taxRate?: number;
+  taxLabel?: string;
 };
 
 export type PaymentCheckoutResult = {

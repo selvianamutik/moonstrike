@@ -84,22 +84,64 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
           </div>
           <section className="mt-8 rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-6">
             <h2 className="text-xl font-black">Order Timeline</h2>
-            <div className="mt-7 grid gap-4 md:grid-cols-5">
-              {timelineSteps.map((label, index) => {
-                const isComplete = index < completedSteps;
-                return (
-                  <div
-                    key={label}
-                    className={`flex h-12 items-center justify-center rounded-md border mono text-xs ${
-                      isComplete
-                        ? "border-[var(--ms-gradient-end)] bg-[var(--ms-gradient-end)]/10 text-[var(--ms-gradient-end)]"
-                        : "border-[var(--ms-border)] bg-black/20 text-[var(--ms-body)]"
-                    }`}
-                  >
-                    {label}
-                  </div>
-                );
-              })}
+            <div className="mt-7">
+              <ol className="relative flex flex-col md:flex-row">
+                {timelineSteps.map((label, index) => {
+                  const isComplete = index < completedSteps - 1
+                  const isCurrent = index === completedSteps - 1
+                  const stepNumber = index + 1
+                  const isLast = index === timelineSteps.length - 1
+
+                  return (
+                    <li key={label} className={`relative flex gap-4 md:flex-col md:items-center md:flex-1 ${isLast ? '' : 'pb-10 md:pb-0'}`}>
+                      {!isLast && (
+                        <>
+                          <div className="absolute left-[18px] top-9 bottom-0 w-0.5 bg-zinc-700/50 md:hidden">
+                            <div className="mx-auto w-full bg-emerald-500 transition-all duration-500" style={{ height: isComplete ? '100%' : '0%' }} />
+                          </div>
+                          <div className="absolute left-[calc(50%+1px)] top-[18px] h-0.5 bg-zinc-700/50 hidden md:block" style={{ width: '100%' }}>
+                            <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: isComplete ? '100%' : '0%' }} />
+                          </div>
+                        </>
+                      )}
+
+                      <div className="relative z-10 flex shrink-0 flex-col items-center">
+                        <div
+                          className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold transition-all duration-300 ${
+                            isComplete
+                              ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
+                              : isCurrent
+                                ? 'border-2 border-emerald-500 bg-emerald-400 text-white ring-2 ring-emerald-500/30'
+                                : 'border-2 border-zinc-600 bg-zinc-800/50 text-zinc-500'
+                          }`}
+                        >
+                          {isComplete ? (
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            </svg>
+                          ) : (
+                            stepNumber
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="min-w-0 pt-1 md:text-center">
+                        <p className={`text-sm font-semibold transition-colors duration-300 ${
+                          isComplete ? 'text-emerald-400' : isCurrent ? 'text-emerald-300' : 'text-zinc-500'
+                        }`}>
+                          {label}
+                        </p>
+                        {isCurrent && !isComplete && (
+                          <p className="mono mt-0.5 text-[10px] uppercase tracking-wider text-emerald-400/70">Current</p>
+                        )}
+                        {isComplete && !isCurrent && (
+                          <p className="mono mt-0.5 text-[10px] uppercase tracking-wider text-emerald-500/50">Done</p>
+                        )}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ol>
             </div>
           </section>
 
@@ -177,9 +219,15 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
             <article className="rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-6">
               <h2 className="text-xl font-black">Price Breakdown</h2>
               <div className="mt-5 space-y-3">
-                <PriceRow label="Order total" value={formatOrderMoney(order.total, order.currency)} />
-                <PriceRow label="Currency" value={order.currency} />
+                <PriceRow label="Base price" value={formatOrderMoney(order.basePrice, order.currency)} />
+                <PriceRow label={`Tax (${formatPaymentProvider(order.paymentProvider)})`} value={formatOrderMoney(order.taxAmount, order.currency)} />
+                <PriceRow
+                  label="Refunded"
+                  value={order.refundAmount > 0 ? formatOrderMoney(order.refundAmount, order.currency) : "0"}
+                  valueClass={order.refundAmount > 0 ? "text-red-400" : "text-[var(--ms-body)]"}
+                />
                 <PriceRow label="Payment provider" value={formatPaymentProvider(order.paymentProvider)} />
+                <PriceRow label="Currency" value={order.currency} />
                 <div className="flex justify-between gap-4 border-t border-[var(--ms-border)] pt-4 text-lg font-black">
                   <span>Total</span>
                   <span className="mono text-[var(--ms-price)]">{formatOrderMoney(order.total, order.currency)}</span>
@@ -195,11 +243,11 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
   );
 }
 
-function PriceRow({ label, value }: { label: string; value: string }) {
+function PriceRow({ label, value, valueClass = "mono text-right" }: { label: string; value: string; valueClass?: string }) {
   return (
     <div className="flex justify-between gap-4 border-b border-[var(--ms-border)] pb-3">
       <span className="text-[var(--ms-body)]">{label}</span>
-      <span className="mono text-right">{value}</span>
+      <span className={valueClass}>{value}</span>
     </div>
   );
 }

@@ -1,0 +1,1 @@
+ALTER TABLE private_offers ADD COLUMN price_eur DECIMAL(10,2) NOT NULL DEFAULT 0;

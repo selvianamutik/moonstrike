@@ -42,8 +42,10 @@ function sortCategories(categories: ServiceCategoryRow[]) {
 }
 
 function getCategoryFilterOptions(categories: ServiceCategoryRow[], gameFilter: string): CategoryFilterOption[] {
+  const filtered = categories.filter((category) => category.slug !== "uncategorized");
+
   if (gameFilter !== "all") {
-    return sortCategories(categories.filter((category) => category.game_id === gameFilter)).map((category) => ({
+    return sortCategories(filtered.filter((category) => category.game_id === gameFilter)).map((category) => ({
       key: category.id,
       label: category.name,
       value: category.id,
@@ -53,7 +55,7 @@ function getCategoryFilterOptions(categories: ServiceCategoryRow[], gameFilter: 
 
   const options = new Map<string, CategoryFilterOption>();
 
-  sortCategories(categories).forEach((category) => {
+  sortCategories(filtered).forEach((category) => {
     const slug = category.slug || slugify(category.name);
     const existing = options.get(slug);
 
@@ -111,7 +113,7 @@ export function ServicesPageClient({
     [categoryRows, gameFilter]
   );
   const modalCategories = useMemo(
-    () => sortCategories(categoryRows.filter((category) => category.game_id === categoryGameId)),
+    () => sortCategories(categoryRows.filter((category) => category.game_id === categoryGameId && category.slug !== "uncategorized")),
     [categoryGameId, categoryRows]
   );
 
@@ -430,7 +432,7 @@ export function ServicesPageClient({
               </div>
             </td>
             <td className="px-6 py-4 text-white">{service.game_name}</td>
-            <td className="px-6 py-4">{service.service_category_name ?? "Uncategorised"}</td>
+            <td className="px-6 py-4">{service.service_category_name ?? "-"}</td>
             <td className="px-6 py-4 text-[#22D3EE] font-medium">${service.base_price_usd.toFixed(2)}</td>
             <td className="px-6 py-4">
               <StatusBadge status={service.status} />
@@ -438,6 +440,7 @@ export function ServicesPageClient({
             <td className="px-6 py-4">
               <ActionIcons
                 editHref={`/admin/services/${service.game_slug}/${service.slug}/edit`}
+                duplicateHref={`/admin/services/new?clone=${service.id}`}
                 previewHref={`/admin/services/${service.game_slug}/${service.slug}/preview`}
                 onDelete={() => setPendingDeleteService(service)}
               />

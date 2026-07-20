@@ -167,6 +167,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .from("orders")
     .update({
       status: "refunded",
+      refund_amount: normalizedAmount,
       updated_at: refundedAt,
     })
     .eq("id", order.id);
