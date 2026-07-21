@@ -1,5 +1,6 @@
 import type Stripe from "stripe";
 import { isCheckoutSnapshotItems, type CheckoutSnapshotItem } from "@/lib/checkout/snapshot";
+import { calculateTaxAmount, getPaymentTaxRate } from "@/lib/checkout/tax";
 import { enqueueGoogleSheetsSync } from "@/lib/admin/google-sheets-sync";
 import { notifyOrderCreated } from "@/lib/notifications";
 import { createOrderReference, createTransactionReference } from "@/lib/order-ref";
@@ -77,10 +78,12 @@ export async function fulfillStripeCheckoutSession(sessionOrId: Stripe.Checkout.
   const currency = checkoutSession.currency;
   const referenceDate = new Date(checkoutSession.created_at);
   const orderRef = createOrderReference(referenceDate, checkoutSession.id);
+  const basePrice = checkoutSession.items.reduce((total, item) => total + (currency === "EUR" ? item.priceEUR : item.priceUSD), 0);
   const amountTotal =
     typeof session.amount_total === "number"
       ? session.amount_total / 100
-      : checkoutSession.items.reduce((total, item) => total + (currency === "EUR" ? item.priceEUR : item.priceUSD), 0);
+      : basePrice;
+  const taxAmount = Number((amountTotal - basePrice).toFixed(2));
 
   const { error: transactionError } = await supabase.from("transactions").upsert(
     {
@@ -116,6 +119,8 @@ export async function fulfillStripeCheckoutSession(sessionOrId: Stripe.Checkout.
         user_id: checkoutSession.user_id,
         checkout_session_id: checkoutSession.id,
         status: "pending",
+        base_price: basePrice,
+        tax_amount: taxAmount,
       },
       {
         onConflict: "checkout_session_id",

@@ -528,7 +528,7 @@ export function ServiceDetail({
 
         <aside className="ms-card h-fit rounded-xl p-6 shadow-[0_20px_80px_rgba(0,0,0,0.35)] lg:sticky lg:top-32">
           <h2 className="text-lg font-medium">Configure Your Run</h2>
-          <div className="mt-6 inline-flex rounded-full border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-1">
+          {/* <div className="mt-6 inline-flex rounded-full border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-1">
             {(["USD", "EUR"] as const).map((option) => (
               <button
                 key={option}
@@ -543,7 +543,7 @@ export function ServiceDetail({
                 {option}
               </button>
             ))}
-          </div>
+          </div> */}
           <div className="mt-8">
             <ServiceOptions
               options={service.options_schema}

@@ -212,7 +212,7 @@ html[data-theme="light"] select:autofill {
   gap: 0.55rem;
   border-radius: 7px;
   background: var(--ms-cta-bg);
-  box-shadow: 0 0 22px rgba(136, 82, 255, 0.45);
+
   color: #ffffff;
   font-weight: 700;
 }

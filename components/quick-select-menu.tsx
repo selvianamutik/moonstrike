@@ -162,15 +162,34 @@ export function QuickSelectMenu() {
                             : `/${activeGame}`;
 
                           return (
-                            <Link
-                              key={category}
-                              href={targetHref}
-                              onClick={() => setIsOpen(false)}
-                              className="group flex cursor-pointer items-center gap-3"
-                            >
-                              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ms-gradient-end)]"></span>
-                              <h3 className="text-sm font-semibold text-white transition-colors group-hover:text-[var(--ms-gradient-end)]">{category}</h3>
-                            </Link>
+                            <div key={category} className="flex flex-col gap-1">
+                              <Link
+                                href={targetHref}
+                                onClick={() => setIsOpen(false)}
+                                className="group flex cursor-pointer items-center gap-3"
+                              >
+                                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ms-gradient-end)]"></span>
+                                <h3 className="text-sm font-semibold text-white transition-colors group-hover:text-[var(--ms-gradient-end)]">{category}</h3>
+                              </Link>
+                              <div className="ml-4 flex flex-col gap-0.5">
+                                {services.map((s) => {
+                                  const serviceHref = categorySlug
+                                    ? `/${activeGame}/${categorySlug}/${s.slug}`
+                                    : `/${activeGame}/${s.slug}`;
+
+                                  return (
+                                    <Link
+                                      key={s.slug}
+                                      href={serviceHref}
+                                      onClick={() => setIsOpen(false)}
+                                      className="cursor-pointer text-xs text-[var(--ms-body)] underline-offset-2 transition-colors hover:text-[var(--ms-gradient-end)] hover:underline"
+                                    >
+                                      {s.name}
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           );
                         })}
                       </div>

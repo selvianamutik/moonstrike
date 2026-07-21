@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogIn, Search, ShoppingCart, User, Gamepad2, CircleUserRound } from "lucide-react";
+import { LogIn, Search, ShoppingCart, User, Gamepad2, CircleUserRound, BookOpen, Newspaper } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import { QuickSelectMenu } from "@/components/quick-select-menu";
 import { SiteSearchOverlay } from "@/components/site-search-overlay";
@@ -31,10 +31,22 @@ export function SiteHeader() {
         <button
           type="button"
           onClick={toggleCurrency}
-          className="ms-button hidden h-11 px-4 mono text-xs uppercase tracking-[0.16em] md:inline-flex"
+          className="relative hidden h-12 w-[132px] items-center rounded-full border border-[var(--ms-border)] bg-[var(--ms-bg-card)] transition-colors duration-300 md:inline-flex"
           aria-label="Toggle currency"
         >
-          <FontAwesomeIcon icon={currency === "USD" ? faDollarSign : faEuroSign} /> {currency === "USD" ? "USD" : "EUR"}
+          <span className="absolute left-0 flex w-full items-center justify-between px-3 text-xs font-bold uppercase tracking-[0.12em] text-[var(--ms-body)] opacity-40">
+            <span>$ USD</span>
+            <span><FontAwesomeIcon icon={faEuroSign} /> EUR</span>
+          </span>
+          <span
+            className={`relative z-10 flex h-[40px] w-[64px] items-center justify-center gap-1 rounded-full text-xs font-black text-white shadow-md transition-transform duration-300 ${
+              currency === "EUR"
+                ? "translate-x-[62px] bg-[var(--ms-gradient-end)]"
+                : "translate-x-[3px] bg-[var(--ms-gradient-end)]"
+            }`}
+          >
+            {currency === "EUR" ? <><FontAwesomeIcon icon={faEuroSign} /><span>EUR</span></> : <><FontAwesomeIcon icon={faDollarSign} /><span>USD</span></>}
+          </span>
         </button>
 
         <div className="hidden xl:block">
@@ -47,7 +59,23 @@ export function SiteHeader() {
             <div className="flex h-10 w-10 items-center justify-center">
               <Gamepad2 aria-hidden="true" className="transition-colors duration-200 group-hover:text-[var(--ms-gradient-end)]" size={22} />
             </div>
-            <span>Games</span>
+            <span className="transition-colors duration-200 group-hover:text-[var(--ms-gradient-end)]">Games</span>
+          </Link>
+
+          {/* Menu Guide */}
+          <Link className="group hidden flex-col items-center text-center text-xs transition-colors duration-200 hover:text-[var(--ms-gradient-end)] sm:flex" href="/guide">
+            <div className="flex h-10 w-10 items-center justify-center">
+              <BookOpen aria-hidden="true" className="transition-colors duration-200 group-hover:text-[var(--ms-gradient-end)]" size={22} />
+            </div>
+            <span className="transition-colors duration-200 group-hover:text-[var(--ms-gradient-end)]">Guide</span>
+          </Link>
+
+          {/* Menu Blog */}
+          <Link className="group hidden flex-col items-center text-center text-xs transition-colors duration-200 hover:text-[var(--ms-gradient-end)] sm:flex" href="/blog">
+            <div className="flex h-10 w-10 items-center justify-center">
+              <Newspaper aria-hidden="true" className="transition-colors duration-200 group-hover:text-[var(--ms-gradient-end)]" size={22} />
+            </div>
+            <span className="transition-colors duration-200 group-hover:text-[var(--ms-gradient-end)]">Blog</span>
           </Link>
 
           {/* Menu Cart */}
@@ -55,14 +83,14 @@ export function SiteHeader() {
             <div className="flex h-10 w-10 items-center justify-center">
               <ShoppingCart aria-hidden="true" className="transition-colors duration-200 group-hover:text-[var(--ms-gradient-end)]" size={22} />
             </div>
-            <span>Cart</span>
+            <span className="transition-colors duration-200 group-hover:text-[var(--ms-gradient-end)]">Cart</span>
           </Link>
 
           {/* Menu Notif */}
           {isLoggedIn ? (
-            <div className="hidden flex-col items-center text-center text-xs transition-colors duration-200 hover:text-[var(--ms-gradient-end)] sm:flex">
+            <div className="group hidden flex-col items-center text-center text-xs transition-colors duration-200 hover:text-[var(--ms-gradient-end)] sm:flex">
               <NotificationBell iconSize={22} label="Notifications" mode="customer" />
-              <span className="mt-0.5">Notif</span>
+              <span className="mt-0.5 transition-colors duration-200 group-hover:text-[var(--ms-gradient-end)]">Notif</span>
             </div>
           ) : null}
 
@@ -74,7 +102,7 @@ export function SiteHeader() {
               <div className="flex h-10 w-10 items-center justify-center">
                 <CircleUserRound aria-hidden="true" className="transition-colors duration-200 group-hover:text-[var(--ms-gradient-end)]" size={23} />
               </div>
-              <span>User</span>
+              <span className="transition-colors duration-200 group-hover:text-[var(--ms-gradient-end)]">User</span>
             </Link>
           ) : (
             <Link className="ms-button h-11 px-3 mono text-xs uppercase tracking-[0.16em] md:px-4" href="/login">

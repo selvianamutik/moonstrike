@@ -1,61 +1,46 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faInstagram, faTiktok, faTwitter, faYoutube } from "@fortawesome/free-brands-svg-icons";
 
-const columns = [
-  {
-    title: "Sitemap",
-    links: [
-      { label: "Landing", href: "/" },
-      { label: "Games", href: "/games" },
-      { label: "Cart", href: "/cart" },
-    ],
-  },
-  {
-    title: "Legal",
-    links: [
-      // { label: "Privacy Policy", href: "/privacy-policy" },
-      { label: "Terms of Service", href: "/terms-of-service" },
-      { label: "Refund Policy", href: "/refund-policy" },
-    ],
-  },
-  // {
-  //   title: "Genres",
-  //   links: [
-  //     { label: "Action RPG", href: "/games" },
-  //     { label: "Tactical Shooting", href: "/games" },
-  //     { label: "MMORPG", href: "/games" },
-  //     { label: "MOBA", href: "/games" },
-  //   ],
-  // },
-];
+type LegalPage = { id: string; title: string; slug: string; category: string };
 
 const socialLinks = [
   { label: "Instagram", href: "https://instagram.com", icon: faInstagram },
   { label: "Youtube", href: "https://youtube.com", icon: faYoutube },
-  {
-    label: "TikTok",
-    href: "https://tiktok.com",
-    icon: faTiktok,
-  },
+  { label: "TikTok", href: "https://tiktok.com", icon: faTiktok },
   { label: "X (Twitter)", href: "https://x.com", icon: faTwitter },
 ];
 
+function getPageHref(page: LegalPage) {
+  if (page.category === "blog") return `/blog/${page.slug}`;
+  if (page.category === "guide") return `/guide/${page.slug}`;
+  return `/p/${page.slug}`;
+}
+
 export function SiteFooter() {
+  const [legalPages, setLegalPages] = useState<LegalPage[]>([]);
+
+  useEffect(() => {
+    fetch("/api/public/pages?category=page")
+      .then((r) => r.json())
+      .then(setLegalPages)
+      .catch(() => {});
+  }, []);
+
   return (
     <footer className="mt-24 border-t border-[var(--ms-border)] bg-[var(--ms-bg-card)] py-20 text-[var(--ms-body)]">
       <div className="ms-shell">
         <div className="grid gap-12 lg:grid-cols-2">
           <div>
             <Link href="/" className="font-display text-5xl font-black tracking-[-0.06em] sm:text-7xl">
-              {/* <span className="brand-gradient">Moon Strike</span> */}
-              <img src={'/logo/logo.png'} width={600}/>
+              <img src={"/logo/logo.png"} width={600} />
             </Link>
             <p className="mt-5 max-w-xl text-lg leading-8">
               Dominate the Game. Premium boosting, coaching, progression, and item services for competitive players.
             </p>
-
-            {/* Social media icons */}
             <div className="mt-8 flex items-center gap-4">
               {socialLinks.map(({ label, href, icon: Icon }) => (
                 <a
@@ -73,22 +58,34 @@ export function SiteFooter() {
           </div>
 
           <div className="grid grid-cols-2 gap-12 lg:gap-24 lg:justify-self-end">
-            {columns.map((column) => (
-              <div key={column.title}>
-                <h3 className="mono text-sm font-bold uppercase tracking-[0.2em] text-[var(--ms-heading)]">
-                  {column.title}
-                </h3>
-                <ul className="mt-4 space-y-3 mono text-xs">
-                  {column.links.map((link) => (
-                    <li key={link.label}>
-                      <Link href={link.href} className="hover:text-[var(--ms-gradient-end)] transition-colors">
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+            <div>
+              <h3 className="mono text-sm font-bold uppercase tracking-[0.2em] text-[var(--ms-heading)]">
+                Sitemap
+              </h3>
+              <ul className="mt-4 space-y-3 mono text-xs">
+                {[{ label: "Landing", href: "/" }, { label: "Games", href: "/games" }, { label: "Cart", href: "/cart" }].map((link) => (
+                  <li key={link.label}>
+                    <Link href={link.href} className="hover:text-[var(--ms-gradient-end)] transition-colors">
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3 className="mono text-sm font-bold uppercase tracking-[0.2em] text-[var(--ms-heading)]">
+                Legal
+              </h3>
+              <ul className="mt-4 space-y-3 mono text-xs">
+                {legalPages.map((page) => (
+                  <li key={page.id}>
+                    <Link href={getPageHref(page)} className="hover:text-[var(--ms-gradient-end)] transition-colors">
+                      {page.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
 

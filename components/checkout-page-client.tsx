@@ -25,17 +25,6 @@ type PaymentSetting = {
   enabled: boolean;
 };
 
-const supportedPaymentMethods = [
-  { label: "Stripe", logo: "/payment/stripe.svg" },
-  { label: "Mastercard", logo: "/payment/master-card.svg" },
-  { label: "Apple Pay", logo: "/payment/apple-pay.svg" },
-  { label: "Google Pay", logo: "/payment/google-pay.svg" },
-  { label: "PayPal", logo: "/payment/paypal.svg" },
-  { label: "Visa" },
-  { label: "Link" },
-  { label: "Bank" },
-];
-
 function formatMoney(value: number, currency: "USD" | "EUR") {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -101,6 +90,14 @@ export function CheckoutPageClient() {
     () => items.reduce((sum, item) => sum + (currency === "EUR" ? item.priceEUR : item.priceUSD), 0),
     [currency, items],
   );
+  const taxInfo = useMemo(() => getTaxInfo(
+    selectedPayment === "crypto" ? "nowpayments" : selectedPayment
+  ), [selectedPayment, paymentSettings]);
+  const taxAmount = useMemo(
+    () => taxInfo ? Number((total * taxInfo.rate).toFixed(2)) : 0,
+    [total, taxInfo],
+  );
+  const grandTotal = useMemo(() => total + taxAmount, [total, taxAmount]);
   const summaryItems = useMemo(
     () =>
       items.map((item) => ({
@@ -230,9 +227,9 @@ export function CheckoutPageClient() {
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
       <header className="border-b border-[var(--ms-border)]">
-        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-10">
-          <Link href="/cart" className="text-[var(--ms-body)]">
-            Back to Cart
+        <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-10">
+          <Link href="/cart" className="text-sm text-[var(--ms-body)] hover:text-[var(--ms-gradient-end)] transition-colors">
+            &larr; Back to Cart
           </Link>
           <Link href="/" className="text-2xl font-black">
             <span className="brand-gradient">Moon Strike</span>
@@ -241,182 +238,93 @@ export function CheckoutPageClient() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-10 py-20">
-        <h1 className="font-display text-4xl font-black">Secure Checkout</h1>
-        <p className="mt-4 text-[var(--ms-body)]">Complete your transaction to dominate the game.</p>
+      <section className="mx-auto max-w-7xl px-4 sm:px-10 py-10 sm:py-20">
+        <h1 className="font-display text-3xl sm:text-4xl font-black">Secure Checkout</h1>
+        <p className="mt-2 text-sm sm:text-base text-[var(--ms-body)]">Complete your transaction to dominate the game.</p>
 
         {error ? (
-          <p className="mt-8 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          <p className="mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
             {error}
           </p>
         ) : null}
 
-          {isLoading ? (
-            <CheckoutSkeleton />
-          ) : items.length === 0 ? (
-            <div className="ms-card mt-12 rounded-xl p-8">
-              <h2 className="text-2xl font-black">Your cart is empty</h2>
-              <p className="mt-3 text-[var(--ms-body)]">Add a configured service before checkout.</p>
-              <Link href="/games" className="ms-button mt-8 inline-flex h-12 items-center px-6 mono">
-                Browse Games
-              </Link>
-            </div>
-          ) : (
-            <>
-              <h2 className="mt-12 text-2xl font-black">Payment Method</h2>
-              <div className="ms-card mt-6 rounded-xl p-8">
-                <div className="grid gap-4 md:grid-rows-3">
-                <div className="rounded-md border border-[var(--primary)] bg-[var(--ms-hover-bg)] p-5 shadow-[0_0_22px_rgba(136,82,255,0.22)]">
-                  <h3 className="text-xl font-black">Stripe Checkout</h3>
-                  <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">
-                    Continue to Stripe's hosted test checkout to complete payment securely.
-                  </p>
-                  {(() => {
-                    const tax = getTaxInfo("stripe");
-                    return tax ? (
-                      <p className="mt-2 text-xs text-[var(--ms-body)]">
-                        Includes {tax.label} ({(tax.rate * 100).toFixed(1)}%)
-                      </p>
-                    ) : null;
-                  })()}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPayment('stripe')}
-                    className={`relative flex flex-col items-center justify-center rounded-md border p-5 transition-all duration-200 h-24 ${
-                      selectedPayment === 'stripe'
-                        ? 'border-[var(--primary)] bg-[var(--ms-hover-bg)] shadow-[0_0_15px_rgba(136,82,255,0.25)]'
-                        : 'border-[var(--ms-border)] bg-[var(--ms-field)] hover:bg-[var(--ms-hover-bg)]'
-                    }`}
-                  >
-                    <Image 
-                      src="/payment/stripe.svg" 
-                      alt="Stripe" 
-                      width={80} 
-                      height={30} 
-                      className="object-contain h-8 w-auto brightness-100 dark:brightness-100" 
-                    />
-                    <span className="text-[10px] text-[var(--ms-body)] font-medium mt-1 block">
-                      +{DISPLAY_TAX_RATES.stripe}% tax
-                    </span>
-                  </button>
-                </div>
-
-                <div className="rounded-md border border-[var(--ms-border)] bg-[var(--ms-field)] p-5">
-                  <h3 className="text-xl font-black">PayPal Checkout</h3>
-                  <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">
-                    Continue to PayPal's hosted sandbox checkout to complete payment securely.
-                  </p>
-                  {(() => {
-                    const tax = getTaxInfo("paypal");
-                    return tax ? (
-                      <p className="mt-2 text-xs text-[var(--ms-body)]">
-                        Includes {tax.label} ({(tax.rate * 100).toFixed(1)}%)
-                      </p>
-                    ) : null;
-                  })()}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPayment('paypal')}
-                    className={`relative flex flex-col items-center justify-center rounded-md border p-5 transition-all duration-200 h-24 ${
-                      selectedPayment === 'paypal'
-                        ? 'border-[var(--primary)] bg-[var(--ms-hover-bg)] shadow-[0_0_15px_rgba(136,82,255,0.25)]'
-                        : 'border-[var(--ms-border)] bg-[var(--ms-field)] hover:bg-[var(--ms-hover-bg)]'
-                    }`}
-                  >
-                    <Image 
-                      src="/payment/paypal.svg" 
-                      alt="PayPal" 
-                      width={80} 
-                      height={30} 
-                      className="object-contain h-8 w-auto" 
-                    />
-                    <span className="text-[10px] md:text-xs font-semibold text-red-500 mt-1">
-                      +{DISPLAY_TAX_RATES.paypal}% tax
-                    </span>
-                  </button>
-                </div>
-
-                <div className="rounded-md border border-[var(--ms-border)] bg-[var(--ms-field)] p-5">
-                  <h3 className="text-xl font-black">Crypto Payment</h3>
-                  <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">
-                    Continue to NOWPayments hosted checkout and pay with supported cryptocurrencies.
-                  </p>
-                  {(() => {
-                    const tax = getTaxInfo("nowpayments");
-                    return tax ? (
-                      <p className="mt-2 text-xs text-[var(--ms-body)]">
-                        Includes {tax.label} ({(tax.rate * 100).toFixed(1)}%)
-                      </p>
-                    ) : null;
-                  })()}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedPayment('crypto')}
-                    className={`relative flex flex-col items-center justify-center rounded-md border p-5 transition-all duration-200 h-24 ${
-                      selectedPayment === 'crypto'
-                        ? 'border-[var(--primary)] bg-[var(--ms-hover-bg)] shadow-[0_0_15px_rgba(136,82,255,0.25)]'
-                        : 'border-[var(--ms-border)] bg-[var(--ms-field)] hover:bg-[var(--ms-hover-bg)]'
-                    }`}
-                  >
-                    <span className="text-sm font-black tracking-wide text-white">
-                      CRYPTO
-                    </span>
-                    <span className="text-[10px] text-[var(--ms-body)] font-medium mt-1 block">
-                      +{DISPLAY_TAX_RATES.crypto}% tax
-                    </span>
-                  </button>
-                </div>
-
-                {/* Tombol Eksekusi Pembayaran Utama */}
-                <button
-                  disabled={submittingProvider !== null}
-                  onClick={handlePrimaryCheckout}
-                  className="w-full rounded-md bg-[var(--primary)] py-4 text-center text-sm font-bold text-white transition-all hover:bg-[var(--primary-hover)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {selectedPayment === 'stripe' && (submittingProvider === 'stripe' ? 'Opening Stripe...' : 'Pay with Stripe Sandbox')}
-                  {selectedPayment === 'paypal' && (submittingProvider === 'paypal' ? 'Opening PayPal...' : 'Pay with PayPal Sandbox')}
-                  {selectedPayment === 'crypto' && (submittingProvider === 'nowpayments' ? 'Opening Crypto...' : 'Pay with Crypto')}
-                </button>
-                <div className="mt-6">
-                  <p className="mono text-xs uppercase tracking-[0.18em] text-[var(--ms-body)]">
-                    Eligible methods may include
-                  </p>
-                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    {supportedPaymentMethods.map((method) => (
-                      <div
-                        key={method.label}
-                        className="flex h-16 items-center justify-center rounded-md border border-[var(--ms-border)] bg-[var(--ms-field)] px-3"
-                        aria-label={method.label}
-                        title={method.label}
-                      >
-                        {method.logo ? (
-                          <img src={method.logo} alt={method.label} className="max-h-7 max-w-full object-contain" />
-                        ) : (
-                          <span className="text-center text-sm font-black">{method.label}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <p className="mt-3 text-xs leading-5 text-[var(--ms-body)]">
-                    Stripe shows the final available methods based on your device, currency, and Dashboard settings.
-                  </p>
-                </div>
-                <p className="mt-4 text-center text-xs text-[var(--ms-body)]">
-                  You will be redirected to the selected provider's hosted checkout.
-                </p>
-              </div>
-              </>
-            )}
+        {isLoading ? (
+          <CheckoutSkeleton />
+        ) : items.length === 0 ? (
+          <div className="ms-card mt-10 rounded-xl p-8 text-center">
+            <h2 className="text-2xl font-black">Your cart is empty</h2>
+            <p className="mt-3 text-[var(--ms-body)]">Add a configured service before checkout.</p>
+            <Link href="/games" className="ms-button mt-8 inline-flex h-12 items-center px-6 mono">
+              Browse Games
+            </Link>
           </div>
+        ) : (
+          <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_380px]">
+            <div>
+              <h2 className="text-2xl font-black">Payment Method</h2>
+              <div className="mt-5 grid gap-4 md:grid-cols-3">
+                {[
+                  { id: "stripe" as const, method: "stripe", label: "Stripe", logo: "/payment/stripe.svg", desc: "Credit card, Apple Pay, Google Pay & more" },
+                  { id: "paypal" as const, method: "paypal", label: "PayPal", logo: "/payment/paypal.svg", desc: "PayPal balance, bank & credit card" },
+                  { id: "crypto" as const, method: "nowpayments", label: "Crypto", logo: null, desc: "BTC, ETH, USDT & 100+ cryptocurrencies" },
+                ].map((provider) => {
+                  const tax = getTaxInfo(provider.method);
+                  return (
+                    <button
+                      key={provider.id}
+                      type="button"
+                      onClick={() => setSelectedPayment(provider.id)}
+                      className={`relative flex flex-col items-center justify-center rounded-xl border p-6 transition-all duration-200 min-h-[150px] ${
+                        selectedPayment === provider.id
+                          ? "border-[var(--primary)] bg-[var(--ms-hover-bg)] shadow-[0_0_22px_rgba(136,82,255,0.22)]"
+                          : "border-[var(--ms-border)] bg-[var(--ms-field)] hover:border-[var(--primary)] hover:bg-[var(--ms-hover-bg)]"
+                      }`}
+                    >
+                      {provider.logo ? (
+                        <Image src={provider.logo} alt={provider.label} width={100} height={36} className="object-contain h-9 w-auto" />
+                      ) : (
+                        <span className="text-base font-black tracking-wider text-white">CRYPTO</span>
+                      )}
+                      <p className="mt-2 text-xs text-[var(--ms-body)]">{provider.desc}</p>
+                      {tax ? (
+                        <span className="mono mt-2 text-[11px] uppercase tracking-[0.12em] text-[var(--ms-gradient-end)]">
+                          +{(tax.rate * 100).toFixed(1)}% {tax.label}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
 
-          <OrderSummary
-            items={summaryItems}
-            rows={[]}
-            serviceName={`${items.length} configured services`}
-            serviceMeta={`Checkout priced in ${currency}`}
-            total={formatMoney(total, currency)}
-          />
-        </div>
+              <button
+                disabled={submittingProvider !== null}
+                onClick={handlePrimaryCheckout}
+                className="mt-6 w-full rounded-xl bg-[var(--primary)] py-4 text-center text-sm font-bold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {selectedPayment === 'stripe' && (submittingProvider === 'stripe' ? 'Opening Stripe...' : 'Pay with Stripe')}
+                {selectedPayment === 'paypal' && (submittingProvider === 'paypal' ? 'Opening PayPal...' : 'Pay with PayPal')}
+                {selectedPayment === 'crypto' && (submittingProvider === 'nowpayments' ? 'Opening Crypto...' : 'Pay with Crypto')}
+              </button>
+
+              <p className="mt-4 text-center text-xs text-[var(--ms-body)]">
+                You will be redirected to the selected provider&apos;s hosted checkout.
+              </p>
+            </div>
+
+            <div className="lg:sticky lg:top-10 self-start">
+              <OrderSummary
+                items={summaryItems}
+                rows={taxInfo ? [
+                  { label: "Subtotal", value: formatMoney(total, currency) },
+                  { label: `${taxInfo.label} (${(taxInfo.rate * 100).toFixed(1)}%)`, value: formatMoney(taxAmount, currency) },
+                ] : []}
+                serviceName={`${items.length} configured services`}
+                serviceMeta={`Checkout priced in ${currency}`}
+                total={formatMoney(grandTotal, currency)}
+              />
+            </div>
+          </div>
+        )}
       </section>
     </main>
   );

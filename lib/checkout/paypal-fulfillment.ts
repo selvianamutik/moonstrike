@@ -1,4 +1,5 @@
 import { isCheckoutSnapshotItems, type CheckoutSnapshotItem } from "@/lib/checkout/snapshot";
+import { calculateTaxAmount, getPaymentTaxRate } from "@/lib/checkout/tax";
 import { enqueueGoogleSheetsSync } from "@/lib/admin/google-sheets-sync";
 import { notifyOrderCreated } from "@/lib/notifications";
 import { createOrderReference, createTransactionReference } from "@/lib/order-ref";
@@ -81,6 +82,12 @@ export async function fulfillPayPalCheckoutSession(checkoutSessionId: string, pa
   // Create single order
   const items = checkoutSession.items as CheckoutSnapshotItem[];
   const orderRef = createOrderReference();
+  const basePrice = items.reduce(
+    (sum, item) => sum + (checkoutSession.currency === "EUR" ? item.priceEUR : item.priceUSD),
+    0,
+  );
+  const taxRate = await getPaymentTaxRate("paypal");
+  const taxAmount = calculateTaxAmount(basePrice, taxRate);
 
   const { data: order, error: orderError } = await supabase
     .from("orders")
@@ -90,6 +97,8 @@ export async function fulfillPayPalCheckoutSession(checkoutSessionId: string, pa
         user_id: checkoutSession.user_id,
         checkout_session_id: checkoutSessionId,
         status: "pending",
+        base_price: basePrice,
+        tax_amount: taxAmount,
       },
       {
         onConflict: "checkout_session_id",
@@ -120,10 +129,7 @@ export async function fulfillPayPalCheckoutSession(checkoutSessionId: string, pa
   if (itemsError) throw itemsError;
 
   // Create transaction
-  const totalAmount = items.reduce(
-    (sum, item) => sum + (checkoutSession.currency === "EUR" ? item.priceEUR : item.priceUSD),
-    0,
-  );
+  const totalAmount = basePrice + taxAmount;
 
   const { error: txError } = await supabase.from("transactions").insert({
     user_id: checkoutSession.user_id,

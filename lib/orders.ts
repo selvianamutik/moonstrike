@@ -132,7 +132,9 @@ function mapOrder(row: CustomerOrderRow, transaction?: CustomerOrderTransactionR
   const fallbackCurrency = items[0]?.currency ?? "USD";
   const fallbackTotal = items.reduce((sum, item) => sum + item.total, 0);
   const currency = transaction?.currency ?? fallbackCurrency;
-  const total = transaction ? Number(transaction.amount) : fallbackTotal;
+  const refundAmount = Number(row.refund_amount) || 0;
+  const chargedTotal = transaction ? Number(transaction.amount) : fallbackTotal;
+  const total = Math.max(0, chargedTotal - refundAmount);
 
   return {
     id: row.id,
@@ -142,7 +144,7 @@ function mapOrder(row: CustomerOrderRow, transaction?: CustomerOrderTransactionR
     total,
     basePrice: Number(row.base_price) || 0,
     taxAmount: Number(row.tax_amount) || 0,
-    refundAmount: Number(row.refund_amount) || 0,
+    refundAmount,
     currency,
     paymentProvider: transaction?.provider ?? "unknown",
     transactionId: transaction?.transaction_ref ?? row.checkout_session_id,
