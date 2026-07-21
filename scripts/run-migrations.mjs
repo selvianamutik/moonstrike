@@ -32,6 +32,9 @@ const files = [
   '20260713000002_private_offers.sql',
   '20260713000003_custom_pages.sql',
   '20260713000004_admin_roles.sql',
+  '20260717000001_custom_pages_category.sql',
+  '20260717000002_custom_pages_image.sql',
+  '20260717000003_custom_pages_public_read.sql',
 ]
 
 for (const file of files) {

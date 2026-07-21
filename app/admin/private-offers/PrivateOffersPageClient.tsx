@@ -224,13 +224,14 @@ export function PrivateOffersPageClient({
               </td>
               <td className="px-6 py-4">
                 <div className="flex items-center gap-2">
-                  <button
+                  <AdminButton
+                    variant="ghost"
                     onClick={() => copyLink(offer.slug)}
-                    className="flex items-center gap-1 rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] px-3 py-1.5 text-xs text-[#94A3B8] hover:text-white transition-colors"
+                    className="gap-1 px-3 py-1.5 text-xs"
                   >
                     <Copy size={14} />
                     {copiedSlug === offer.slug ? "Copied!" : "Copy Link"}
-                  </button>
+                  </AdminButton>
                   <a
                     href={`/offer/${offer.slug}`}
                     target="_blank"

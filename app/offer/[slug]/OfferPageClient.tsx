@@ -119,7 +119,7 @@ export function OfferPageClient({
           <button
             onClick={addToCart}
             disabled={adding}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[var(--admin-accent)] to-[#6366F1] px-8 py-3 text-sm font-bold text-white transition-all hover:shadow-[0_0_30px_var(--admin-accent-hover)] disabled:opacity-50"
+            className="ms-button px-8 py-3 text-sm transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
             {adding ? <Loader2 size={18} className="animate-spin" /> : <ShoppingCart size={18} />}
             {adding ? "Adding..." : "Add to Cart"}
