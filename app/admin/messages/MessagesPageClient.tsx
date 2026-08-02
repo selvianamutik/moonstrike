@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { MessageSquarePlus, Send, UserCircle, X } from "lucide-react";
+import { MessageSquarePlus, CornerUpLeft, Package, Send, UserCircle, X } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { ChatAttachments } from "@/components/chat/ChatAttachments";
@@ -17,6 +17,85 @@ import { useUnreadDocumentTitle } from "@/hooks/useUnreadDocumentTitle";
 import { notifyChatUpdated, subscribeToChatUpdates } from "@/lib/chat-events";
 import type { ChatMessage, ChatTicket } from "@/lib/chat";
 
+// ─── Last Order Section ───────────────────────────────────────────────────────
+type LastOrderInfo = {
+  orderRef: string;
+  status: string;
+  serviceSummary: string;
+  createdAt: string;
+  total: number;
+  currency: string;
+};
+
+function LastOrderSection({ userId }: { userId: string }) {
+  const [order, setOrder] = useState<LastOrderInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/admin/customers/${encodeURIComponent(userId)}/orders?limit=1`, { cache: "no-store" })
+      .then((r) => r.json().catch(() => ({})))
+      .then((payload) => {
+        const orders = Array.isArray(payload.orders) ? payload.orders : [];
+        if (orders[0]) {
+          const o = orders[0];
+          setOrder({
+            orderRef: o.orderReference ?? o.order_ref ?? "—",
+            status: o.status ?? "unknown",
+            serviceSummary: o.serviceSummary ?? o.service_summary ?? "—",
+            createdAt: o.createdAt ?? o.created_at ?? "",
+            total: Number(o.total ?? 0),
+            currency: o.currency ?? "USD",
+          });
+        }
+      })
+      .catch(() => null)
+      .finally(() => setLoading(false));
+  }, [userId]);
+
+  if (loading) {
+    return (
+      <div className="mt-2 space-y-2">
+        <div className="h-4 w-3/4 animate-pulse rounded bg-white/10" />
+        <div className="h-3 w-1/2 animate-pulse rounded bg-white/10" />
+      </div>
+    );
+  }
+
+  if (!order) {
+    return <p className="mt-2 text-xs text-[#64748B]">No orders found.</p>;
+  }
+
+  return (
+    <div className="mt-2">
+      <div className="flex items-start gap-2">
+        <Package size={14} className="mt-0.5 shrink-0 text-[#22D3EE]" />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-white">{order.orderRef}</p>
+          <p className="mt-0.5 truncate text-xs text-[#64748B]">{order.serviceSummary}</p>
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.1em] ${
+              order.status === "completed" ? "bg-emerald-500/15 text-emerald-400"
+              : order.status === "refunded" ? "bg-red-500/15 text-red-400"
+              : "bg-amber-500/15 text-amber-400"
+            }`}>
+              {order.status.replace("_", " ")}
+            </span>
+            <span className="text-xs text-[#64748B]">
+              {order.currency} {order.total.toFixed(2)}
+            </span>
+          </div>
+        </div>
+      </div>
+      <Link
+        href={`/admin/orders?search=${encodeURIComponent(order.orderRef)}`}
+        className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-white/10 px-3 py-1.5 text-xs text-[#64748B] transition-colors hover:border-[#22D3EE] hover:text-[#22D3EE]"
+      >
+        View order
+      </Link>
+    </div>
+  );
+}
+
 type CreateChatType = "order" | "support";
 
 type ChatCandidate = {
@@ -28,7 +107,7 @@ type ChatCandidate = {
 };
 
 function threadLabel(ticket: ChatTicket) {
-  return ticket.orderRef ? `[Order ${ticket.orderRef}]` : "[Support]";
+  return ticket.subject ?? "[Support]";
 }
 
 function initialsFromName(value: string) {
@@ -36,16 +115,14 @@ function initialsFromName(value: string) {
   return (parts[0]?.[0] ?? "O").concat(parts[1]?.[0] ?? "C").toUpperCase();
 }
 
-function draftOrderTicket(orderRef: string, customerName = "Order customer", customerEmail: string | null = null): ChatTicket {
+function draftOrderTicket(customerEmail: string, customerName = "Customer"): ChatTicket {
   const now = new Date().toISOString();
-  const name = customerName.trim() || "Order customer";
+  const name = customerName.trim() || "Customer";
   return {
-    id: `draft:${orderRef}`,
-    orderId: null,
-    orderRef,
+    id: `draft:email:${encodeURIComponent(customerEmail.trim().toLowerCase())}`,
     userId: null,
     sessionId: null,
-    subject: `Order ${orderRef}`,
+    subject: "Support",
     status: "open",
     createdAt: now,
     updatedAt: now,
@@ -55,6 +132,8 @@ function draftOrderTicket(orderRef: string, customerName = "Order customer", cus
     latestMessage: "",
     latestMessageAt: null,
     unreadCount: 0,
+    adminLastReadAt: null,
+    customerLastReadAt: null,
   };
 }
 
@@ -68,11 +147,9 @@ function draftSupportTicket(customerEmail: string): ChatTicket {
   const name = email || "Customer";
   return {
     id: supportDraftId(email),
-    orderId: null,
-    orderRef: null,
     userId: null,
     sessionId: null,
-    subject: "General Support",
+    subject: "Support",
     status: "open",
     createdAt: now,
     updatedAt: now,
@@ -82,6 +159,8 @@ function draftSupportTicket(customerEmail: string): ChatTicket {
     latestMessage: "",
     latestMessageAt: null,
     unreadCount: 0,
+    adminLastReadAt: null,
+    customerLastReadAt: null,
   };
 }
 
@@ -140,6 +219,7 @@ export default function MessagesPageClient() {
   const [createChatError, setCreateChatError] = useState("");
   const [error, setError] = useState("");
   const [sendFailedMessage, setSendFailedMessage] = useState("");
+  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
 
   const selectedTicket = useMemo(
     () => tickets.find((ticket) => ticket.id === selectedId) ?? null,
@@ -270,7 +350,7 @@ export default function MessagesPageClient() {
     window.dispatchEvent(new Event("moonstrike:admin-messages-read"));
   }
 
-  const loadTickets = useCallback(async (preferredId?: string | null, preferredOrderRef?: string | null, { quiet = false }: { quiet?: boolean } = {}) => {
+  const loadTickets = useCallback(async (preferredId?: string | null, _preferredOrderRef?: string | null, { quiet = false }: { quiet?: boolean } = {}) => {
     if (!quiet) setError("");
 
     try {
@@ -283,22 +363,16 @@ export default function MessagesPageClient() {
       }
 
       const nextTickets = Array.isArray(payload.tickets) ? payload.tickets : [];
-      const orderTicketId = preferredOrderRef
-        ? nextTickets.find((ticket: ChatTicket) => ticket.orderRef === preferredOrderRef)?.id ?? ""
-        : "";
-      const draftTicket = preferredOrderRef && !orderTicketId ? draftOrderTicket(preferredOrderRef, customerFromUrl ?? undefined, emailFromUrl) : null;
       setTickets((current) => {
         const currentDraftTickets = current.filter((ticket) => isDraftTicketId(ticket.id));
-        return draftTicket
-          ? [draftTicket, ...nextTickets]
-          : [...currentDraftTickets.filter((draft) => !nextTickets.some((ticket: ChatTicket) => ticket.orderRef === draft.orderRef)), ...nextTickets];
+        return [...currentDraftTickets.filter((draft) => !nextTickets.some((ticket: ChatTicket) => ticket.id === draft.id)), ...nextTickets];
       });
 
-      const nextSelectedId = preferredId || orderTicketId || (draftTicket ? draftTicket.id : "") || selectedId || "";
+      const nextSelectedId = preferredId || selectedId || "";
       if (nextSelectedId && nextSelectedId !== selectedId) {
         setSelectedId(nextSelectedId);
       }
-      if ((preferredId || orderTicketId) && !selectedId && nextSelectedId) {
+      if (preferredId && !selectedId && nextSelectedId) {
         await loadMessages(nextSelectedId);
       }
     } catch {
@@ -426,14 +500,14 @@ export default function MessagesPageClient() {
     void markTicketRead(selectedId, { force: true });
   }
 
-  function openOrderChat(orderRefValue: string) {
-    const orderRef = orderRefValue.trim();
-    if (!orderRef) {
-      setCreateChatError("Enter an order reference first.");
+  function openOrderChat(emailValue: string) {
+    const email = emailValue.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      setCreateChatError("Enter a valid customer email first.");
       return;
     }
 
-    const existing = tickets.find((ticket) => ticket.orderRef?.toLowerCase() === orderRef.toLowerCase() && !isDraftTicketId(ticket.id));
+    const existing = tickets.find((ticket) => !isDraftTicketId(ticket.id) && ticket.customerEmail?.toLowerCase() === email);
     if (existing) {
       setCreateChatOpen(false);
       setCreateChatError("");
@@ -441,7 +515,7 @@ export default function MessagesPageClient() {
       return;
     }
 
-    const draft = draftOrderTicket(orderRef);
+    const draft = draftOrderTicket(email);
     setTickets((current) => (current.some((ticket) => ticket.id === draft.id) ? current : [draft, ...current]));
     setSelectedId(draft.id);
     setMessages([]);
@@ -458,7 +532,7 @@ export default function MessagesPageClient() {
     }
 
     const existing = tickets.find(
-      (ticket) => !ticket.orderRef && !isDraftTicketId(ticket.id) && ticket.customerEmail?.toLowerCase() === customerEmail,
+      (ticket) => !isDraftTicketId(ticket.id) && ticket.customerEmail?.toLowerCase() === customerEmail,
     );
     if (existing) {
       setCreateChatOpen(false);
@@ -529,7 +603,7 @@ export default function MessagesPageClient() {
       const response = await fetch(`/api/admin/messages/${ticketId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: draft, attachments: resolved.attachments }),
+        body: JSON.stringify({ content: draft, attachments: resolved.attachments, replyToId: replyingTo?.id ?? null }),
       });
       const payload = await response.json().catch(() => ({}));
 
@@ -540,6 +614,7 @@ export default function MessagesPageClient() {
 
       setDraft("");
       setAttachments([]);
+      setReplyingTo(null);
       appendMessage(payload.message);
       void markTicketRead(ticketId, { force: true });
       notifyChatUpdated();
@@ -717,19 +792,73 @@ export default function MessagesPageClient() {
 
                     {messages.map((message) => {
                       const adminMessage = message.senderRole === "admin";
+                      // Read receipt: admin sent message is read if customer_last_read_at >= message.sentAt
+                      const isRead = adminMessage && selectedTicket?.customerLastReadAt
+                        ? message.sentAt <= selectedTicket.customerLastReadAt
+                        : false;
+
+                      const replyBtn = (
+                        <button
+                          type="button"
+                          onClick={() => setReplyingTo(message)}
+                          title="Reply"
+                          aria-label="Reply"
+                          className="mb-1 shrink-0 rounded-full p-1 text-[#64748B] opacity-0 transition-all group-hover:opacity-100 hover:bg-white/10 hover:text-white"
+                        >
+                          <CornerUpLeft size={12} />
+                        </button>
+                      );
+
                       return (
-                        <div key={message.id} className={`flex ${adminMessage ? "justify-end" : "justify-start"}`}>
-                          <div
-                            className={`max-w-[82%] rounded-xl px-4 py-3 ${
-                              adminMessage
-                                ? "bg-gradient-to-r from-[#8B5CF6] to-[#6366F1] text-white"
-                                : "border border-[var(--ms-accent)] bg-[var(--ms-primary)] text-[#F1F5F9]"
-                            }`}
-                          >
-                            {message.content ? <p className="text-sm leading-6">{message.content}</p> : null}
-                            <ChatAttachments attachments={message.attachments} />
-                            <div className="mt-2 text-right text-[10px] opacity-70">{formatTime(message.sentAt)}</div>
+                        <div key={message.id} className={`group flex items-end gap-1 ${adminMessage ? "justify-end" : "justify-start"}`}>
+                          {/* Reply button LEFT — admin messages (bubble on right) */}
+                          {adminMessage && replyBtn}
+
+                          <div className={`flex max-w-[82%] flex-col gap-1 ${adminMessage ? "items-end" : "items-start"}`}>
+                            {/* Reply quote */}
+                            {message.replyToId && (
+                              <div className="flex items-start gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2 py-1.5 text-[10px] opacity-75 text-[#94A3B8]">
+                                <CornerUpLeft size={10} className="mt-0.5 shrink-0 text-[#8B5CF6]" />
+                                <span className="line-clamp-1">
+                                  <span className="font-bold text-white">{message.replyToSenderRole === "admin" ? "You" : "Customer"}: </span>
+                                  {(message.replyToContent ?? "Attachment").slice(0, 60)}
+                                </span>
+                              </div>
+                            )}
+
+                            <div
+                              className={`rounded-xl px-4 py-3 ${
+                                adminMessage
+                                  ? "bg-gradient-to-r from-[#8B5CF6] to-[#6366F1] text-white"
+                                  : "border border-[var(--ms-accent)] bg-[var(--ms-primary)] text-[#F1F5F9]"
+                              }`}
+                            >
+                              {message.content ? <p className="text-sm leading-6 whitespace-pre-wrap break-words">{message.content}</p> : null}
+                              <ChatAttachments attachments={message.attachments} />
+                              <div className={`mt-2 flex items-center gap-1 text-[10px] opacity-70 ${adminMessage ? "justify-end" : "justify-start"}`}>
+                                <span>{formatTime(message.sentAt)}</span>
+                                {adminMessage && (
+                                  isRead ? (
+                                    <span title="Seen" className="inline-flex text-[#22D3EE] opacity-100">
+                                      <svg width="16" height="10" viewBox="0 0 16 10" fill="none" aria-hidden="true">
+                                        <path d="M1 5l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                        <path d="M5 5l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                      </svg>
+                                    </span>
+                                  ) : (
+                                    <span title="Sent" className="inline-flex opacity-60">
+                                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                                        <path d="M1 5l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                      </svg>
+                                    </span>
+                                  )
+                                )}
+                              </div>
+                            </div>
                           </div>
+
+                          {/* Reply button RIGHT — customer messages (bubble on left) */}
+                          {!adminMessage && replyBtn}
                         </div>
                       );
                     })}
@@ -738,6 +867,29 @@ export default function MessagesPageClient() {
               </div>
 
               <div className="border-t border-[var(--ms-accent)] p-5">
+                {/* Reply preview bar */}
+                {replyingTo && (
+                  <div className="mb-3 flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2">
+                    <CornerUpLeft size={13} className="shrink-0 text-[#8B5CF6]" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[#8B5CF6]">
+                        Replying to {replyingTo.senderRole === "admin" ? "yourself" : "customer"}
+                      </p>
+                      <p className="truncate text-[10px] text-[#64748B]">
+                        {(replyingTo.content || "Attachment").slice(0, 60)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setReplyingTo(null)}
+                      className="shrink-0 rounded-md p-0.5 text-[#64748B] hover:text-white"
+                      aria-label="Cancel reply"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                )}
+
                 {sendFailedMessage ? (
                   <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
                     <span>{sendFailedMessage}</span>
@@ -751,7 +903,7 @@ export default function MessagesPageClient() {
                     </button>
                   </div>
                 ) : null}
-                <ChatComposerTools attachments={attachments} disabled={isSending} onAttachmentsChange={setAttachments} onError={setError} />
+                <ChatComposerTools attachments={attachments} disabled={isSending} onAttachmentsChange={setAttachments} onError={setError} userId={selectedTicket?.userId ?? undefined} />
                 <div className="mt-3 flex gap-2">
                   <textarea
                     value={draft}
@@ -818,23 +970,13 @@ export default function MessagesPageClient() {
             </div>
 
             <div className="mt-4 rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] p-4">
-              <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--ms-text-secondary)]">Conversation</p>
-              <p className="mt-2 text-sm font-bold text-white">{threadLabel(selectedTicket)}</p>
-              <p className="mt-2 text-xs text-[#64748B]">Updated {formatTime(selectedTicket.updatedAt)}</p>
-              {selectedTicket.latestMessage ? (
-                <p className="mt-3 line-clamp-2 text-sm text-[var(--ms-text-secondary)]">{selectedTicket.latestMessage}</p>
-              ) : null}
+              <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--ms-text-secondary)]">Last Order</p>
+              {selectedTicket.userId ? (
+                <LastOrderSection userId={selectedTicket.userId} />
+              ) : (
+                <p className="mt-2 text-xs text-[#64748B]">Anonymous customer — no order history</p>
+              )}
             </div>
-
-            {selectedTicket.orderRef ? (
-              <Link
-                href={`/admin/orders/${selectedTicket.orderRef}`}
-                onClick={() => setCustomerModalOpen(false)}
-                className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-md border border-[var(--ms-accent)] px-4 text-xs font-bold uppercase tracking-[0.14em] text-[var(--ms-text-secondary)] hover:border-[#8B5CF6] hover:text-white"
-              >
-                View Related Order
-              </Link>
-            ) : null}
           </section>
         </div>
       ) : null}

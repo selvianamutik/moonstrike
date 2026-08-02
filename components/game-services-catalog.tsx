@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { PlaceholderAsset } from "@/components/asset-image";
 import { ScrollingTabList, type ScrollingTabItem } from "@/components/scrolling-tab-list";
 import { ServiceCard } from "@/components/service-card";
@@ -45,8 +45,20 @@ export function GameServicesCatalog({
 }) {
   const [query, setQuery] = useState("");
   const [visible, setVisible] = useState(initialVisibleCount);
-  const { currency, setCurrency } = useCurrency();
+  const [discordUrl, setDiscordUrl] = useState<string | null>(null);
+  const { currency } = useCurrency();
   const tabSourceServices = navigationServices ?? services;
+
+  useEffect(() => {
+    fetch('/api/public/social-links')
+      .then((r) => r.json())
+      .then((data) => {
+        const discord = Array.isArray(data) ? data.find((link: any) => link.platform === 'discord') : null;
+        setDiscordUrl(discord?.url || null);
+      })
+      .catch(() => {});
+  }, []);
+
   const tabs = useMemo<ServiceTab[]>(() => {
     const categoryTabs = new Map<string, ServiceTab>();
 
@@ -123,33 +135,24 @@ export function GameServicesCatalog({
               Browse active offers, compare service categories, and pick the run that matches your current goal.
             </p>
           </div>
-          <div className="text-left md:text-center">
-            <div className="inline-flex rounded-full border border-white/15 bg-black/45 p-1 backdrop-blur">
-              <button
-                type="button"
-                onClick={() => setCurrency("USD")}
-                className={`h-9 rounded-full px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] transition ${
-                  currency === "USD"
-                    ? "bg-[var(--primary)] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]"
-                    : "text-white hover:text-white/80"
-                }`}
-              >
-                USD
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrency("EUR")}
-                className={`h-9 rounded-full px-4 mono text-xs font-bold uppercase leading-9 tracking-[0.18em] transition ${
-                  currency === "EUR"
-                    ? "bg-[var(--primary)] text-[var(--ms-heading)] shadow-[0_0_18px_rgba(139,92,246,0.35)]"
-                    : "text-white hover:text-white/80"
-                }`}
-              >
-                EUR
-              </button>
+
+          {/* Discord Join Us */}
+          {discordUrl && (
+            <a
+              href={discordUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full shrink-0 items-center gap-3 rounded-xl border border-white/20 bg-[#5865F2]/20 px-5 py-4 text-white backdrop-blur-sm transition-all hover:bg-[#5865F2]/40 hover:border-white/30 sm:w-auto"
+            >
+            <svg width="28" height="22" viewBox="0 0 28 22" fill="none" aria-hidden="true">
+              <path d="M23.7187 1.84C21.9252 1.0175 20.0095 0.418768 18.0185 0.0800018C17.7765 0.512502 17.4944 1.0925 17.2986 1.556C15.1819 1.2425 13.0852 1.2425 11.0085 1.556C10.8127 1.0925 10.524 0.512502 10.2799 0.0800018C8.28694 0.418768 6.36923 1.02 4.5757 1.8445C0.658192 7.693 -0.40318 13.3985 0.127286 19.025C2.52479 20.7685 4.84548 21.8285 7.12736 22.5C7.69152 21.736 8.19548 20.921 8.62902 20.059C7.7989 19.7585 7.00298 19.384 6.24957 18.9435C6.44507 18.8035 6.63649 18.657 6.82173 18.506C11.8594 20.8385 17.3386 20.8385 22.3183 18.506C22.5055 18.657 22.6969 18.8035 22.8904 18.9435C22.135 19.386 21.3371 19.7605 20.507 20.061C20.9405 20.9225 21.4425 21.739 22.0087 22.5C24.2925 21.8285 26.6152 20.7685 29.0127 19.025C29.6267 12.5305 27.9474 6.877 23.7187 1.84ZM9.72844 15.574C8.2284 15.574 6.99319 14.2235 6.99319 12.574C6.99319 10.9245 8.20223 9.5715 9.72844 9.5715C11.2547 9.5715 12.4899 10.9245 12.4637 12.574C12.4657 14.2235 11.2547 15.574 9.72844 15.574ZM19.4315 15.574C17.9315 15.574 16.6963 14.2235 16.6963 12.574C16.6963 10.9245 17.9053 9.5715 19.4315 9.5715C20.9578 9.5715 22.193 10.9245 22.1668 12.574C22.1668 14.2235 20.9578 15.574 19.4315 15.574Z" fill="white"/>
+            </svg>
+            <div className="text-left">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/70">Community</p>
+              <p className="text-sm font-black text-white">Join our Discord</p>
             </div>
-            <p className="mt-3 text-sm text-[var(--ms-gradient-end)]">{currency} pricing view</p>
-          </div>
+          </a>
+          )}
         </div>
       </div>
 
@@ -193,7 +196,7 @@ export function GameServicesCatalog({
       </div>
 
       {filteredServices.length > 0 ? (
-        <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
           {visibleServices.map((service) => (
             <ServiceCard key={service.slug} service={service} />
           ))}

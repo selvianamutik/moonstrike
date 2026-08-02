@@ -12,5 +12,5 @@ export default async function AdminDashboard() {
 
   const dashboard = await getAdminDashboardData(30);
 
-  return <DashboardClient initialDashboard={dashboard} />;
+  return <DashboardClient initialDashboard={dashboard} adminRole={admin.role} />;
 }

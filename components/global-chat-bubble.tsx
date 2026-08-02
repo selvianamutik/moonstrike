@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Send, X } from "lucide-react";
-import { ChatAttachments } from "@/components/chat/ChatAttachments";
+import { CornerUpLeft, Send, X } from "lucide-react";
 import { notifyChatUpdated } from "@/lib/chat-events";
 import type { ChatMessage, ChatTicket } from "@/lib/chat";
 
@@ -24,6 +23,7 @@ export function GlobalChatBubble() {
   const [ticket, setTicket] = useState<ChatTicket | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
+  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
@@ -60,8 +60,7 @@ export function GlobalChatBubble() {
 
     if (response?.ok && Array.isArray(payload?.tickets)) {
       const supportUnreadCount = payload.tickets
-        .filter((item) => !item.orderId)
-        .reduce((total, item) => total + item.unreadCount, 0);
+        .reduce((total: number, item: ChatTicket) => total + item.unreadCount, 0);
       setUnreadCount(supportUnreadCount);
     }
   }
@@ -100,7 +99,7 @@ export function GlobalChatBubble() {
       }
 
       const tickets = Array.isArray(ticketPayload.tickets) ? ticketPayload.tickets as ChatTicket[] : [];
-      const existingTicket = tickets.find((item) => !item.orderId) ?? null;
+      const existingTicket = tickets[0] ?? null;
       setUnauthorized(false);
       setTicket(existingTicket);
       setMessages([]);
@@ -161,7 +160,7 @@ export function GlobalChatBubble() {
       const response = await fetch(`/api/chat/tickets/${ticketId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: draft }),
+        body: JSON.stringify({ content: draft, replyToId: replyingTo?.id ?? null }),
       });
       const payload = await response.json().catch(() => ({}));
 
@@ -171,6 +170,7 @@ export function GlobalChatBubble() {
       }
 
       setDraft("");
+      setReplyingTo(null);
       appendMessage(payload.message);
       void markTicketRead(ticketId);
       notifyChatUpdated();
@@ -374,9 +374,9 @@ export function GlobalChatBubble() {
           >
             {isLoading ? (
               <div className="space-y-3">
-                <div className="h-16 w-3/4 animate-pulse rounded-lg bg-white/10" />
-                <div className="ml-auto h-16 w-3/4 animate-pulse rounded-lg bg-white/10" />
-                <div className="h-16 w-1/2 animate-pulse rounded-lg bg-white/10" />
+                <div className="h-16 w-3/4 animate-pulse rounded-lg bg-[var(--ms-border)]" />
+                <div className="ml-auto h-16 w-3/4 animate-pulse rounded-lg bg-[var(--ms-border)]" />
+                <div className="h-16 w-1/2 animate-pulse rounded-lg bg-[var(--ms-border)]" />
               </div>
             ) : unauthorized ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
@@ -398,28 +398,81 @@ export function GlobalChatBubble() {
             ) : (
               <>
                 {isLoadingOlder ? (
-                  <div className="mx-auto h-8 w-32 animate-pulse rounded-md bg-white/10" />
+                  <div className="mx-auto h-8 w-32 animate-pulse rounded-md bg-[var(--ms-border)]" />
                 ) : hasMoreMessages ? (
                   <p className="text-center text-[10px] text-[var(--ms-body)]">Scroll up for older messages</p>
                 ) : null}
 
                 {messages.map((message) => {
                   const mine = message.senderRole === "customer";
+                  const isRead = mine && ticket?.adminLastReadAt
+                    ? message.sentAt <= ticket.adminLastReadAt
+                    : false;
+
+                  const replyBtn = (
+                    <button
+                      type="button"
+                      onClick={() => setReplyingTo(message)}
+                      title="Reply"
+                      aria-label="Reply"
+                      className="mb-1 shrink-0 rounded-full p-1 text-[var(--ms-body)] opacity-0 transition-all group-hover:opacity-100 hover:bg-[var(--ms-hover-bg)] hover:text-[var(--ms-heading)]"
+                    >
+                      <CornerUpLeft size={12} />
+                    </button>
+                  );
+
                   return (
-                    <div key={message.id} className={mine ? "text-right" : ""}>
-                      <p className="mono mb-1 text-[10px] uppercase tracking-[0.14em] text-[var(--ms-body)]">
-                        {mine ? "You" : "Support"} / {formatTime(message.sentAt)}
-                      </p>
-                      <div
-                        className={`inline-block max-w-[85%] rounded-lg px-4 py-3 text-left text-sm leading-6 ${
+                    <div key={message.id} className={`group flex items-end gap-1 ${mine ? "justify-end" : "justify-start"}`}>
+                      {/* Reply button LEFT — own messages (bubble on right) */}
+                      {mine && replyBtn}
+
+                      <div className={`flex max-w-[85%] flex-col gap-1 ${mine ? "items-end" : "items-start"}`}>
+                        {/* Reply quote */}
+                        {message.replyToId && (
+                          <div className="flex items-start gap-1.5 rounded-lg border border-[var(--ms-border)] bg-[var(--ms-bg-page)] px-2 py-1.5 text-[10px] opacity-75">
+                            <CornerUpLeft size={10} className="mt-0.5 shrink-0 text-[var(--ms-gradient-end)]" />
+                            <span className="line-clamp-1 text-[var(--ms-body)]">
+                              <span className="font-bold text-[var(--ms-heading)]">{message.replyToSenderRole === "admin" ? "Support" : "You"}: </span>
+                              {(message.replyToContent ?? "Attachment").slice(0, 60)}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Bubble */}
+                        <div className={`rounded-lg px-3 py-2.5 text-left text-sm leading-6 ${
                           mine
                             ? "bg-[linear-gradient(135deg,var(--ms-gradient-start),var(--ms-gradient-end))] text-white"
-                            : "border border-[var(--ms-border)] bg-[var(--ms-hover-bg)] text-[var(--ms-body)]"
-                        }`}
-                      >
-                        {message.content ? <p>{message.content}</p> : null}
-                        <ChatAttachments attachments={message.attachments} />
+                            : "chat-bubble-support"
+                        }`}>
+                          {message.content ? <p className="whitespace-pre-wrap break-words">{message.content}</p> : null}
+                          {message.attachments.length > 0 && (
+                            <p className="mt-1 text-xs italic opacity-70">📎 attachment</p>
+                          )}
+                          {/* Timestamp + read receipt */}
+                          <div className={`mt-1 flex items-center gap-1 text-[10px] opacity-60 ${mine ? "justify-end" : "justify-start"}`}>
+                            <span>{formatTime(message.sentAt)}</span>
+                            {mine && (
+                              isRead ? (
+                                <span title="Seen" className="inline-flex text-[var(--ms-gradient-end)] opacity-100">
+                                  <svg width="16" height="9" viewBox="0 0 16 9" fill="none" aria-hidden="true">
+                                    <path d="M1 4.5l2.5 2.5L8 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <path d="M5 4.5l2.5 2.5L12 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                </span>
+                              ) : (
+                                <span title="Sent" className="inline-flex">
+                                  <svg width="10" height="9" viewBox="0 0 10 9" fill="none" aria-hidden="true">
+                                    <path d="M1 4.5l2.5 2.5 5-6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                </span>
+                              )
+                            )}
+                          </div>
+                        </div>
                       </div>
+
+                      {/* Reply button RIGHT — admin/support messages (bubble on left) */}
+                      {mine && replyBtn}
                     </div>
                   );
                 })}
@@ -427,11 +480,34 @@ export function GlobalChatBubble() {
             )}
           </div>
 
-          {error ? <p className="px-3 pb-2 text-xs text-red-300">{error}</p> : null}
+          {error ? <p className="px-3 pb-2 text-xs text-red-600 dark:text-red-300">{error}</p> : null}
 
           <div className="border-t border-[var(--ms-border)] p-3">
+            {/* Reply preview bar */}
+            {replyingTo && (
+              <div className="mb-2 flex items-center gap-2 rounded-lg border border-[var(--ms-border)] bg-[var(--ms-bg-page)] px-2 py-1.5">
+                <CornerUpLeft size={12} className="shrink-0 text-[var(--ms-gradient-end)]" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--ms-gradient-end)]">
+                    {replyingTo.senderRole === "admin" ? "Support" : "You"}
+                  </p>
+                  <p className="truncate text-[10px] text-[var(--ms-body)]">
+                    {(replyingTo.content || "Attachment").slice(0, 50)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReplyingTo(null)}
+                  className="shrink-0 rounded-md p-0.5 text-[var(--ms-body)] hover:text-[var(--ms-heading)]"
+                  aria-label="Cancel reply"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            )}
+
             {sendFailedMessage ? (
-              <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+              <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-200">
                 <span>{sendFailedMessage}</span>
                 <button
                   type="button"

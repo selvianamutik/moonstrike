@@ -5,7 +5,6 @@ import { LivePageRefresh } from "@/components/live-page-refresh";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { requireVerifiedUser } from "@/lib/auth/session";
-import { fulfillStripeCheckoutSession } from "@/lib/checkout/stripe-fulfillment";
 import { fulfillPayPalCheckoutSession } from "@/lib/checkout/paypal-fulfillment";
 import { formatOrderMoney, formatOrderOptionValue, getCustomerOrderByCheckoutSession, type CustomerOrder } from "@/lib/orders";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -39,11 +38,11 @@ async function resolveConfirmedOrder(userId: string, session: string, paypalToke
     .eq("id", session)
     .maybeSingle<{ user_id: string; provider: string }>();
 
-  if (!checkoutSession && !session.startsWith("cs_")) {
+  if (!checkoutSession) {
     return { order: null };
   }
 
-  if (checkoutSession && checkoutSession.user_id !== userId) {
+  if (checkoutSession.user_id !== userId) {
     return { order: null };
   }
 
@@ -75,29 +74,6 @@ async function resolveConfirmedOrder(userId: string, session: string, paypalToke
     }
 
     return { order: null, pendingProvider: "paypal" };
-  }
-
-  if (!session.startsWith("cs_")) {
-    return { order: null };
-  }
-
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const fulfillment = await fulfillStripeCheckoutSession(session).catch((fulfillmentError) => {
-      console.error("Failed to fulfill Stripe checkout session from confirmation page", fulfillmentError);
-      return null;
-    });
-
-    if (fulfillment && "checkoutSessionId" in fulfillment) {
-      order = await getCustomerOrderByCheckoutSession(userId, fulfillment.checkoutSessionId);
-    } else {
-      order = await getCustomerOrderByCheckoutSession(userId, session);
-    }
-
-    if (order) {
-      return { order };
-    }
-
-    await wait(900);
   }
 
   return { order: null };

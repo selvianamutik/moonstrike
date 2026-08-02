@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { writeAuditLog } from '@/lib/admin/audit'
 import { getAdminSession } from '@/lib/admin/session'
-import { CMS_MEDIA_BUCKET, getStoragePathFromPublicUrl } from '@/lib/cms/storage'
+import { getStoragePathFromPublicUrl } from '@/lib/cms/storage'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { r2DeleteMany } from '@/lib/r2'
 import { revalidatePath } from 'next/cache'
 
 const STATUSES = new Set(['active', 'draft', 'archived'])
@@ -84,13 +85,9 @@ export async function PATCH(
     .filter((value): value is string => Boolean(value))
 
   if (replacedPaths.length > 0) {
-    const { error: removeError } = await supabase.storage
-      .from(CMS_MEDIA_BUCKET)
-      .remove(Array.from(new Set(replacedPaths)))
-
-    if (removeError) {
-      console.error('Failed to remove replaced game image', removeError.message)
-    }
+    await r2DeleteMany(Array.from(new Set(replacedPaths))).catch((err: Error) => {
+      console.error('Failed to remove replaced game image', err.message)
+    })
   }
 
   await writeAuditLog({
@@ -146,13 +143,9 @@ export async function DELETE(
     .filter((value): value is string => Boolean(value))
 
   if (imagePaths.length > 0) {
-    const { error: removeError } = await supabase.storage
-      .from(CMS_MEDIA_BUCKET)
-      .remove(Array.from(new Set(imagePaths)))
-
-    if (removeError) {
-      console.error('Failed to remove deleted game image', removeError.message)
-    }
+    await r2DeleteMany(Array.from(new Set(imagePaths))).catch((err: Error) => {
+      console.error('Failed to remove deleted game image', err.message)
+    })
   }
 
   await writeAuditLog({

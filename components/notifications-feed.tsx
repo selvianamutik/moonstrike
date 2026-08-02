@@ -187,7 +187,7 @@ export function NotificationsFeed({ mode, initialNotifications }: NotificationsF
                   className="min-w-0 flex-1"
                 >
                   <div className="flex items-start gap-4">
-                    <span className={`mt-1 h-3 w-3 shrink-0 rounded-full ${notification.readAt ? "bg-white/15" : "bg-[var(--ms-gradient-end)]"}`} />
+                    <span className={`mt-1 h-3 w-3 shrink-0 rounded-full ${notification.readAt ? "bg-[var(--ms-border)]" : "bg-[var(--ms-gradient-end)]"}`} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-3">
                         <h2 className="text-base font-bold text-[var(--ms-heading)]">{notification.title}</h2>

@@ -195,6 +195,12 @@ export function ServiceForm({
   const [isUploading, setIsUploading] = useState(false);
   const [draftImageFile, setDraftImageFile] = useState<File | null>(null);
   const [draftImagePreview, setDraftImagePreview] = useState("");
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategorySlug, setNewCategorySlug] = useState("");
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [categoryError, setCategoryError] = useState("");
+  const [allCategories, setAllCategories] = useState(categories);
 
   useEffect(() => {
     return () => {
@@ -204,10 +210,10 @@ export function ServiceForm({
 
   const availableCategories = useMemo(
     () =>
-      categories
+      allCategories
         .filter((category) => category.game_id === gameId && category.slug !== "uncategorized")
         .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
-    [categories, gameId],
+    [allCategories, gameId],
   );
 
   const hasQuantityOption = optionsSchema.some((option) => option.type === "quantity");
@@ -285,6 +291,62 @@ export function ServiceForm({
     setOpenRequirementServicePickers((current) =>
       current.map((item, itemIndex) => (itemIndex === index ? isOpen : item)),
     );
+  }
+
+  function openCategoryModal() {
+    if (!gameId) {
+      setError("Please select a game first");
+      return;
+    }
+    setShowCategoryModal(true);
+    setNewCategoryName("");
+    setNewCategorySlug("");
+    setCategoryError("");
+  }
+
+  async function createCategory() {
+    if (!gameId) {
+      setCategoryError("Please select a game first");
+      return;
+    }
+
+    if (!newCategoryName.trim()) {
+      setCategoryError("Category name is required");
+      return;
+    }
+
+    setIsCreatingCategory(true);
+    setCategoryError("");
+
+    try {
+      const response = await fetch("/api/admin/service-categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameId,
+          name: newCategoryName.trim(),
+          slug: newCategorySlug.trim() || undefined,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setCategoryError(result.error || "Failed to create category");
+        return;
+      }
+
+      // Add new category to the list and select it
+      setAllCategories((prev) => [...prev, result.category]);
+      setCategoryId(result.category.id);
+      setShowCategoryModal(false);
+      setNewCategoryName("");
+      setNewCategorySlug("");
+    } catch (err) {
+      setCategoryError("Network error. Please try again.");
+    } finally {
+      setIsCreatingCategory(false);
+    }
   }
 
   function scrollToSection(id: string) {
@@ -623,16 +685,22 @@ export function ServiceForm({
                 </select>
               </AdminFormField>
               <AdminFormField label="Service Category">
-                <select className={adminSelectClass} value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
-                  <option value="" disabled>Select Category</option>
-                  {availableCategories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name} ({category.slug})
-                    </option>
-                  ))}
-                </select>
+                <div className="flex gap-2">
+                  <select className={adminSelectClass} value={categoryId} onChange={(e) => setCategoryId(e.target.value)} required>
+                    <option value="" disabled>Select Category</option>
+                    {availableCategories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name} ({category.slug})
+                      </option>
+                    ))}
+                  </select>
+                  <AdminButton type="button" onClick={openCategoryModal} variant="secondary" className="shrink-0">
+                    <Plus size={16} />
+                    New
+                  </AdminButton>
+                </div>
                 {availableCategories.length === 0 && (
-                  <p className="mt-2 text-xs text-amber-300">No categories yet for this game. Add one from the Services list.</p>
+                  <p className="mt-2 text-xs text-amber-300">No categories yet for this game. Click "New" to create one.</p>
                 )}
               </AdminFormField>
               <AdminFormField label="Status">
@@ -1012,6 +1080,72 @@ export function ServiceForm({
           </section>
         </div>
       </div>
+
+      {/* Category Creation Modal */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-xl border border-[var(--admin-border)] bg-[var(--admin-card)] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--admin-border)] px-6 py-4">
+              <h3 className="text-lg font-bold text-white">Create New Category</h3>
+              <button
+                type="button"
+                onClick={() => setShowCategoryModal(false)}
+                className="rounded-lg p-2 text-[var(--admin-muted)] transition-colors hover:bg-white/5 hover:text-white"
+                aria-label="Close modal"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-6 py-5">
+              <AdminFormField label="Category Name">
+                <input
+                  type="text"
+                  className={adminInputClass}
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="e.g. Power Leveling"
+                  autoFocus
+                />
+              </AdminFormField>
+
+              <AdminFormField label="Slug (optional)">
+                <input
+                  type="text"
+                  className={adminInputClass}
+                  value={newCategorySlug}
+                  onChange={(e) => setNewCategorySlug(e.target.value)}
+                  placeholder="Auto-generated from name if empty"
+                />
+              </AdminFormField>
+
+              {categoryError && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                  {categoryError}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-[var(--admin-border)] px-6 py-4">
+              <AdminButton
+                type="button"
+                variant="secondary"
+                onClick={() => setShowCategoryModal(false)}
+                disabled={isCreatingCategory}
+              >
+                Cancel
+              </AdminButton>
+              <AdminButton
+                type="button"
+                onClick={createCategory}
+                disabled={isCreatingCategory || !newCategoryName.trim()}
+              >
+                {isCreatingCategory ? "Creating..." : "Create Category"}
+              </AdminButton>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

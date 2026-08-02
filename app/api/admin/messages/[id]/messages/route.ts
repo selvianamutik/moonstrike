@@ -48,6 +48,7 @@ export async function POST(
   const body = await request.json().catch(() => null)
   const content = typeof body?.content === 'string' ? body.content : ''
   const attachments = Array.isArray(body?.attachments) ? (body.attachments as ChatAttachment[]) : []
+  const replyToId = typeof body?.replyToId === 'string' ? body.replyToId : null
 
   try {
     const exists = await adminCanAccessTicket(id)
@@ -59,6 +60,7 @@ export async function POST(
       senderRole: 'admin',
       content,
       attachments,
+      replyToId,
     })
 
     return NextResponse.json({ message })

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Shield, ShieldCheck, Trash2, UserCog, Plus, X, Eye, EyeOff, Pencil, Check } from "lucide-react";
+import { Shield, ShieldCheck, Trash2, UserCog, Plus, X, Eye, EyeOff, Pencil, Check, KeyRound } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { adminInputClass, adminSelectClass } from "@/components/admin/AdminFormField";
@@ -52,6 +52,7 @@ const AVAILABLE_PERMISSIONS = [
   { key: "orders", label: "Orders" },
   { key: "transactions", label: "Transactions" },
   { key: "content", label: "Content & Pages" },
+  { key: "pages", label: "Pages (Create/Edit)" },
   { key: "messages", label: "Messages" },
   { key: "logs", label: "Logs" },
   { key: "settings", label: "Settings" },
@@ -65,6 +66,7 @@ const permissionLabels: Record<string, string> = {
   orders: "Orders",
   transactions: "Transactions",
   content: "Content & Pages",
+  pages: "Pages (Create/Edit)",
   messages: "Messages",
   logs: "Logs",
   settings: "Settings",
@@ -104,6 +106,14 @@ export function AdminsPageClient({
   const [editPermList, setEditPermList] = useState<string[]>([]);
   const [newPermItem, setNewPermItem] = useState("");
   const [isSavingPerms, setIsSavingPerms] = useState(false);
+
+  // Change Password state
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordChangeAdmin, setPasswordChangeAdmin] = useState<AdminUserRecord | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   function getRolePerm(role: AdminRole): RolePermission {
     return rolePerms.find((rp) => rp.role === role) ?? {
@@ -162,6 +172,27 @@ export function AdminsPageClient({
     finally { setIsAdding(false); }
   }
 
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!passwordChangeAdmin) return;
+    setPasswordError("");
+    setIsChangingPassword(true);
+    try {
+      const response = await fetch(`/api/admin/admin-users/${passwordChangeAdmin.id}/password`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: newPassword }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) { setPasswordError(result?.error ?? "Failed to change password."); return; }
+      setShowPasswordModal(false);
+      setPasswordChangeAdmin(null);
+      setNewPassword("");
+      setShowNewPassword(false);
+    } catch { setPasswordError("Network error."); }
+    finally { setIsChangingPassword(false); }
+  }
+
   function openEditRolePerm(role: AdminRole) {
     const perm = getRolePerm(role);
     setEditingRole(role);
@@ -208,6 +239,7 @@ export function AdminsPageClient({
         }];
       });
       setEditingRole(null);
+      window.dispatchEvent(new CustomEvent("moonstrike:admin-permissions-updated"));
     } catch { setError("Network error."); }
     finally { setIsSavingPerms(false); }
   }
@@ -322,13 +354,22 @@ export function AdminsPageClient({
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         {isSuperAdmin && (
-                          <button
-                            onClick={() => { setEditingId(admin.id); setEditRole(admin.role); }}
-                            className="admin-action-icon hover:border-[#22D3EE] hover:text-[#22D3EE]"
-                            aria-label="Edit role"
-                          >
-                            <UserCog size={16} />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => { setEditingId(admin.id); setEditRole(admin.role); }}
+                              className="admin-action-icon hover:border-[#22D3EE] hover:text-[#22D3EE]"
+                              aria-label="Edit role"
+                            >
+                              <UserCog size={16} />
+                            </button>
+                            <button
+                              onClick={() => { setPasswordChangeAdmin(admin); setShowPasswordModal(true); }}
+                              className="admin-action-icon hover:border-amber-500/30 hover:text-amber-300"
+                              aria-label="Change password"
+                            >
+                              <KeyRound size={16} />
+                            </button>
+                          </>
                         )}
                         {isSuperAdmin && admin.id !== currentAdminId && (
                           <button
@@ -538,6 +579,60 @@ export function AdminsPageClient({
                 </AdminButton>
                 <AdminButton type="submit" disabled={isAdding}>
                   {isAdding ? "Creating..." : "Create Admin"}
+                </AdminButton>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {showPasswordModal && passwordChangeAdmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => { setShowPasswordModal(false); setPasswordChangeAdmin(null); setNewPassword(""); setShowNewPassword(false); setPasswordError(""); }}>
+          <div className="w-full max-w-md rounded-lg border border-[#334155] bg-[#1E293B] p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white">Change Password</h2>
+              <button onClick={() => { setShowPasswordModal(false); setPasswordChangeAdmin(null); setNewPassword(""); setShowNewPassword(false); setPasswordError(""); }} className="text-[#64748B] hover:text-white">
+                <X size={20} />
+              </button>
+            </div>
+            <p className="mb-4 text-sm text-[#94A3B8]">
+              Change password for <strong className="text-white">{passwordChangeAdmin.display_name}</strong> ({passwordChangeAdmin.email})
+            </p>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-xs text-[#94A3B8] mb-1">New Password</label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    className={adminInputClass}
+                    placeholder="Enter new password (min 8 characters)"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    minLength={8}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-white"
+                    aria-label={showNewPassword ? "Hide password" : "Show password"}
+                  >
+                    {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+              {passwordError && (
+                <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
+                  {passwordError}
+                </p>
+              )}
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <AdminButton type="button" variant="secondary" onClick={() => { setShowPasswordModal(false); setPasswordChangeAdmin(null); setNewPassword(""); setShowNewPassword(false); setPasswordError(""); }}>
+                  Cancel
+                </AdminButton>
+                <AdminButton type="submit" disabled={isChangingPassword}>
+                  {isChangingPassword ? "Changing..." : "Change Password"}
                 </AdminButton>
               </div>
             </form>

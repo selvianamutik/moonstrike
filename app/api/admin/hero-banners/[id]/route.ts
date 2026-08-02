@@ -2,9 +2,10 @@ import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { writeAuditLog } from "@/lib/admin/audit";
 import { getAdminSession } from "@/lib/admin/session";
-import { CMS_MEDIA_BUCKET, getStoragePathFromPublicUrl } from "@/lib/cms/storage";
+import { getStoragePathFromPublicUrl } from "@/lib/cms/storage";
 import { MAX_VISIBLE_HERO_BANNERS, heroBannerPayload, normalizeHeroBannerInput, HERO_BANNER_SELECT } from "@/lib/cms/hero-banners";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { r2DeleteMany } from "@/lib/r2";
 
 function storagePath(value: string | null | undefined) {
   if (!value) return null;
@@ -13,13 +14,9 @@ function storagePath(value: string | null | undefined) {
 
 async function cleanupReplacedMedia(paths: string[]) {
   if (paths.length === 0) return;
-
-  const supabase = createAdminClient();
-  const { error } = await supabase.storage.from(CMS_MEDIA_BUCKET).remove(Array.from(new Set(paths)));
-
-  if (error) {
-    console.error("Failed to remove replaced hero banner media", error.message);
-  }
+  await r2DeleteMany(Array.from(new Set(paths))).catch((err: Error) => {
+    console.error("Failed to remove replaced hero banner media", err.message);
+  });
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

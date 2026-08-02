@@ -16,12 +16,12 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [refundAmount, setRefundAmount] = useState(initialOrder.total.toFixed(2));
-  const [refundMode, setRefundMode] = useState<RefundMode>(initialOrder.paymentProvider === "stripe" ? "automatic" : "manual");
+  const [refundMode, setRefundMode] = useState<RefundMode>("manual");
   const [refundMessage, setRefundMessage] = useState("");
   const [pendingStatus, setPendingStatus] = useState<AdminOrderActionStatus | null>(null);
   const [pendingRefund, setPendingRefund] = useState<{ amount: number; mode: RefundMode } | null>(null);
   const actions = getNextOrderActions(order.status);
-  const automaticRefundSupported = order.paymentProvider === "stripe";
+  const automaticRefundSupported = order.paymentProvider === "paypal";
 
   useEffect(() => {
     setOrder(initialOrder);
@@ -106,7 +106,7 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
       setRefundMessage(
         payload.manual
           ? "Manual refund recorded."
-          : `${order.paymentProvider === "stripe" ? "Stripe" : order.paymentProvider} refund issued${payload.refundId ? `: ${payload.refundId}` : "."}`,
+          : `${order.paymentProvider} refund issued${payload.refundId ? `: ${payload.refundId}` : "."}`,
       );
       setOrder((current) => ({
         ...current,
@@ -245,7 +245,7 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
             <ol className="relative border-l border-[var(--ms-accent)] ml-3 space-y-6">
               {order.timeline.map((step, i) => (
                 <li key={i} className="ml-6">
-                  <span className="absolute -left-1.5 w-3 h-3 rounded-full bg-[#8B5CF6]" />
+                  <span className={`absolute -left-1.5 w-3 h-3 rounded-full ${step.status === "refunded" || step.status === "refund_requested" ? "bg-red-500" : "bg-[#8B5CF6]"}`} />
                   <div className="flex flex-wrap items-center gap-2 mb-1">
                     <StatusBadge status={step.status} />
                     <span className="text-xs text-[var(--ms-text-secondary)]">{step.at}</span>
@@ -299,7 +299,7 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
             <section className="bg-[var(--ms-secondary)] border border-red-500/30 rounded-xl p-6">
               <h3 className="text-white font-bold mb-3">Refund Panel</h3>
               <p className="text-sm text-[var(--ms-text-secondary)] mb-2">
-                Payment: {order.paymentProvider === "stripe" ? "Card (Stripe)" : "Crypto (NowPayments)"}
+                Payment: {order.paymentProvider === "paypal" ? "PayPal" : "Crypto (NowPayments)"}
               </p>
               <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs leading-5 text-amber-300">
                 {refundMode === "automatic"

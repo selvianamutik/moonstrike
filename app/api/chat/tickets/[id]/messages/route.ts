@@ -7,14 +7,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await getCurrentUser()
-
   const { id } = await params
 
   try {
     const ticket = user ? await getTicketForCustomer(id, user.id) : await getTicketForAnonymous(id)
     if (!ticket) return NextResponse.json({ error: 'Ticket not found.' }, { status: 404 })
 
-    const limit = Number(request.nextUrl.searchParams.get('limit') ?? '10')
+    const limit = Number(request.nextUrl.searchParams.get('limit') ?? '20')
     const before = request.nextUrl.searchParams.get('before')
     const page = await listMessages(id, { limit, before })
     return NextResponse.json(page)
@@ -28,11 +27,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await getCurrentUser()
-
   const { id } = await params
   const body = await request.json().catch(() => null)
   const content = typeof body?.content === 'string' ? body.content : ''
   const attachments = Array.isArray(body?.attachments) ? (body.attachments as ChatAttachment[]) : []
+  const replyToId = typeof body?.replyToId === 'string' ? body.replyToId : null
 
   try {
     const ticket = user ? await getTicketForCustomer(id, user.id) : await getTicketForAnonymous(id)
@@ -44,6 +43,7 @@ export async function POST(
       senderRole: 'customer',
       content,
       attachments,
+      replyToId,
     })
 
     return NextResponse.json({ message })

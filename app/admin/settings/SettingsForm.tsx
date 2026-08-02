@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Bell, KeyRound, Save, Settings2, User } from "lucide-react";
+import { Bell, KeyRound, Save, Settings2, User, Share2 } from "lucide-react";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { AdminFormField, adminInputClass, adminSelectClass } from "@/components/admin/AdminFormField";
 import type { AdminSettings } from "@/lib/admin/settings";
@@ -9,6 +9,12 @@ import { cleanupUploadedMedia } from "@/lib/cms/client-media-cleanup";
 
 import type { PaymentSettingRow } from "@/lib/admin/payment-settings";
 import { CreditCard } from "lucide-react";
+
+type SocialMediaSetting = {
+  platform: string
+  url: string | null
+  is_active: boolean
+}
 
 type SettingsFormProps = {
   initialSettings: AdminSettings;
@@ -81,6 +87,7 @@ async function resizeToWebp(file: File, maxWidth: number, quality: number) {
 export function SettingsForm({ initialSettings, initialPaymentSettings = [] }: SettingsFormProps) {
   const [settings, setSettings] = useState(initialSettings);
   const [paymentSettings, setPaymentSettings] = useState(initialPaymentSettings);
+  const [socialMedia, setSocialMedia] = useState<SocialMediaSetting[]>([]);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -91,6 +98,14 @@ export function SettingsForm({ initialSettings, initialPaymentSettings = [] }: S
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [draftAvatarFile, setDraftAvatarFile] = useState<File | null>(null);
   const [draftAvatarPreview, setDraftAvatarPreview] = useState("");
+
+  // Load social media settings
+  useEffect(() => {
+    fetch('/api/admin/settings/social-media')
+      .then((r) => r.json())
+      .then((data) => setSocialMedia(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -231,6 +246,28 @@ export function SettingsForm({ initialSettings, initialPaymentSettings = [] }: S
     }
   }
 
+  async function updateSocialMedia(platform: string, url: string | null, is_active: boolean) {
+    resetMessages();
+    try {
+      const response = await fetch('/api/admin/settings/social-media', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform, url, is_active }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error ?? 'Failed to update social media.');
+      }
+
+      const updated = await response.json();
+      setSocialMedia((prev) => prev.map((s) => (s.platform === platform ? updated : s)));
+      setStatusMessage(`${platform} updated.`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to update social media.');
+    }
+  }
+
   return (
     <>
       <div className="flex flex-col gap-6">
@@ -360,6 +397,48 @@ export function SettingsForm({ initialSettings, initialPaymentSettings = [] }: S
               ))}
               {paymentSettings.length === 0 && (
                 <p className="text-sm text-[var(--ms-text-secondary)]">No payment methods configured in database.</p>
+              )}
+            </div>
+          </Section>
+
+          <Section icon={<Share2 size={16} className="text-blue-300" />} title="Social Media Links">
+            <div className="grid gap-4">
+              {socialMedia.map((social) => (
+                <div key={social.platform} className="rounded-lg border border-[#172554] bg-[#050816] p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-sm font-bold capitalize text-white">{social.platform}</span>
+                    <label className="flex items-center gap-2">
+                      <span className="text-xs text-[var(--ms-text-secondary)]">Active</span>
+                      <input
+                        type="checkbox"
+                        checked={social.is_active}
+                        onChange={(e) => updateSocialMedia(social.platform, social.url, e.target.checked)}
+                        className="h-4 w-4 rounded border-[#172554] bg-[#0F172A] accent-[#8B5CF6]"
+                      />
+                    </label>
+                  </div>
+                  <input
+                    type={social.platform === "email" ? "email" : social.platform === "phone" ? "tel" : "url"}
+                    className={adminInputClass}
+                    value={social.url || ''}
+                    onChange={(e) => {
+                      setSocialMedia((prev) =>
+                        prev.map((s) => (s.platform === social.platform ? { ...s, url: e.target.value } : s))
+                      );
+                    }}
+                    onBlur={(e) => updateSocialMedia(social.platform, e.target.value || null, social.is_active)}
+                    placeholder={
+                      social.platform === "email"
+                        ? "Enter support email address"
+                        : social.platform === "phone"
+                        ? "Enter phone number e.g. +1 (555) 123-4567"
+                        : `Enter ${social.platform} URL`
+                    }
+                  />
+                </div>
+              ))}
+              {socialMedia.length === 0 && (
+                <p className="text-sm text-[var(--ms-text-secondary)]">Loading social media settings...</p>
               )}
             </div>
           </Section>

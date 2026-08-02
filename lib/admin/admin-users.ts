@@ -57,6 +57,19 @@ export async function deleteAdminUser(id: string) {
   return { ok: true }
 }
 
+export async function updateAdminPassword(id: string, newPassword: string) {
+  const supabase = createAdminClient()
+  const password_hash = hashAdminPassword(newPassword)
+  
+  const { error } = await supabase
+    .from('admin_users')
+    .update({ password_hash })
+    .eq('id', id)
+
+  if (error) throw error
+  return { ok: true }
+}
+
 export type RolePermission = {
   role: AdminRole
   description: string

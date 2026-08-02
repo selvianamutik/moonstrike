@@ -3,11 +3,12 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Lock } from 'lucide-react'
 import { AuthCardSkeleton } from '@/components/storefront-skeletons'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth, readLockout } from '@/hooks/useAuth'
 import { authProviders, hasEmailPassword } from '@/lib/auth/providers'
 import { createClient } from '@/lib/supabase/client'
+import { Turnstile } from '@/components/Turnstile'
 
 type AuthMode = 'login' | 'register' | 'reset'
 
@@ -117,6 +118,47 @@ function AuthCard() {
   const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null)
   const [resendCooldown, setResendCooldown] = useState(0)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  // Lockout state - lazy initializer reads from localStorage immediately on
+  // first render to avoid the hydration gap that caused the countdown to reset.
+  const [lockedUntil, setLockedUntil] = useState<Date | null>(() => {
+    if (typeof window === 'undefined') return null
+    const entry = readLockout()
+    if (!entry) return null
+    const until = new Date(entry.lockedUntil)
+    return until.getTime() > Date.now() ? until : null
+  })
+  const [lockoutSecondsLeft, setLockoutSecondsLeft] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0
+    const entry = readLockout()
+    if (!entry) return 0
+    const secsLeft = Math.ceil((new Date(entry.lockedUntil).getTime() - Date.now()) / 1000)
+    return secsLeft > 0 ? secsLeft : 0
+  })
+
+  // Restore lockout from localStorage on mount (fallback for SSR)
+  useEffect(() => {
+    const entry = readLockout()
+    if (!entry) return
+    const until = new Date(entry.lockedUntil)
+    const secsLeft = Math.ceil((until.getTime() - Date.now()) / 1000)
+    if (secsLeft > 0) {
+      setLockedUntil(until)
+      setLockoutSecondsLeft(secsLeft)
+    }
+  }, [])
+
+  // Live countdown ticker
+  useEffect(() => {
+    if (lockoutSecondsLeft <= 0) {
+      setLockedUntil(null)
+      return
+    }
+    const id = window.setTimeout(() => {
+      setLockoutSecondsLeft((s) => Math.max(s - 1, 0))
+    }, 1000)
+    return () => window.clearTimeout(id)
+  }, [lockoutSecondsLeft])
 
   useEffect(() => {
     if (!window.location.hash) return
@@ -226,18 +268,35 @@ function AuthCard() {
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (lockedUntil) return // block submit while locked
+    if (!turnstileToken) {
+      setError('Please complete the security verification.')
+      return
+    }
     setError(null)
     setNotice(null)
     setIsSubmitting(true)
 
-    const { error: signInError } = await signIn(email, password)
+    const { error: signInError } = await signIn(email, password, turnstileToken)
     setIsSubmitting(false)
+    setTurnstileToken(null) // Reset token after use
 
     if (signInError) {
       if (signInError.message.toLowerCase().includes('email not confirmed')) {
         setUnconfirmedEmail(email.trim())
         setError('This email is registered but not verified. Check your inbox or resend the verification email.')
         return
+      }
+
+      // Check if error carries lockedUntil (set by useAuth)
+      const lockedUntilRaw = (signInError as Error & { lockedUntil?: string }).lockedUntil
+      if (lockedUntilRaw) {
+        const until = new Date(lockedUntilRaw)
+        const secsLeft = Math.ceil((until.getTime() - Date.now()) / 1000)
+        if (secsLeft > 0) {
+          setLockedUntil(until)
+          setLockoutSecondsLeft(secsLeft)
+        }
       }
 
       setError(signInError.message)
@@ -251,6 +310,11 @@ function AuthCard() {
     e.preventDefault()
     setError(null)
     setNotice(null)
+
+    if (!turnstileToken) {
+      setError('Please complete the security verification.')
+      return
+    }
 
     if (username.trim().length < 3) {
       setError('Username must be at least 3 characters.')
@@ -273,8 +337,9 @@ function AuthCard() {
     }
 
     setIsSubmitting(true)
-    const { data, error: signUpError } = await signUp(email, password, username.trim())
+    const { data, error: signUpError } = await signUp(email, password, username.trim(), turnstileToken)
     setIsSubmitting(false)
+    setTurnstileToken(null) // Reset token after use
 
     if (signUpError) {
       setError(signUpError.message)
@@ -377,10 +442,29 @@ function AuthCard() {
           </div>
         )}
 
-        {error && (
+        {error && !lockedUntil && (
           <p className="mono mt-6 rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs leading-5 text-red-400">
             {error}
           </p>
+        )}
+
+        {lockedUntil && lockoutSecondsLeft > 0 && (
+          <div className="mt-6 rounded-md border border-red-500/30 bg-red-500/10 px-4 py-4">
+            <div className="flex items-start gap-3">
+              <Lock size={16} className="mt-0.5 shrink-0 text-red-400" />
+              <div>
+                <p className="text-sm font-bold text-red-400">Account temporarily locked</p>
+                <p className="mt-1 text-xs leading-5 text-red-400/80">
+                  Too many failed login attempts. You can try again in:
+                </p>
+                <p className="mono mt-2 text-xl font-black text-red-400">
+                  {Math.floor(lockoutSecondsLeft / 60).toString().padStart(2, '0')}
+                  :
+                  {(lockoutSecondsLeft % 60).toString().padStart(2, '0')}
+                </p>
+              </div>
+            </div>
+          </div>
         )}
 
         {notice && (
@@ -466,12 +550,20 @@ function AuthCard() {
               </button>
             </div>
 
+            <div className="mt-6 flex justify-center">
+              <Turnstile
+                onSuccess={(token) => setTurnstileToken(token)}
+                onError={() => setTurnstileToken(null)}
+                onExpire={() => setTurnstileToken(null)}
+              />
+            </div>
+
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !!lockedUntil || !turnstileToken}
               className="ms-button mt-7 flex h-13 w-full items-center justify-center mono text-sm uppercase tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isSubmitting ? 'Logging in...' : 'Login'}
+              {isSubmitting ? 'Logging in...' : lockedUntil ? `Locked — ${Math.floor(lockoutSecondsLeft / 60).toString().padStart(2, '0')}:${(lockoutSecondsLeft % 60).toString().padStart(2, '0')}` : 'Login'}
             </button>
           </form>
         )}
@@ -584,9 +676,17 @@ function AuthCard() {
                 </label>
               </div>
 
+              <div className="mt-6 flex justify-center">
+                <Turnstile
+                  onSuccess={(token) => setTurnstileToken(token)}
+                  onError={() => setTurnstileToken(null)}
+                  onExpire={() => setTurnstileToken(null)}
+                />
+              </div>
+
               <button
                 type="submit"
-                disabled={isSubmitting || !acceptedTerms}
+                disabled={isSubmitting || !acceptedTerms || !turnstileToken}
                 className="ms-button mt-7 flex h-13 w-full items-center justify-center mono text-sm uppercase tracking-[0.16em] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSubmitting ? 'Creating account...' : 'Create Account'}

@@ -27,6 +27,8 @@ type ChatComposerToolsProps = {
   disabled?: boolean;
   onAttachmentsChange: (attachments: ChatComposerAttachment[]) => void;
   onError: (message: string) => void;
+  /** Optional user ID for loading personalized suggestions */
+  userId?: string | null;
 };
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
@@ -80,16 +82,43 @@ export async function uploadChatComposerAttachments(attachments: ChatComposerAtt
     resolved.push(uploaded);
   }
 
-  return { attachments: resolved, uploadedImages };
+  return { uploadedImages, attachments: resolved };
 }
 
-export function ChatComposerTools({ attachments, disabled = false, onAttachmentsChange, onError }: ChatComposerToolsProps) {
+export function ChatComposerTools({ attachments, disabled = false, onAttachmentsChange, onError, userId }: ChatComposerToolsProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pendingAttachmentsRef = useRef(attachments);
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+
+  // Load suggestions when link picker opens
+  useEffect(() => {
+    if (!linkPickerOpen) return;
+    if (suggestions.length > 0) return; // already loaded
+
+    setIsLoadingSuggestions(true);
+    const url = userId
+      ? `/api/chat/suggestions?userId=${encodeURIComponent(userId)}`
+      : "/api/chat/suggestions";
+
+    fetch(url, { cache: "no-store" })
+      .then((r) => r.json().catch(() => ({})))
+      .then((payload) => {
+        if (Array.isArray(payload.suggestions)) {
+          setSuggestions(payload.suggestions);
+        }
+      })
+      .catch(() => null)
+      .finally(() => setIsLoadingSuggestions(false));
+  }, [linkPickerOpen, userId, suggestions.length]);
+
+  useEffect(() => {
+    pendingAttachmentsRef.current = attachments;
+  }, [attachments]);
 
   function addImage(file: File) {
     onError("");
@@ -149,7 +178,7 @@ export function ChatComposerTools({ attachments, disabled = false, onAttachments
 
   function addLinkAttachment(result: SearchResult) {
     onAttachmentsChange([
-      ...attachments,
+      ...pendingAttachmentsRef.current,
       {
         type: "link",
         linkType: result.type === "Game" ? "game" : "service",
@@ -159,45 +188,39 @@ export function ChatComposerTools({ attachments, disabled = false, onAttachments
         meta: result.meta,
       },
     ]);
-    setLinkPickerOpen(false);
     setQuery("");
     setResults([]);
+    setLinkPickerOpen(false);
   }
 
-  useEffect(() => {
-    const previous = pendingAttachmentsRef.current;
-    for (const attachment of previous) {
-      if (isDraftImage(attachment) && !attachments.includes(attachment)) {
-        revokeDraftImage(attachment);
-      }
-    }
-    pendingAttachmentsRef.current = attachments;
-  }, [attachments]);
-
-  useEffect(() => {
-    return () => {
-      for (const attachment of pendingAttachmentsRef.current) {
-        revokeDraftImage(attachment);
-      }
-    };
-  }, []);
+  // Items to render: search results when typing, otherwise suggestions
+  const displayItems = query.trim().length >= 2 ? results : suggestions;
+  const showSkeleton = query.trim().length >= 2 ? isSearching : isLoadingSuggestions;
+  const emptyLabel = query.trim().length >= 2
+    ? "No results found."
+    : "No suggestions available.";
+  const headerLabel = query.trim().length >= 2
+    ? null
+    : suggestions.length > 0
+      ? "Suggested for you"
+      : null;
 
   return (
-    <div className="space-y-2">
+    <div>
       {attachments.length > 0 ? (
-        <div className="flex max-h-24 flex-wrap gap-2 overflow-y-auto rounded-lg border border-white/10 bg-black/10 p-2">
+        <div className="mb-3 flex flex-wrap gap-2">
           {attachments.map((attachment, index) => (
-            <div key={index} className="flex max-w-full items-center gap-2 rounded-md border border-white/15 bg-black/20 px-2 py-1.5 text-xs">
+            <div key={index} className="flex max-w-full items-center gap-2 rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-page)] px-2 py-1.5 text-xs">
               {attachment.type === "image" || attachment.type === "draft_image" ? (
                 <img src={attachment.type === "draft_image" ? attachment.previewUrl : attachment.url} alt="" className="h-8 w-8 rounded object-cover" />
               ) : attachment.image ? (
                 <img src={attachment.image} alt="" className="h-8 w-8 rounded object-cover" />
               ) : (
-                <span className="grid h-8 w-8 place-items-center rounded bg-white/10">
+                <span className="grid h-8 w-8 place-items-center rounded bg-[var(--ms-hover-bg)]">
                   <LinkIcon size={14} />
                 </span>
               )}
-              <span className="min-w-0 max-w-[180px] truncate">
+              <span className="min-w-0 max-w-[180px] truncate text-[var(--ms-heading)]">
                 {attachment.type === "image" || attachment.type === "draft_image" ? attachment.filename || "Image" : attachment.title}
               </span>
               <button
@@ -214,41 +237,60 @@ export function ChatComposerTools({ attachments, disabled = false, onAttachments
       ) : null}
 
       {linkPickerOpen ? (
-        <div className="max-h-72 overflow-hidden rounded-lg border border-white/10 bg-black/20 p-3">
-          <div className="flex items-center gap-2 rounded-md border border-white/10 px-3">
-            <Search size={15} className="opacity-60" />
+        <div className="mb-3 overflow-hidden rounded-lg border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-3">
+          {/* Search input */}
+          <div className="flex items-center gap-2 rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-page)] px-3">
+            <Search size={15} className="shrink-0 opacity-60 text-[var(--ms-body)]" />
             <input
               value={query}
               onChange={(event) => void searchLinks(event.target.value)}
               placeholder="Search games or services..."
-              className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none"
+              className="h-10 min-w-0 flex-1 bg-transparent text-sm text-[var(--ms-heading)] outline-none placeholder:text-[var(--ms-body)]"
               autoFocus
             />
-            <button type="button" onClick={() => setLinkPickerOpen(false)} className="opacity-60 hover:opacity-100" aria-label="Close link picker">
+            <button
+              type="button"
+              onClick={() => { setLinkPickerOpen(false); setQuery(""); setResults([]); }}
+              className="shrink-0 opacity-60 hover:opacity-100 text-[var(--ms-body)]"
+              aria-label="Close link picker"
+            >
               <X size={15} />
             </button>
           </div>
-          <div className="mt-3 max-h-48 overflow-y-auto">
-            {isSearching ? (
+
+          {/* Results / suggestions */}
+          <div className="mt-3 max-h-52 overflow-y-auto">
+            {showSkeleton ? (
               <div className="space-y-2">
-                <div className="h-14 animate-pulse rounded-md bg-white/10" />
-                <div className="h-14 animate-pulse rounded-md bg-white/10" />
+                <div className="h-14 animate-pulse rounded-md bg-[var(--ms-border)]" />
+                <div className="h-14 animate-pulse rounded-md bg-[var(--ms-border)]" />
+                <div className="h-14 animate-pulse rounded-md bg-[var(--ms-border)]" />
               </div>
-            ) : results.length === 0 ? (
-              <p className="px-1 py-3 text-xs opacity-70">Search by game or service name.</p>
+            ) : displayItems.length === 0 ? (
+              <p className="px-1 py-3 text-xs text-[var(--ms-body)]">{emptyLabel}</p>
             ) : (
-              <div className="space-y-2">
-                {results.map((result) => (
+              <div className="space-y-1.5">
+                {headerLabel && (
+                  <p className="px-1 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--ms-gradient-end)]">
+                    {headerLabel}
+                  </p>
+                )}
+                {displayItems.map((result) => (
                   <button
                     key={`${result.type}-${result.href}`}
                     type="button"
                     onClick={() => addLinkAttachment(result)}
-                    className="flex w-full items-center gap-3 rounded-md border border-white/10 p-2 text-left hover:border-[var(--ms-gradient-end)]"
+                    className="flex w-full items-center gap-3 rounded-md border border-[var(--ms-border)] p-2 text-left transition-colors hover:border-[var(--ms-gradient-end)] hover:bg-[var(--ms-hover-bg)]"
                   >
-                    {result.image ? <img src={result.image} alt="" className="h-10 w-10 rounded object-cover" /> : <div className="h-10 w-10 rounded bg-white/10" />}
+                    {result.image
+                      ? <img src={result.image} alt="" className="h-10 w-10 rounded object-cover" />
+                      : <div className="grid h-10 w-10 shrink-0 place-items-center rounded bg-[var(--ms-hover-bg)] text-[var(--ms-body)]"><LinkIcon size={14} /></div>
+                    }
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-bold">{result.title}</span>
-                      <span className="block truncate text-xs opacity-70">{result.type} / {result.meta}</span>
+                      <span className="block truncate text-sm font-bold text-[var(--ms-heading)]">{result.title}</span>
+                      <span className="block truncate text-xs text-[var(--ms-body)]">
+                        {result.type} {result.meta ? `/ ${result.meta}` : ""}
+                      </span>
                     </span>
                   </button>
                 ))}
@@ -273,7 +315,7 @@ export function ChatComposerTools({ attachments, disabled = false, onAttachments
           type="button"
           disabled={disabled}
           onClick={() => fileInputRef.current?.click()}
-          className="inline-flex h-9 items-center gap-2 rounded-md border border-white/15 px-3 text-xs opacity-80 hover:border-[var(--ms-gradient-end)] hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-9 items-center gap-2 rounded-md border border-[var(--ms-border)] px-3 text-xs text-[var(--ms-body)] opacity-80 hover:border-[var(--ms-gradient-end)] hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ImagePlus size={15} />
           Image
@@ -282,7 +324,7 @@ export function ChatComposerTools({ attachments, disabled = false, onAttachments
           type="button"
           disabled={disabled}
           onClick={() => setLinkPickerOpen((current) => !current)}
-          className="inline-flex h-9 items-center gap-2 rounded-md border border-white/15 px-3 text-xs opacity-80 hover:border-[var(--ms-gradient-end)] hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-9 items-center gap-2 rounded-md border border-[var(--ms-border)] px-3 text-xs text-[var(--ms-body)] opacity-80 hover:border-[var(--ms-gradient-end)] hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <LinkIcon size={15} />
           Game/Service

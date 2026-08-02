@@ -46,7 +46,7 @@ type AdminOrderRow = {
 type AdminOrderTransactionRow = {
   checkout_session_id: string;
   transaction_ref: string;
-  provider: "stripe" | "nowpayments";
+  provider: "nowpayments" | "paypal";
   provider_payment_id: string;
   amount: number | string;
   currency: "USD" | "EUR";
@@ -87,7 +87,7 @@ export type AdminOrderRecord = {
   refundAmount: number;
   currency: "USD" | "EUR";
   status: AdminOrderStatus;
-  paymentProvider: "stripe" | "nowpayments";
+  paymentProvider: "nowpayments" | "paypal";
   transactionId: string;
   checkoutSessionId: string;
   orderReference: string;
@@ -225,7 +225,7 @@ function mapOrder(row: AdminOrderRow, user: AdminCustomer | undefined, transacti
     refundAmount: Number(row.refund_amount ?? 0),
     currency,
     status: row.status,
-    paymentProvider: transaction?.provider ?? "stripe",
+    paymentProvider: transaction?.provider ?? "nowpayments",
     transactionId,
     checkoutSessionId: row.checkout_session_id,
     orderReference: row.order_ref,

@@ -4,9 +4,9 @@ import { CheckoutError, createPaymentCheckout } from "@/lib/payments/checkout";
 
 export async function POST(request: NextRequest) {
   try {
-    const checkout = await createPaymentCheckout("stripe", request);
+    const checkout = await createPaymentCheckout("nowpayments", request);
     await writeAuditLog({
-      action: `Stripe checkout created ${checkout.checkoutSessionId}`,
+      action: `Checkout created ${checkout.checkoutSessionId}`,
       status: "success",
       request,
       eventType: "checkout",
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof CheckoutError) {
       await writeAuditLog({
-        action: `Stripe checkout blocked: ${error.message}`,
+        action: `Checkout blocked: ${error.message}`,
         status: "blocked",
         request,
         eventType: "checkout",
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     const message = error instanceof Error ? error.message : "Unable to create checkout.";
     await writeAuditLog({
-      action: `Stripe checkout failed: ${message}`,
+      action: `Checkout failed: ${message}`,
       status: "critical",
       request,
       eventType: "checkout",

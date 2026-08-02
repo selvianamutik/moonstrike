@@ -8,6 +8,25 @@ type QuillEditorProps = {
   placeholder?: string;
 };
 
+/**
+ * Strip table-related HTML tags from a string while preserving inner text.
+ * Quill has no native Blot for <table>, so any table HTML in the editor
+ * becomes an unselectable/undeletable node. We sanitize on load and on paste.
+ */
+function stripTableHtml(html: string): string {
+  return html
+    // Replace <tr> with a newline so rows don't merge into one line
+    .replace(/<\/tr\s*>/gi, "\n")
+    // Replace closing td/th with a tab separator so columns stay readable
+    .replace(/<\/t[dh]\s*>/gi, "\t")
+    // Remove all table-related opening/closing tags
+    .replace(/<\/?(table|thead|tbody|tfoot|tr|th|td|colgroup|col|caption)[^>]*>/gi, "")
+    // Collapse consecutive whitespace left behind
+    .replace(/\t+/g, " | ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export function QuillEditor({ value, onChange, placeholder }: QuillEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const quillRef = useRef<unknown>(null);
@@ -43,6 +62,16 @@ export function QuillEditor({ value, onChange, placeholder }: QuillEditorProps) 
 
       if (cancelled) return;
 
+      // ── Table paste handler ──────────────────────────────────────────────────
+      // Clipboard Matchers prevent NEW table pastes from becoming stuck nodes.
+      // We also strip table HTML from the initial value below (line 67).
+      const tableNodeNames = ["TABLE", "THEAD", "TBODY", "TFOOT", "TR", "TH", "TD"];
+      for (const nodeName of tableNodeNames) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        quill.clipboard.addMatcher(nodeName, (_node: Node, delta: any) => delta);
+      }
+      // ── End table paste handler ──────────────────────────────────────────────
+
       quill.on("text-change", () => {
         const html = quill.root.innerHTML;
         if (html !== "<p><br></p>") {
@@ -53,7 +82,9 @@ export function QuillEditor({ value, onChange, placeholder }: QuillEditorProps) 
       });
 
       if (value) {
-        quill.root.innerHTML = value;
+        // Strip table HTML before loading into Quill so existing saved tables
+        // don't become stuck/undeletable nodes in the editor DOM.
+        quill.root.innerHTML = stripTableHtml(value);
       }
 
       quillRef.current = quill;
@@ -69,8 +100,10 @@ export function QuillEditor({ value, onChange, placeholder }: QuillEditorProps) 
 
   useEffect(() => {
     const quill = quillRef.current as { root: HTMLDivElement } | null;
-    if (quill && !initializedRef.current) {
-      quill.root.innerHTML = value;
+    if (!quill || !initializedRef.current) return;
+    // Sync from outside only when value is cleared to support the Clear button.
+    if (value === "") {
+      quill.root.innerHTML = "";
     }
   }, [value]);
 

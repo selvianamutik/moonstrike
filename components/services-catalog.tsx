@@ -206,7 +206,7 @@ export function ServicesCatalog({
       </div>
 
       {filteredServices.length > 0 ? (
-        <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
           {visibleServices.map((service) => (
             <ServiceCard key={`${service.gameSlug}-${service.slug}`} service={service} />
           ))}

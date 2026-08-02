@@ -1,3 +1,5 @@
+import { r2KeyFromPublicUrl } from '@/lib/r2'
+
 export const CMS_MEDIA_BUCKET =
   process.env.SUPABASE_MEDIA_BUCKET || 'media'
 
@@ -21,11 +23,21 @@ export function getChangedStoragePaths(
   return oldPaths.filter((path) => !newPaths.has(path))
 }
 
-export function getStoragePathFromPublicUrl(url: string) {
+/**
+ * Extracts the storage key/path from a public URL.
+ * Supports both R2 public URLs and legacy Supabase storage URLs.
+ */
+export function getStoragePathFromPublicUrl(url: string): string | null {
+  // Try R2 URL first
+  const r2Key = r2KeyFromPublicUrl(url)
+  if (r2Key) return r2Key
+
+  // Legacy: Supabase storage URL
   const marker = `/storage/v1/object/public/${CMS_MEDIA_BUCKET}/`
   const markerIndex = url.indexOf(marker)
+  if (markerIndex !== -1) {
+    return decodeURIComponent(url.slice(markerIndex + marker.length))
+  }
 
-  if (markerIndex === -1) return null
-
-  return decodeURIComponent(url.slice(markerIndex + marker.length))
+  return null
 }

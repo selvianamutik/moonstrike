@@ -3,7 +3,7 @@
 import React, { useState, useTransition, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AlertTriangle, ArrowRight, CheckCircle2, CreditCard, MessageSquareWarning, RotateCcw, Sparkles, Users } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, CreditCard, Database, MessageSquareWarning, RotateCcw, Sparkles, Users } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { StatusBadge, type StatusType } from "@/components/admin/StatusBadge";
@@ -30,11 +30,12 @@ function UnauthorizedAlert() {
   );
 }
 
-export function DashboardClient({ initialDashboard }: { initialDashboard: AdminDashboardData }) {
+export function DashboardClient({ initialDashboard, adminRole }: { initialDashboard: AdminDashboardData; adminRole: string }) {
   const [dashboard, setDashboard] = useState(initialDashboard);
   const [selectedDays, setSelectedDays] = useState<AdminDashboardPeriodDays>(initialDashboard.period.days);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
+  const isSuperAdmin = adminRole === "super_admin";
 
   function loadDashboard(days: AdminDashboardPeriodDays) {
     setSelectedDays(days);
@@ -93,7 +94,9 @@ export function DashboardClient({ initialDashboard }: { initialDashboard: AdminD
       ) : null}
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <AdminStatCard title="TOTAL REVENUE" value={dashboard.stats.revenue} subtitle={`Successful payments / ${dashboard.period.label.toLowerCase()}`} icon={<CreditCard size={18} className="text-[#8B5CF6]" />} progressColor="bg-[#8B5CF6]" />
+        {isSuperAdmin && (
+          <AdminStatCard title="TOTAL REVENUE" value={dashboard.stats.revenue} subtitle={`Successful payments / ${dashboard.period.label.toLowerCase()}`} icon={<CreditCard size={18} className="text-[#8B5CF6]" />} progressColor="bg-[#8B5CF6]" />
+        )}
         <AdminStatCard title="ACTIVE CUSTOMERS" value={String(dashboard.stats.activeCustomers)} subtitle={`${dashboard.stats.newCustomers} new / ${dashboard.period.label.toLowerCase()}`} icon={<Users size={18} className="text-[#22D3EE]" />} progressColor="bg-[#22D3EE]" />
         <AdminStatCard title="COMPLETED ORDERS" value={String(dashboard.stats.completedOrders)} subtitle={`Completed / ${dashboard.period.label.toLowerCase()}`} icon={<CheckCircle2 size={18} className="text-green-500" />} progressColor="bg-green-500" />
         <AdminStatCard title="REFUND REQUESTS" value={String(dashboard.stats.refundRequests)} subtitle="Current requests needing review" icon={<RotateCcw size={18} className="text-amber-500" />} progressColor="bg-amber-500" />
@@ -111,11 +114,13 @@ export function DashboardClient({ initialDashboard }: { initialDashboard: AdminD
               <h2 className="mb-1 text-lg font-bold text-white">Order Pulse</h2>
               <p className="text-sm text-[var(--admin-muted)]">Order count and successful payment value for {dashboard.period.label.toLowerCase()}.</p>
             </div>
-            <div className="flex flex-wrap items-center gap-4">
-              <LegendDot color="bg-[#22D3EE]" label="Orders" />
-              <LegendDot color="bg-[#8B5CF6]" label="USD" />
-              <LegendDot color="bg-green-500" label="EUR" />
-            </div>
+            {isSuperAdmin && (
+              <div className="flex flex-wrap items-center gap-4">
+                <LegendDot color="bg-[#22D3EE]" label="Orders" />
+                <LegendDot color="bg-[#8B5CF6]" label="USD" />
+                <LegendDot color="bg-green-500" label="EUR" />
+              </div>
+            )}
           </div>
 
           <div className="h-72 min-w-0">
@@ -131,15 +136,17 @@ export function DashboardClient({ initialDashboard }: { initialDashboard: AdminD
                   allowDecimals={false}
                   width={38}
                 />
-                <YAxis
-                  yAxisId="revenue"
-                  orientation="right"
-                  tick={{ fill: "#94A3B8", fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={48}
-                  tickFormatter={(value: number) => `${Math.round(value)}`}
-                />
+                {isSuperAdmin && (
+                  <YAxis
+                    yAxisId="revenue"
+                    orientation="right"
+                    tick={{ fill: "#94A3B8", fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={48}
+                    tickFormatter={(value: number) => `${Math.round(value)}`}
+                  />
+                )}
                 <Tooltip content={<PulseTooltip />} cursor={{ stroke: "rgba(148,163,184,0.2)", strokeWidth: 1 }} />
                 <Line
                   yAxisId="orders"
@@ -151,53 +158,59 @@ export function DashboardClient({ initialDashboard }: { initialDashboard: AdminD
                   dot={{ r: 3, fill: "#22D3EE", strokeWidth: 0 }}
                   activeDot={{ r: 5, fill: "#22D3EE", strokeWidth: 0 }}
                 />
-                <Line
-                  yAxisId="revenue"
-                  type="monotone"
-                  dataKey="revenueUsd"
-                  name="USD Revenue"
-                  stroke="#8B5CF6"
-                  strokeWidth={2}
-                  dot={{ r: 3, fill: "#8B5CF6", strokeWidth: 0 }}
-                  activeDot={{ r: 5, fill: "#8B5CF6", strokeWidth: 0 }}
-                />
-                <Line
-                  yAxisId="revenue"
-                  type="monotone"
-                  dataKey="revenueEur"
-                  name="EUR Revenue"
-                  stroke="#22C55E"
-                  strokeWidth={2}
-                  dot={{ r: 3, fill: "#22C55E", strokeWidth: 0 }}
-                  activeDot={{ r: 5, fill: "#22C55E", strokeWidth: 0 }}
-                />
+                {isSuperAdmin && (
+                  <>
+                    <Line
+                      yAxisId="revenue"
+                      type="monotone"
+                      dataKey="revenueUsd"
+                      name="USD Revenue"
+                      stroke="#8B5CF6"
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: "#8B5CF6", strokeWidth: 0 }}
+                      activeDot={{ r: 5, fill: "#8B5CF6", strokeWidth: 0 }}
+                    />
+                    <Line
+                      yAxisId="revenue"
+                      type="monotone"
+                      dataKey="revenueEur"
+                      name="EUR Revenue"
+                      stroke="#22C55E"
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: "#22C55E", strokeWidth: 0 }}
+                      activeDot={{ r: 5, fill: "#22C55E", strokeWidth: 0 }}
+                    />
+                  </>
+                )}
               </LineChart>
             </ResponsiveContainer>
           </div>
         </section>
 
-        <section className="rounded-xl border border-[#172554] bg-[#0F172A] p-6">
-          <div className="mb-6 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-bold text-white">Top Selling Services</h2>
-              <p className="mt-1 text-xs text-[#64748B]">Non-refunded order items / {dashboard.period.label.toLowerCase()}</p>
+        {isSuperAdmin && (
+          <section className="rounded-xl border border-[#172554] bg-[#0F172A] p-6">
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-white">Top Selling Services</h2>
+                <p className="mt-1 text-xs text-[#64748B]">Non-refunded order items / {dashboard.period.label.toLowerCase()}</p>
+              </div>
+              <Link href="/admin/services" className="text-xs font-bold text-[#22D3EE] hover:text-white">
+                View all
+              </Link>
             </div>
-            <Link href="/admin/services" className="text-xs font-bold text-[#22D3EE] hover:text-white">
-              View all
-            </Link>
-          </div>
-          <div className="flex flex-col gap-6">
-            {dashboard.topServices.length > 0 ? (
-              dashboard.topServices.map((service) => (
-                <TopServiceItem key={service.name} name={service.name} image={service.image} category={`${service.category} / ${service.count} order item${service.count === 1 ? "" : "s"}`} revenue={service.revenue} />
+            <div className="flex flex-col gap-6">
+              {dashboard.topServices.length > 0 ? (
+                dashboard.topServices.map((service) => (
+                  <TopServiceItem key={service.name} name={service.name} image={service.image} category={`${service.category} / ${service.count} order item${service.count === 1 ? "" : "s"}`} revenue={service.revenue} />
               ))
-            ) : (
-              <p className="rounded-lg border border-[#172554] bg-[#020617]/40 p-4 text-sm text-[#64748B]">
-                No non-refunded order item sales in {dashboard.period.label.toLowerCase()} yet.
-              </p>
-            )}
-          </div>
-        </section>
+              ) : (
+                <p className="rounded-lg border border-[#172554] bg-[#020617]/40 p-4 text-sm text-[#64748B]">
+                  No non-refunded order item sales in {dashboard.period.label.toLowerCase()} yet.
+                </p>
+              )}
+            </div>
+          </section>
+        )}
       </div>
 
       <section className="flex flex-col overflow-hidden rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface)]">
@@ -319,6 +332,8 @@ export function DashboardClient({ initialDashboard }: { initialDashboard: AdminD
           </table>
         </div>
       </section>
+
+      {isSuperAdmin && <StorageMigrationPanel />}
     </div>
   );
 }
@@ -374,6 +389,103 @@ function AttentionCard({ title, value, href, description, icon }: { title: strin
       </div>
     </Link>
   );
+}
+
+// ─── Storage Migration Panel (temporary — remove after migration complete) ────
+
+type MigrationResult = {
+  total: number
+  migrated: number
+  skipped: number
+  failed: number
+  errors: Array<{ path: string; error: string }>
+  dryRun: boolean
+  message: string
+}
+
+function StorageMigrationPanel() {
+  const [status, setStatus] = useState<"idle" | "running" | "done" | "error">("idle")
+  const [result, setResult] = useState<MigrationResult | null>(null)
+  const [prefix, setPrefix] = useState("")
+
+  async function run(dryRun: boolean) {
+    setStatus("running")
+    setResult(null)
+    try {
+      const res = await fetch("/api/admin/migrate-storage-to-r2", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dryRun, prefix: prefix.trim() || undefined }),
+      })
+      const data = await res.json()
+      setResult(data)
+      setStatus(data.ok === false ? "error" : "done")
+    } catch (err) {
+      setResult({ total: 0, migrated: 0, skipped: 0, failed: 0, errors: [], dryRun, message: err instanceof Error ? err.message : "Request failed" })
+      setStatus("error")
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-6">
+      <div className="flex items-center gap-3 mb-4">
+        <Database size={18} className="text-amber-400 shrink-0" />
+        <div>
+          <h2 className="text-base font-bold text-white">Supabase → R2 Storage Migration</h2>
+          <p className="text-xs text-[#94A3B8] mt-0.5">One-time migration. Remove this panel after use.</p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <input
+          type="text"
+          value={prefix}
+          onChange={(e) => setPrefix(e.target.value)}
+          placeholder="Filter prefix (e.g. games) — leave empty for all"
+          className="h-9 flex-1 min-w-[220px] rounded-md border border-[#172554] bg-[#050816] px-3 text-sm text-white placeholder:text-[#475569] outline-none"
+        />
+        <button
+          type="button"
+          disabled={status === "running"}
+          onClick={() => run(true)}
+          className="h-9 rounded-md border border-[#22D3EE]/40 px-4 text-xs font-bold uppercase tracking-[0.1em] text-[#22D3EE] hover:bg-[#22D3EE]/10 disabled:opacity-50"
+        >
+          {status === "running" ? "Running..." : "Dry Run"}
+        </button>
+        <button
+          type="button"
+          disabled={status === "running"}
+          onClick={() => run(false)}
+          className="h-9 rounded-md bg-amber-500 px-4 text-xs font-bold uppercase tracking-[0.1em] text-black hover:bg-amber-400 disabled:opacity-50"
+        >
+          {status === "running" ? "Migrating..." : "Run Migration"}
+        </button>
+      </div>
+
+      {status === "running" && (
+        <p className="text-sm text-[#94A3B8] animate-pulse">Migration in progress — do not close this page...</p>
+      )}
+
+      {result && (
+        <div className="mt-3 rounded-lg border border-[#172554] bg-[#050816] p-4 text-sm space-y-2">
+          <p className={`font-bold ${status === "error" ? "text-red-400" : "text-green-400"}`}>{result.message}</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 text-xs text-[#94A3B8]">
+            <span>Total: <span className="text-white font-bold">{result.total}</span></span>
+            <span>Migrated: <span className="text-green-400 font-bold">{result.migrated}</span></span>
+            <span>Skipped: <span className="text-[#22D3EE] font-bold">{result.skipped}</span></span>
+            <span>Failed: <span className="text-red-400 font-bold">{result.failed}</span></span>
+          </div>
+          {result.errors.length > 0 && (
+            <div className="mt-2 max-h-40 overflow-y-auto space-y-1">
+              {result.errors.map((e, i) => (
+                <p key={i} className="text-xs text-red-300"><span className="text-red-500">{e.path}</span>: {e.error}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  )
 }
 
 function TopServiceItem({ name, image, category, revenue }: { name: string; image: string | null; category: string; revenue: string }) {

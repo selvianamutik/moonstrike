@@ -63,14 +63,14 @@ export function TrustpilotReviewPrompt({ orderId }: { orderId: string }) {
           <button
             type="button"
             onClick={closePrompt}
-            className="rounded-lg p-1.5 text-[var(--ms-body)] transition-colors hover:bg-white/10 hover:text-white"
+            className="rounded-lg p-1.5 text-[var(--ms-body)] transition-colors hover:bg-[var(--ms-hover-bg)] hover:text-[var(--ms-heading)]"
             aria-label="Close review prompt"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="mt-6 rounded-lg border border-[var(--ms-border)] bg-black/15 p-4">
+        <div className="mt-6 rounded-lg border border-[var(--ms-border)] bg-[var(--ms-bg-page)] p-4">
           <TrustpilotReviewCollector />
         </div>
 
@@ -78,7 +78,7 @@ export function TrustpilotReviewPrompt({ orderId }: { orderId: string }) {
           <button
             type="button"
             onClick={closePrompt}
-            className="rounded-lg border border-[var(--ms-border)] px-4 py-2.5 text-sm font-bold text-[var(--ms-body)] transition-colors hover:border-[var(--ms-gradient-end)] hover:text-white"
+            className="rounded-lg border border-[var(--ms-border)] px-4 py-2.5 text-sm font-bold text-[var(--ms-body)] transition-colors hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]"
           >
             Maybe later
           </button>

@@ -30,6 +30,37 @@ async function loadSessionStatus({ force = false }: { force?: boolean } = {}) {
   return sessionStatusInFlight
 }
 
+// ─── Lockout local storage helpers ───────────────────────────────────────────
+// Uses localStorage (not sessionStorage) so lockout persists across tabs and
+// page refreshes. TTL is enforced client-side via the lockedUntil timestamp.
+const LOCKOUT_KEY = 'ms_login_lockout'
+
+type LockoutEntry = { email: string; lockedUntil: string }
+
+function saveLockout(email: string, lockedUntil: string) {
+  try {
+    localStorage.setItem(LOCKOUT_KEY, JSON.stringify({ email, lockedUntil }))
+  } catch { /* ignore quota errors */ }
+}
+
+function clearLockout() {
+  try { localStorage.removeItem(LOCKOUT_KEY) } catch { /* ignore */ }
+}
+
+export function readLockout(): LockoutEntry | null {
+  try {
+    const raw = localStorage.getItem(LOCKOUT_KEY)
+    if (!raw) return null
+    const entry = JSON.parse(raw) as LockoutEntry
+    // Auto-expire if lockedUntil is in the past
+    if (new Date(entry.lockedUntil).getTime() <= Date.now()) {
+      clearLockout()
+      return null
+    }
+    return entry
+  } catch { return null }
+}
+
 export function useAuth() {
   const supabase = useMemo(() => createClient(), [])
   const [user, setUser] = useState<User | null>(null)
@@ -81,7 +112,7 @@ export function useAuth() {
   }, [supabase])
 
   const signIn = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, captchaToken?: string) => {
       // Check if account is locked before attempting login
       const lockCheckResponse = await fetch(
         `/api/auth/login-attempt?email=${encodeURIComponent(email)}`
@@ -90,24 +121,30 @@ export function useAuth() {
       if (lockCheckResponse?.ok) {
         const lockStatus = await lockCheckResponse.json().catch(() => ({}))
         if (lockStatus.locked) {
-          const lockedUntil = lockStatus.lockedUntil ? new Date(lockStatus.lockedUntil) : null
+          const lockedUntil = lockStatus.lockedUntil ?? null
+          if (lockedUntil) saveLockout(email, lockedUntil)
           const minutesRemaining = lockedUntil
-            ? Math.ceil((lockedUntil.getTime() - Date.now()) / 60000)
+            ? Math.ceil((new Date(lockedUntil).getTime() - Date.now()) / 60000)
             : 30
-          
           return {
             data: null,
-            error: new Error(
-              `Account is temporarily locked due to multiple failed login attempts. Please try again in ${minutesRemaining} minute${minutesRemaining !== 1 ? 's' : ''}.`
+            error: Object.assign(
+              new Error(`Account is temporarily locked due to multiple failed login attempts. Please try again in ${minutesRemaining} minute${minutesRemaining !== 1 ? 's' : ''}.`),
+              { lockedUntil }
             ),
           }
         }
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+        options: captchaToken ? { captchaToken } : undefined,
+      })
       
       if (!error && data.user) {
-        // Successful login - reset login attempts
+        // Successful login - reset login attempts + clear lockout session
+        clearLockout()
         await fetch('/api/auth/login-attempt', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -125,9 +162,14 @@ export function useAuth() {
         
         if (attemptResponse?.status === 423) {
           const attemptData = await attemptResponse.json().catch(() => ({}))
+          const lockedUntil = attemptData.lockedUntil ?? null
+          if (lockedUntil) saveLockout(email, lockedUntil)
           return {
             data: null,
-            error: new Error(attemptData.message || 'Account is temporarily locked.'),
+            error: Object.assign(
+              new Error(attemptData.message || 'Account is temporarily locked.'),
+              { lockedUntil }
+            ),
           }
         }
         
@@ -148,7 +190,7 @@ export function useAuth() {
   )
 
   const signUp = useCallback(
-    async (email: string, password: string, username: string) => {
+    async (email: string, password: string, username: string, captchaToken?: string) => {
       const checkResponse = await fetch('/api/auth/register-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -171,6 +213,7 @@ export function useAuth() {
         options: {
           data: { username },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
+          captchaToken,
         },
       })
 

@@ -4,7 +4,7 @@ import { SiteHeader } from "@/components/site-header";
 import { requireVerifiedUser } from "@/lib/auth/session";
 import { formatMemberSince, getUserDisplayName, getUserInitials } from "@/lib/auth/user-display";
 import { formatOrderMoney, listCustomerOrders, type CustomerOrder } from "@/lib/orders";
-import { listCustomerTickets, listMessages } from "@/lib/chat";
+import { getOrCreateCustomerTicket, listMessages } from "@/lib/chat";
 import { ProfileChatClient } from "./ProfileChatClient";
 
 export const dynamic = "force-dynamic";
@@ -24,19 +24,11 @@ function formatTotalSpent(orders: CustomerOrder[]) {
   return parts.length > 0 ? parts.join(" / ") : "$0.00";
 }
 
-export default async function ProfileChatPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ order?: string }>;
-}) {
+export default async function ProfileChatPage() {
   const user = await requireVerifiedUser("/profile/chat");
-  const resolvedSearchParams = await searchParams;
-  const orderRef = typeof resolvedSearchParams.order === "string" ? resolvedSearchParams.order : null;
   const orders = await listCustomerOrders(user.id);
-  const tickets = await listCustomerTickets(user);
-  const orderTicket = orderRef ? tickets.find((ticket) => ticket.orderRef === orderRef) ?? null : null;
-  const activeTicket = orderTicket;
-  const initialMessagePage = activeTicket ? await listMessages(activeTicket.id) : { messages: [], hasMore: false };
+  const ticket = await getOrCreateCustomerTicket(user);
+  const initialMessagePage = await listMessages(ticket.id);
   const displayName = getUserDisplayName(user);
   const initials = getUserInitials(displayName, user.email);
   const memberSince = formatMemberSince(user.created_at);
@@ -61,13 +53,9 @@ export default async function ProfileChatPage({
           </div>
 
           <ProfileChatClient
-            key={activeTicket?.id ?? (orderRef ? `draft:${orderRef}` : "empty")}
-            initialTickets={tickets}
-            chatOrders={orders.map((order) => ({ orderRef: order.orderReference, label: `${order.orderReference} / ${order.serviceSummary}` }))}
+            initialTicket={ticket}
             initialMessages={initialMessagePage.messages}
             initialHasMore={initialMessagePage.hasMore}
-            initialSelectedId={activeTicket?.id ?? ""}
-            initialDraftOrderRef={orderRef && !orderTicket ? orderRef : null}
           />
         </div>
       </section>

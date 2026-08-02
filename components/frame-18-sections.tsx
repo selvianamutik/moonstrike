@@ -89,9 +89,9 @@ export function Frame18Sections({ benefits, steps }: { benefits: LandingBenefits
           ["/payment/paypal.svg", "PayPal"],
           ["/payment/btc.svg", "Crypto"],
           ["/payment/master-card.svg", "Mastercard"],
-          ["/payment/QRIS.svg", "QRIS (Doku)"],
-          ["/payment/Skrill.svg", "Skrill"],
-          ["/payment/Payoneer.svg", "Payoneer"],
+          ["/payment/visa.svg", "Visa"],
+          ["/payment/apple-pay.svg", "Apple Pay"],
+          ["/payment/google-pay.svg", "Google Pay"],
         ].map(([src, alt]) => (
           <Image key={src} src={src} alt={alt} width={150} height={46} className="h-10 w-auto opacity-90" />
         ))}

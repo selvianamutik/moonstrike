@@ -35,6 +35,14 @@ function matchesDateFilter(createdAtIso: string, dateFilter: DateFilter, dateFro
   return createdAt >= from && createdAt <= to;
 }
 
+// Fixed EUR→USD exchange rate used for converting refunded amounts to USD only.
+// This is a display-only conversion — raw transaction values are unchanged.
+const EUR_TO_USD_RATE = 1.08;
+
+function convertToUsd(amount: number, currency: "USD" | "EUR"): number {
+  return currency === "EUR" ? amount * EUR_TO_USD_RATE : amount;
+}
+
 function formatMoney(value: number, currency: "USD" | "EUR") {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -50,13 +58,20 @@ function formatMoneyParts(totals: Record<"USD" | "EUR", number>) {
   return parts.join(" / ") || "$0.00";
 }
 
+function formatMoneyUsdOnly(usdAmount: number) {
+  return formatMoney(usdAmount, "USD");
+}
+
 export function TransactionsPageClient({
   stats: initialStats,
   transactions,
+  adminRole,
 }: {
   stats: AdminTransactionStats;
   transactions: AdminTransactionRecord[];
+  adminRole?: string;
 }) {
+  const isSuperAdmin = adminRole === "super_admin";
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All Status");
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
@@ -93,19 +108,22 @@ export function TransactionsPageClient({
       },
       { EUR: 0, USD: 0 },
     );
-    const refundedTotals = filtered.reduce(
+    // Convert all refunded EUR amounts to USD for display
+    const refundedUsd = filtered.reduce(
       (sum, transaction) => {
-        if (transaction.status === "refunded") sum[transaction.currency] += transaction.amountValue;
+        if (transaction.status === "refunded") {
+          sum += convertToUsd(transaction.amountValue, transaction.currency);
+        }
         return sum;
       },
-      { EUR: 0, USD: 0 },
+      0,
     );
 
     return {
       totalCollected: formatMoneyParts(collectedTotals),
       successfulCount: filtered.filter((transaction) => transaction.status === "success").length,
       refundedCount: filtered.filter((transaction) => transaction.status === "refunded").length,
-      totalRefunded: formatMoneyParts(refundedTotals),
+      totalRefunded: formatMoneyUsdOnly(refundedUsd),
     } satisfies AdminTransactionStats;
   }, [filtered]);
 
@@ -132,7 +150,9 @@ export function TransactionsPageClient({
       />
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <AdminStatCard title="TOTAL COLLECTED" value={stats.totalCollected} subtitle="Successful transaction value" icon={<DollarSign size={18} className="text-[#8B5CF6]" />} progressColor="bg-[#8B5CF6]" progressWidth="w-[65%]" />
+        {isSuperAdmin && (
+          <AdminStatCard title="TOTAL COLLECTED" value={stats.totalCollected} subtitle="Successful transaction value" icon={<DollarSign size={18} className="text-[#8B5CF6]" />} progressColor="bg-[#8B5CF6]" progressWidth="w-[65%]" />
+        )}
         <AdminStatCard title="SUCCESSFUL" value={String(stats.successfulCount)} subtitle="Provider-confirmed payments" icon={<CheckCircle size={18} className="text-green-500" />} progressColor="bg-green-500" progressWidth="w-[60%]" />
         <AdminStatCard title="REFUNDED" value={String(stats.refundedCount)} subtitle="Completed refunds" icon={<RotateCcw size={18} className="text-amber-500" />} progressColor="bg-amber-500" progressWidth="w-[15%]" />
         <AdminStatCard title="TOTAL REFUNDED" value={stats.totalRefunded} subtitle="Refunded transaction value" icon={<RotateCcw size={18} className="text-[#22D3EE]" />} progressColor="bg-[#22D3EE]" progressWidth="w-[35%]" />

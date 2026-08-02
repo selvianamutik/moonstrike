@@ -1,0 +1,36 @@
+# Moon Strike
+
+> Moon Strike is a premium game boosting, coaching, and item services marketplace for competitive gamers.
+
+## What Moon Strike Does
+
+Moon Strike connects gamers with verified professional boosters and coaches across popular competitive titles. Players can order rank boosting, coaching sessions, account leveling, and in-game item services with fast delivery.
+
+## Key Pages
+
+- [Homepage](/) — Browse featured games, hot offers, and trust metrics
+- [All Games](/games) — Full catalog of supported games
+- [All Services](/services) — Browse every available boosting and coaching service
+- [Blog & Guides](/blog) — Tips, guides, and news for competitive gamers
+
+## Services Offered
+
+- **Rank Boosting** — Solo or duo rank progression in competitive games
+- **Coaching** — One-on-one sessions with verified pro players
+- **Account Leveling** — Fast leveling services for new or secondary accounts
+- **Item Services** — In-game item farming and unlocking
+- **Placement Matches** — Guided placement match assistance
+
+## Supported Games
+
+Moon Strike supports a growing catalog of popular competitive titles. Visit [/games](/games) for the full list.
+
+## About
+
+Moon Strike is a trusted gaming marketplace offering a secure ordering system, verified booster profiles, real-time order tracking, and 24/7 customer support via live chat.
+
+## Content Focus
+
+- Game-specific boosting and coaching service pages at `/{game-slug}/{category-slug}/{service-slug}`
+- Game hub pages at `/{game-slug}` with all available services for that title
+- Blog posts and guides for competitive gaming at `/blog` and `/guide`

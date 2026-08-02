@@ -20,19 +20,19 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-  { name: "Users", href: "/admin/users", icon: Users },
-  { name: "Games", href: "/admin/games", icon: Gamepad2 },
-  { name: "Services", href: "/admin/services", icon: Box },
-  { name: "Private Offers", href: "/admin/private-offers", icon: Sparkles },
-  { name: "Orders", href: "/admin/orders", icon: ShoppingBag },
-  { name: "Transactions", href: "/admin/transactions", icon: ReceiptText },
-  { name: "Content", href: "/admin/content", icon: Layers },
-  { name: "Pages", href: "/admin/pages", icon: FileText },
-  { name: "Messages", href: "/admin/messages", icon: MessageSquare },
-  { name: "Logs", href: "/admin/logs", icon: History },
-  { name: "Settings", href: "/admin/settings", icon: Settings },
-  { name: "Admin Accounts", href: "/admin/admins", icon: Shield },
+  { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard, superAdminOnly: false },
+  { name: "Users", href: "/admin/users", icon: Users, superAdminOnly: false },
+  { name: "Games", href: "/admin/games", icon: Gamepad2, superAdminOnly: false },
+  { name: "Services", href: "/admin/services", icon: Box, superAdminOnly: false },
+  { name: "Private Offers", href: "/admin/private-offers", icon: Sparkles, superAdminOnly: false },
+  { name: "Orders", href: "/admin/orders", icon: ShoppingBag, superAdminOnly: false },
+  { name: "Transactions", href: "/admin/transactions", icon: ReceiptText, superAdminOnly: true },
+  { name: "Content", href: "/admin/content", icon: Layers, superAdminOnly: false },
+  { name: "Pages", href: "/admin/pages", icon: FileText, superAdminOnly: false },
+  { name: "Messages", href: "/admin/messages", icon: MessageSquare, superAdminOnly: false },
+  { name: "Logs", href: "/admin/logs", icon: History, superAdminOnly: false },
+  { name: "Settings", href: "/admin/settings", icon: Settings, superAdminOnly: false },
+  { name: "Admin Accounts", href: "/admin/admins", icon: Shield, superAdminOnly: false },
 ];
 
 function isNavActive(pathname: string, href: string) {
@@ -73,15 +73,22 @@ export function AdminSidebar() {
   useEffect(() => {
     let isMounted = true;
     async function loadPermissions() {
-      const response = await fetch("/api/admin/me").catch(() => null);
+      const response = await fetch("/api/admin/me", { cache: "no-store" }).catch(() => null);
       const data = await response?.json().catch(() => null);
       if (isMounted && response?.ok && data?.permissions) {
         setAllowedPermissions(data.permissions);
       }
     }
     void loadPermissions();
+
+    function handlePermissionsUpdated() {
+      void loadPermissions();
+    }
+    window.addEventListener("moonstrike:admin-permissions-updated", handlePermissionsUpdated);
+
     return () => {
       isMounted = false;
+      window.removeEventListener("moonstrike:admin-permissions-updated", handlePermissionsUpdated);
     };
   }, []);
 
@@ -97,7 +104,7 @@ export function AdminSidebar() {
     else if (item.href.startsWith("/admin/orders")) key = "orders";
     else if (item.href.startsWith("/admin/transactions")) key = "transactions";
     else if (item.href.startsWith("/admin/content")) key = "content";
-    else if (item.href.startsWith("/admin/pages")) key = "content";
+    else if (item.href.startsWith("/admin/pages")) key = "pages";
     else if (item.href.startsWith("/admin/messages")) key = "messages";
     else if (item.href.startsWith("/admin/logs")) key = "logs";
     else if (item.href.startsWith("/admin/settings")) key = "settings";

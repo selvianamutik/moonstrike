@@ -105,7 +105,7 @@ export function ProfileSidebar({ displayName, email, initials, memberSince, tota
                 className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
                   active
                     ? "bg-[var(--primary)] text-white shadow-[0_0_18px_rgba(139,92,246,0.25)]"
-                    : "text-[var(--ms-body)] hover:bg-white/5 hover:text-[var(--ms-heading)]"
+                    : "text-[var(--ms-body)] hover:bg-[var(--ms-hover-bg)] hover:text-[var(--ms-heading)]"
                 }`}
               >
                 <Icon size={18} />

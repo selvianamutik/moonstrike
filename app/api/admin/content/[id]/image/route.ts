@@ -1,34 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { writeAuditLog } from '@/lib/admin/audit'
 import { getAdminSession } from '@/lib/admin/session'
-import { CMS_MEDIA_BUCKET } from '@/lib/cms/storage'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { r2Delete, r2Upload } from '@/lib/r2'
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 const MAX_THUMB_BYTES = 512 * 1024
 
 function safeFilePart(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-')
-}
-
-async function ensureBucket() {
-  const supabase = createAdminClient()
-  const { error } = await supabase.storage.getBucket(CMS_MEDIA_BUCKET)
-
-  if (!error) return
-
-  const { error: createError } = await supabase.storage.createBucket(
-    CMS_MEDIA_BUCKET,
-    {
-      public: true,
-      fileSizeLimit: `${MAX_IMAGE_BYTES}`,
-      allowedMimeTypes: ['image/webp', 'image/jpeg', 'image/png'],
-    }
-  )
-
-  if (createError && !createError.message.toLowerCase().includes('already')) {
-    throw createError
-  }
 }
 
 export async function POST(
@@ -71,56 +50,49 @@ export async function POST(
     )
   }
 
-  await ensureBucket()
-
-  const supabase = createAdminClient()
   const now = Date.now()
-  const imagePath = `cms/${id}/${usage}-${now}.webp`
-  const thumbnailPath = `cms/${id}/${usage}-${now}-thumb.webp`
+  const imageKey = `cms/${id}/${usage}-${now}.webp`
+  const thumbnailKey = `cms/${id}/${usage}-${now}-thumb.webp`
 
-  const { error: imageError } = await supabase.storage
-    .from(CMS_MEDIA_BUCKET)
-    .upload(imagePath, image, {
+  try {
+    const imageResult = await r2Upload({
+      key: imageKey,
+      body: image,
       contentType: image.type || 'image/webp',
-      cacheControl: '31536000',
-      upsert: false,
     })
 
-  if (imageError) {
-    return NextResponse.json({ error: imageError.message }, { status: 500 })
-  }
+    let thumbnailResult: { publicUrl: string; key: string }
+    try {
+      thumbnailResult = await r2Upload({
+        key: thumbnailKey,
+        body: thumbnail,
+        contentType: thumbnail.type || 'image/webp',
+      })
+    } catch (thumbError) {
+      await r2Delete(imageKey).catch(() => null)
+      return NextResponse.json(
+        { error: thumbError instanceof Error ? thumbError.message : 'Thumbnail upload failed.' },
+        { status: 500 }
+      )
+    }
 
-  const { error: thumbnailError } = await supabase.storage
-    .from(CMS_MEDIA_BUCKET)
-    .upload(thumbnailPath, thumbnail, {
-      contentType: thumbnail.type || 'image/webp',
-      cacheControl: '31536000',
-      upsert: false,
+    await writeAuditLog({
+      action: `Uploaded CMS image for ${usage}`,
+      status: 'success',
+      request,
+      admin,
     })
 
-  if (thumbnailError) {
-    await supabase.storage.from(CMS_MEDIA_BUCKET).remove([imagePath])
-    return NextResponse.json({ error: thumbnailError.message }, { status: 500 })
+    return NextResponse.json({
+      imageUrl: imageResult.publicUrl,
+      thumbnailUrl: thumbnailResult.publicUrl,
+      storagePath: imageKey,
+      thumbnailPath: thumbnailKey,
+    })
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Upload failed.' },
+      { status: 500 }
+    )
   }
-
-  const { data: imagePublic } = supabase.storage
-    .from(CMS_MEDIA_BUCKET)
-    .getPublicUrl(imagePath)
-  const { data: thumbnailPublic } = supabase.storage
-    .from(CMS_MEDIA_BUCKET)
-    .getPublicUrl(thumbnailPath)
-
-  await writeAuditLog({
-    action: `Uploaded CMS image for ${usage}`,
-    status: 'success',
-    request,
-    admin,
-  })
-
-  return NextResponse.json({
-    imageUrl: imagePublic.publicUrl,
-    thumbnailUrl: thumbnailPublic.publicUrl,
-    storagePath: imagePath,
-    thumbnailPath,
-  })
 }

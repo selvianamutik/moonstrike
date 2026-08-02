@@ -25,8 +25,14 @@ type ProfileOrderDetailPageProps = {
 };
 
 const timelineSteps = ["Pending", "Confirmed", "In Progress", "Delivered", "Completed"];
+const refundedStep = "Refunded";
+
+function isRefundedOrder(status: string) {
+  return status === "refunded";
+}
 
 function completedStepCount(status: string) {
+  if (status === "refunded") return 6;
   if (status === "completed") return 5;
   if (status === "delivered") return 4;
   if (status === "in_progress") return 3;
@@ -73,7 +79,7 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
                 {order.status.replace("_", " ")}
               </span>
               <div className="flex flex-wrap items-center gap-3">
-                <Link href={`/profile/chat?order=${encodeURIComponent(order.orderReference)}`} className="ms-action-button inline-flex items-center justify-center rounded-md border border-[var(--ms-border)] px-4 py-3 text-sm text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
+                <Link href={`/profile/chat`} className="ms-action-button inline-flex items-center justify-center rounded-md border border-[var(--ms-border)] px-4 py-3 text-sm text-[var(--ms-body)] hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)]">
                   <MessageSquare size={16} />
                   Open Chat
                 </Link>
@@ -86,21 +92,23 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
             <h2 className="text-xl font-black">Order Timeline</h2>
             <div className="mt-7">
               <ol className="relative flex flex-col md:flex-row">
-                {timelineSteps.map((label, index) => {
-                  const isComplete = index < completedSteps - 1
-                  const isCurrent = index === completedSteps - 1
-                  const stepNumber = index + 1
-                  const isLast = index === timelineSteps.length - 1
+                {[...timelineSteps, ...(isRefundedOrder(order.status) ? [refundedStep] : [])].map((label, index) => {
+                  const allSteps = [...timelineSteps, ...(isRefundedOrder(order.status) ? [refundedStep] : [])];
+                  const isRefundedLabel = label === refundedStep;
+                  const isComplete = index < completedSteps - 1;
+                  const isCurrent = index === completedSteps - 1;
+                  const stepNumber = index + 1;
+                  const isLast = index === allSteps.length - 1;
 
                   return (
                     <li key={label} className={`relative flex gap-4 md:flex-col md:items-center md:flex-1 ${isLast ? '' : 'pb-10 md:pb-0'}`}>
                       {!isLast && (
                         <>
-                          <div className="absolute left-[18px] top-9 bottom-0 w-0.5 bg-zinc-700/50 md:hidden">
-                            <div className="mx-auto w-full bg-emerald-500 transition-all duration-500" style={{ height: isComplete ? '100%' : '0%' }} />
+                          <div className={`absolute left-[18px] top-9 bottom-0 w-0.5 md:hidden ${isRefundedLabel ? 'bg-red-500/20' : 'bg-[var(--ms-border)]'}`}>
+                            <div className={`mx-auto w-full transition-all duration-500 ${isRefundedLabel ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ height: isComplete ? '100%' : '0%' }} />
                           </div>
-                          <div className="absolute left-[calc(50%+1px)] top-[18px] h-0.5 bg-zinc-700/50 hidden md:block" style={{ width: '100%' }}>
-                            <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: isComplete ? '100%' : '0%' }} />
+                          <div className={`absolute left-[calc(50%+1px)] top-[18px] h-0.5 hidden md:block ${isRefundedLabel ? 'bg-red-500/20' : 'bg-[var(--ms-border)]'}`} style={{ width: '100%' }}>
+                            <div className={`h-full transition-all duration-500 ${isRefundedLabel ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: isComplete ? '100%' : '0%' }} />
                           </div>
                         </>
                       )}
@@ -108,16 +116,18 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
                       <div className="relative z-10 flex shrink-0 flex-col items-center">
                         <div
                           className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold transition-all duration-300 ${
-                            isComplete
-                              ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
-                              : isCurrent
-                                ? 'border-2 border-emerald-500 bg-emerald-400 text-white ring-2 ring-emerald-500/30'
-                                : 'border-2 border-zinc-600 bg-zinc-800/50 text-zinc-500'
+                            isRefundedLabel && isCurrent
+                              ? 'border-2 border-red-500 bg-red-500 text-white ring-2 ring-red-500/30'
+                              : isComplete
+                                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
+                                : isCurrent
+                                  ? 'border-2 border-emerald-500 bg-emerald-500 text-white ring-2 ring-emerald-500/30'
+                                  : 'border-2 border-[var(--ms-border)] bg-[var(--ms-bg-card)] text-[var(--ms-body)]'
                           }`}
                         >
-                          {isComplete ? (
+                          {isComplete || (isRefundedLabel && isCurrent) ? (
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                           ) : (
                             stepNumber
@@ -127,15 +137,21 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
 
                       <div className="min-w-0 pt-1 md:text-center">
                         <p className={`text-sm font-semibold transition-colors duration-300 ${
-                          isComplete ? 'text-emerald-400' : isCurrent ? 'text-emerald-300' : 'text-zinc-500'
+                          isRefundedLabel && isCurrent
+                            ? 'text-red-500'
+                            : isComplete
+                              ? 'text-emerald-500'
+                              : isCurrent
+                                ? 'text-emerald-500'
+                                : 'text-[var(--ms-body)]'
                         }`}>
                           {label}
                         </p>
                         {isCurrent && !isComplete && (
-                          <p className="mono mt-0.5 text-[10px] uppercase tracking-wider text-emerald-400/70">Current</p>
+                          <p className="mono mt-0.5 text-[10px] uppercase tracking-wider text-[var(--ms-gradient-end)]">Current</p>
                         )}
                         {isComplete && !isCurrent && (
-                          <p className="mono mt-0.5 text-[10px] uppercase tracking-wider text-emerald-500/50">Done</p>
+                          <p className="mono mt-0.5 text-[10px] uppercase tracking-wider text-emerald-500/70">Done</p>
                         )}
                       </div>
                     </li>
@@ -170,7 +186,7 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
                 const options = Object.entries(item.selectedOptionsSnapshot);
 
                 return (
-                  <details key={item.id} className="group rounded-lg border border-[var(--ms-border)] bg-black/20 p-4" open={index === 0}>
+                  <details key={item.id} className="group rounded-lg border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-4" open={index === 0}>
                     <summary className="flex cursor-pointer list-none flex-col gap-4 md:flex-row md:items-center md:justify-between">
                       <div className="flex gap-4">
                         {item.service.image ? (
@@ -254,7 +270,7 @@ function PriceRow({ label, value, valueClass = "mono text-right" }: { label: str
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-[var(--ms-border)] bg-black/20 p-4">
+    <div className="rounded-lg border border-[var(--ms-border)] bg-[var(--ms-bg-page)] p-4">
       <p className="mono text-[10px] uppercase tracking-[0.16em] text-[var(--ms-body)]">{label}</p>
       <p className="mt-2 break-all font-bold capitalize text-[var(--ms-heading)]">{value}</p>
     </div>

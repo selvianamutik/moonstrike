@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ExternalLink, FileText, BookOpen, Compass, Eye, Image as ImageIcon, Plus, Trash2 } from "lucide-react";
+import { ExternalLink, FileText, BookOpen, Compass, Eye, Image as ImageIcon, Plus, Trash2, X } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
@@ -400,13 +400,26 @@ export function PagesPageClient({ pages: initialPages }: { pages: CustomPageRow[
                     </AdminFormField>
                   )}
 
-                  <AdminFormField label="Content">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--ms-text-secondary)]">Content</span>
+                      {form.content && (
+                        <button
+                          type="button"
+                          onClick={() => setForm((f) => ({ ...f, content: "" }))}
+                          className="flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[#64748B] hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                        >
+                          <X size={11} />
+                          Clear
+                        </button>
+                      )}
+                    </div>
                     <QuillEditor
                       value={form.content}
                       onChange={(html) => setForm((f) => ({ ...f, content: html }))}
                       placeholder="Write your content here..."
                     />
-                  </AdminFormField>
+                  </div>
 
                   <AdminFormField label="Meta Description">
                     <input className={adminInputClass} value={form.metaDescription}

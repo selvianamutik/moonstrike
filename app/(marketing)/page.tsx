@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Frame18Sections } from "@/components/frame-18-sections";
 import { HeroCarousel } from "@/components/hero-carousel";
@@ -9,6 +10,20 @@ import { trustMetrics } from "@/lib/catalog";
 import { listActiveCatalogGames } from "@/lib/cms/games";
 import { getActiveHeroSlides, getActiveLandingCms } from "@/lib/cms/landing";
 import { listActiveHotOffers, serviceRowToCatalogService } from "@/lib/cms/services";
+
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://moonstrike.pro';
+
+export const metadata: Metadata = {
+  title: "Moon Strike | Game Boosting Marketplace",
+  description:
+    "Moon Strike helps gamers order boosting, coaching, and item services through a premium cosmic marketplace.",
+  alternates: {
+    canonical: BASE_URL,
+  },
+  openGraph: {
+    url: BASE_URL,
+  },
+};
 
 export default async function Home() {
   const [{ benefits, steps }, heroes, gameCards, hotOfferRows] = await Promise.all([

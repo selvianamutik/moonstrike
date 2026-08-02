@@ -1,7 +1,17 @@
+import type { Metadata } from "next";
 import { ServicesCatalog } from "@/components/services-catalog";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { listActiveServices, serviceRowToCatalogService } from "@/lib/cms/services";
+
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://moonstrike.pro';
+
+export const metadata: Metadata = {
+  title: "All Services",
+  description: "Explore all boosting, coaching, and item services available on Moon Strike across every supported game.",
+  alternates: { canonical: `${BASE_URL}/services` },
+  openGraph: { url: `${BASE_URL}/services` },
+};
 
 type ServicesPageProps = {
   searchParams?: Promise<{

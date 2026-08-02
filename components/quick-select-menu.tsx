@@ -2,27 +2,27 @@
 
 import Link from "next/link";
 import { createPortal } from "react-dom";
-import { useEffect, useMemo, useState } from "react";
-import { type GameCatalogItem, type GameService } from "@/lib/catalog";
+import { useEffect, useState } from "react";
 import { faBars } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { useQuickSelectCatalog, useQuickSelectFilter } from "@/hooks/useQuickSelectCatalog";
 
-type QuickSelectCatalog = {
-  games: GameCatalogItem[];
-  services: GameService[];
-};
-
-const GAMES_PER_PAGE = 4;
-const ANIM_DURATION = 240;
-
-export function QuickSelectMenu() {
+export function QuickSelectMenu({ forceOpen, onForceOpenConsumed }: { forceOpen?: boolean; onForceOpenConsumed?: () => void } = {}) {
   const [activeGame, setActiveGame] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [catalog, setCatalog] = useState<QuickSelectCatalog>({ games: [], services: [] });
-  const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
-  const [hasLoadedCatalog, setHasLoadedCatalog] = useState(false);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+  const { catalog, isLoadingCatalog } = useQuickSelectCatalog(isOpen);
+  const { filteredGames, serviceColumns, debouncedQuery } = useQuickSelectFilter(catalog, query, activeGame);
+
+  // Open dialog when forceOpen is triggered from parent (e.g. mobile drawer)
+  useEffect(() => {
+    if (forceOpen) {
+      setIsOpen(true);
+      onForceOpenConsumed?.();
+    }
+  }, [forceOpen, onForceOpenConsumed]);
 
   useEffect(() => {
     setPortalTarget(document.body);
@@ -37,53 +37,19 @@ export function QuickSelectMenu() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [isOpen]);
 
+  // Auto-select first game after catalog loads
   useEffect(() => {
-    if (!isOpen || hasLoadedCatalog) return;
-    let isMounted = true;
-    setIsLoadingCatalog(true);
-    fetch("/api/catalog/quick-select")
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((data: QuickSelectCatalog) => {
-        if (isMounted) {
-          setCatalog({
-            games: Array.isArray(data.games) ? data.games : [],
-            services: Array.isArray(data.services) ? data.services : [],
-          });
-          setHasLoadedCatalog(true);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setCatalog({ games: [], services: [] });
-          setHasLoadedCatalog(true);
-        }
-      })
-      .finally(() => {
-        if (isMounted) setIsLoadingCatalog(false);
-      });
-    return () => { isMounted = false; };
-  }, [hasLoadedCatalog, isOpen]);
+    if (catalog.games.length > 0 && !activeGame) {
+      setActiveGame(catalog.games[0].slug);
+    }
+  }, [catalog.games, activeGame]);
 
-  const filteredServices = useMemo(() => {
-    if (!activeGame) return [];
-    const q = query.trim().toLowerCase();
-    return catalog.services.filter((s) => {
-      const matchGame = activeGame === "all" || s.gameSlug === activeGame;
-      const matchQ = !q || [s.name, s.offerTitle, s.gameName, s.serviceCategory, s.description, ...s.tags]
-        .some((v) => (v ?? "").toLowerCase().includes(q));
-      return matchGame && matchQ;
-    });
-  }, [activeGame, catalog.services, query]);
-
-  const serviceColumns = useMemo(() => {
-    const groups = new Map<string, typeof filteredServices>();
-    filteredServices.forEach((s) => {
-      const arr = groups.get(s.serviceCategory) ?? [];
-      groups.set(s.serviceCategory, [...arr, s]);
-    });
-    return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [filteredServices]);
-
+  // Auto-focus first filtered game when search query changes
+  useEffect(() => {
+    if (debouncedQuery && filteredGames.length > 0) {
+      setActiveGame(filteredGames[0].slug);
+    }
+  }, [debouncedQuery, filteredGames]);
 
   return (
     <>
@@ -93,6 +59,8 @@ export function QuickSelectMenu() {
         className="ms-button hidden h-11 shrink-0 items-center gap-2 px-4 mono text-xs uppercase tracking-[0.16em] lg:inline-flex"
       >
         <FontAwesomeIcon icon={faBars} />
+        <span className="hidden md:block">Choose Game</span>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
       </button>
 
       {portalTarget && isOpen
@@ -125,33 +93,51 @@ export function QuickSelectMenu() {
                     className="h-8 w-8 flex items-center justify-center rounded-full border border-[var(--ms-border)] text-[var(--ms-body)] hover:text-[var(--ms-heading)]"
                     aria-label="Close"
                   >
-                    X
+                    ✕
                   </button>
                 </div>
 
                 <div className="flex min-h-[400px] flex-1 border-t border-[var(--ms-border)] overflow-hidden">
                   {/* SIDEBAR KIRI (Daftar Game) */}
                   <div className="w-[240px] shrink-0 border-r border-[var(--ms-border)] overflow-y-auto p-4 flex flex-col gap-1">
-                    {catalog.games.map((g) => (
-                      <button
-                        key={g.slug}
-                        onClick={() => setActiveGame(g.slug)}
-                        className={`text-left px-3 py-2 rounded-md text-sm font-semibold transition-colors ${
-                          activeGame === g.slug 
-                            ? 'bg-[var(--ms-gradient-end)] text-white' 
-                            : 'text-[var(--ms-body)] hover:bg-[var(--ms-hover-bg)] hover:text-white'
-                        }`}
-                      >
-                        {g.name}
-                      </button>
-                    ))}
+                    {isLoadingCatalog ? (
+                      <div className="space-y-2 p-2">
+                        {[0, 1, 2, 3].map((i) => (
+                          <div key={i} className="h-9 w-full animate-pulse rounded-md bg-[var(--ms-border)]" />
+                        ))}
+                      </div>
+                    ) : filteredGames.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-[var(--ms-body)]">No games found</p>
+                    ) : (
+                      filteredGames.map((g) => (
+                        <button
+                          key={g.slug}
+                          onClick={() => setActiveGame(g.slug)}
+                          className={`qs-game-btn text-left px-3 py-2 rounded-md text-sm font-semibold transition-colors ${
+                            activeGame === g.slug
+                              ? 'qs-game-btn--active'
+                              : 'qs-game-btn--idle'
+                          }`}
+                        >
+                          {g.name}
+                        </button>
+                      ))
+                    )}
                   </div>
 
-                  {/* PANEL KANAN (Daftar Kategori - Skycoach Style) */}
+                  {/* PANEL KANAN (Daftar Kategori) */}
                   <div className="flex-1 overflow-y-auto p-6">
                     {!activeGame ? (
                       <div className="flex h-full items-center justify-center text-[var(--ms-body)]">
                         <p className="text-sm">Select a game from the left menu to view categories</p>
+                      </div>
+                    ) : serviceColumns.length === 0 ? (
+                      <div className="flex h-full items-center justify-center text-[var(--ms-body)]">
+                        <p className="text-sm">
+                          {debouncedQuery.trim()
+                            ? `No services match "${debouncedQuery.trim()}"`
+                            : "No services available for this game"}
+                        </p>
                       </div>
                     ) : (
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
@@ -166,10 +152,10 @@ export function QuickSelectMenu() {
                               <Link
                                 href={targetHref}
                                 onClick={() => setIsOpen(false)}
-                                className="group flex cursor-pointer items-center gap-3"
+                                className="qs-category-link group flex cursor-pointer items-center gap-3"
                               >
-                                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ms-gradient-end)]"></span>
-                                <h3 className="text-sm font-semibold text-white transition-colors group-hover:text-[var(--ms-gradient-end)]">{category}</h3>
+                                <span className="qs-bullet h-1.5 w-1.5 shrink-0 rounded-full"></span>
+                                <h3 className="qs-category-label text-sm font-semibold transition-colors">{category}</h3>
                               </Link>
                               <div className="ml-4 flex flex-col gap-0.5">
                                 {services.map((s) => {
@@ -182,7 +168,7 @@ export function QuickSelectMenu() {
                                       key={s.slug}
                                       href={serviceHref}
                                       onClick={() => setIsOpen(false)}
-                                      className="cursor-pointer text-xs text-[var(--ms-body)] underline-offset-2 transition-colors hover:text-[var(--ms-gradient-end)] hover:underline"
+                                      className="qs-service-link cursor-pointer text-xs underline-offset-2 transition-colors hover:underline"
                                     >
                                       {s.name}
                                     </Link>
@@ -196,10 +182,10 @@ export function QuickSelectMenu() {
                     )}
                   </div>
                 </div>
-          </section>
-        </div>,
-        portalTarget,
-      ) : null}
+              </section>
+            </div>,
+            portalTarget,
+          ) : null}
     </>
   );
 }

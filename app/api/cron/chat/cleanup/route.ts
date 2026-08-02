@@ -40,7 +40,6 @@ export async function GET(request: NextRequest) {
     const result = await cleanupExpiredChatTickets({
       anonymousMaxAgeSeconds: positiveNumber(params.get("anonymousMaxAgeSeconds"), 60 * 60),
       loggedInSupportRetentionDays: positiveNumber(params.get("supportDays"), 90),
-      orderChatRetentionDays: positiveNumber(params.get("orderDays"), 30),
     });
 
     await writeAuditLog({

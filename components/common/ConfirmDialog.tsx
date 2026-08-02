@@ -17,9 +17,9 @@ type ConfirmDialogProps = {
 };
 
 const confirmStyles = {
-  danger: "border-red-500/40 bg-red-500/10 text-red-200 hover:bg-red-500/20",
-  warning: "border-amber-500/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20",
-  primary: "border-[#8B5CF6]/40 bg-[#8B5CF6]/20 text-white hover:bg-[#8B5CF6]/30",
+  danger: "border-red-500/40 bg-red-500/10 text-red-500 hover:bg-red-500/20",
+  warning: "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-300 hover:bg-amber-500/20",
+  primary: "border-[var(--primary)]/40 bg-[var(--primary)]/20 text-[var(--ms-heading)] hover:bg-[var(--primary)]/30",
 };
 
 export function ConfirmDialog({
@@ -38,22 +38,22 @@ export function ConfirmDialog({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 px-4">
-      <div className="w-full max-w-md rounded-xl border border-[#172554] bg-[#0F172A] p-6 shadow-2xl">
+      <div className="w-full max-w-md rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-amber-300">
+            <div className="mt-0.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-amber-500">
               <AlertTriangle size={18} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">{title}</h2>
-              <p className="mt-2 text-sm leading-6 text-[#94A3B8]">{description}</p>
+              <h2 className="text-lg font-bold text-[var(--ms-heading)]">{title}</h2>
+              <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">{description}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="rounded-lg p-1.5 text-[#94A3B8] transition-colors hover:bg-[#172554] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg p-1.5 text-[var(--ms-body)] transition-colors hover:bg-[var(--ms-hover-bg)] hover:text-[var(--ms-heading)] disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Close confirmation dialog"
           >
             <X size={16} />
@@ -67,7 +67,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="admin-action-button rounded-lg border border-[#172554] px-4 py-2.5 text-sm font-medium text-[#94A3B8] transition-colors hover:border-[#8B5CF6] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="admin-action-button rounded-lg border border-[var(--ms-border)] px-4 py-2.5 text-sm font-medium text-[var(--ms-body)] transition-colors hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-heading)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <X size={16} />
             {cancelLabel}

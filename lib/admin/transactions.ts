@@ -7,7 +7,7 @@ type TransactionRow = {
   transaction_ref: string;
   checkout_session_id: string;
   user_id: string;
-  provider: "stripe" | "nowpayments";
+  provider: "nowpayments" | "paypal";
   provider_payment_id: string;
   provider_session_id: string | null;
   amount: number | string;
@@ -43,7 +43,7 @@ export type AdminTransactionRecord = {
   amountValue: number;
   currency: "USD" | "EUR";
   method: string;
-  paymentProvider: "stripe" | "nowpayments";
+  paymentProvider: "nowpayments" | "paypal";
   status: TransactionRow["status"];
   canRefund: boolean;
   refundBlockedReason?: string;
@@ -96,8 +96,8 @@ function formatDate(value: string) {
 }
 
 function mapProviderName(provider: string) {
-  if (provider === "stripe") return "stripe";
   if (provider === "nowpayments") return "nowpayments";
+  if (provider === "paypal") return "paypal";
   return provider;
 }
 

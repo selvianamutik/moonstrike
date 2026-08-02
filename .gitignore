@@ -24,3 +24,10 @@ claude.md
 repair_plan.md
 
 docs/
+.kilo/
+.playwright-mcp/
+credentials.txt
+phase_docs.md
+revision_plan.md
+UAT.md
+TURNSTILE_SETUP.md

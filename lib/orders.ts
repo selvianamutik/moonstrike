@@ -120,7 +120,7 @@ function mapItem(row: CustomerOrderItemRow): CustomerOrderItem {
       title: service?.title ?? "Service",
       image: service?.image ?? null,
       description: service?.description ?? "",
-      gameName: game?.name ?? "Game",
+      gameName: game?.name ?? "game no longer exist",
       categoryName: category?.name ?? "Service",
     },
   };

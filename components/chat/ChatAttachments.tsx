@@ -42,7 +42,7 @@ export function ChatAttachments({ attachments }: { attachments: ChatAttachment[]
                 key={`${attachment.url}-${index}`}
                 type="button"
                 onClick={() => setOpenImage(attachment)}
-                className="block w-80 max-w-full overflow-hidden rounded-lg border border-white/15 bg-black/20 text-left transition hover:border-[var(--ms-gradient-end)]"
+                className="block w-80 max-w-full overflow-hidden rounded-lg border border-[var(--ms-border)] bg-[var(--ms-bg-card)] text-left transition hover:border-[var(--ms-gradient-end)]"
                 title="Open image full size"
               >
                 <img src={attachment.url} alt={attachment.filename || "Chat attachment"} className="max-h-72 w-full object-cover" />
@@ -50,42 +50,67 @@ export function ChatAttachments({ attachments }: { attachments: ChatAttachment[]
             );
           }
 
+          // Detect deleted game/service: broken href, sentinel titles, or empty title
+          const GAME_DELETED_SENTINELS = new Set([
+            "[Deleted]",
+            "This game has been deleted",
+            "game no longer exist",
+          ]);
+          const isDeleted =
+            attachment.href === "#" ||
+            !attachment.href ||
+            GAME_DELETED_SENTINELS.has(attachment.title);
+          const displayTitle = isDeleted ? "game no longer exist" : attachment.title;
+          
           return (
             <div
               key={`${attachment.href}-${index}`}
-              className="w-80 max-w-full rounded-lg border border-white/15 bg-black/20 p-3"
+              className="w-80 max-w-full rounded-lg border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-3"
             >
-              <Link href={attachment.href} target="_blank" rel="noreferrer" className="flex gap-3 transition hover:text-[var(--ms-gradient-end)]">
-                {attachment.image ? (
-                  <img src={attachment.image} alt="" className="h-16 w-16 shrink-0 rounded-md object-cover" />
-                ) : (
-                  <div className="h-16 w-16 shrink-0 rounded-md border border-white/10 bg-white/5" />
-                )}
-                <span className="min-w-0">
-                  <span className="mono text-[10px] uppercase tracking-[0.14em] opacity-70">{attachment.linkType}</span>
-                  <span className="mt-1 block truncate text-sm font-bold">{attachment.title}</span>
-                  {attachment.meta ? <span className="mt-1 block truncate text-xs opacity-70">{attachment.meta}</span> : null}
-                </span>
-              </Link>
-              <div className="mt-3 flex gap-2">
-                <Link
-                  href={attachment.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-white/15 px-2 text-[11px] font-bold uppercase tracking-[0.08em] opacity-80 hover:border-[var(--ms-gradient-end)] hover:opacity-100"
-                >
-                  <ExternalLink size={13} />
-                  Open
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => void copyLink(attachment.href)}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-white/15 px-2 text-[11px] font-bold uppercase tracking-[0.08em] opacity-80 hover:border-[var(--ms-gradient-end)] hover:opacity-100"
-                >
-                  <Copy size={13} />
-                  {copiedHref === attachment.href ? "Copied" : "Copy"}
-                </button>
-              </div>
+              {isDeleted ? (
+                <div className="flex gap-3 opacity-60">
+                  <div className="h-16 w-16 shrink-0 rounded-md border border-[var(--ms-border)] bg-[var(--ms-hover-bg)]" />
+                  <span className="min-w-0">
+                    <span className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ms-gradient-end)]">{attachment.linkType}</span>
+                    <span className="mt-1 block truncate text-sm font-bold text-[var(--ms-body)] italic">{displayTitle}</span>
+                    {attachment.meta ? <span className="mt-1 block truncate text-xs text-[var(--ms-body)]">{attachment.meta}</span> : null}
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <Link href={attachment.href} target="_blank" rel="noreferrer" className="flex gap-3 transition hover:text-[var(--ms-gradient-end)]">
+                    {attachment.image ? (
+                      <img src={attachment.image} alt="" className="h-16 w-16 shrink-0 rounded-md object-cover" />
+                    ) : (
+                      <div className="h-16 w-16 shrink-0 rounded-md border border-[var(--ms-border)] bg-[var(--ms-hover-bg)]" />
+                    )}
+                    <span className="min-w-0">
+                      <span className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ms-gradient-end)]">{attachment.linkType}</span>
+                      <span className="mt-1 block truncate text-sm font-bold text-[var(--ms-heading)]">{attachment.title}</span>
+                      {attachment.meta ? <span className="mt-1 block truncate text-xs text-[var(--ms-body)]">{attachment.meta}</span> : null}
+                    </span>
+                  </Link>
+                  <div className="mt-3 flex gap-2">
+                    <Link
+                      href={attachment.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[var(--ms-gradient-end)] px-3 text-[11px] font-bold uppercase tracking-[0.08em] text-white transition-opacity hover:opacity-80"
+                    >
+                      <ExternalLink size={13} />
+                      Open
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => void copyLink(attachment.href)}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--ms-border)] bg-[var(--ms-hover-bg)] px-3 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--ms-heading)] transition-colors hover:border-[var(--ms-gradient-end)] hover:text-[var(--ms-gradient-end)]"
+                    >
+                      <Copy size={13} />
+                      {copiedHref === attachment.href ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           );
         })}

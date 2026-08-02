@@ -430,11 +430,11 @@ export function ServiceDetail({
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
       {showSiteChrome ? <SiteHeader /> : null}
       {previewMode ? (
-        <div className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-3 text-center text-sm font-medium text-amber-200">
+        <div className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-3 text-center text-sm font-medium text-amber-700 dark:text-amber-200">
           PREVIEW MODE - This service is not yet published.
         </div>
       ) : null}
-      <section className="ms-shell grid gap-12 py-20 lg:grid-cols-[1fr_390px]">
+      <section className="ms-shell grid gap-8 py-10 sm:py-16 lg:gap-12 lg:py-20 lg:grid-cols-[1fr_minmax(0,390px)]">
         <div>
           <nav className="mono text-xs uppercase tracking-[0.22em] text-[var(--ms-gradient-end)]">
             <Link href={`/${service.game_slug}`} className="hover:text-[var(--ms-heading)]">
@@ -454,14 +454,14 @@ export function ServiceDetail({
             ))}
           </div>
           {service.image ? (
-            <div className="relative mt-12 h-[380px] overflow-hidden rounded-lg border border-[var(--ms-border)]">
+            <div className="relative mt-12 h-[220px] overflow-hidden rounded-lg border border-[var(--ms-border)] sm:h-[300px] md:h-[380px]">
               <img src={service.image} alt={`${service.title} preview`} className="h-full w-full object-cover" />
             </div>
           ) : (
             <PlaceholderAsset
               isHidden={false}
               alt={`${service.title} service preview`}
-              className="mt-12 h-[380px] rounded-lg border border-[var(--ms-border)]"
+              className="mt-12 h-[220px] rounded-lg border border-[var(--ms-border)] sm:h-[300px] md:h-[380px]"
               priority
               imageClassName="p-20"
             />
@@ -526,7 +526,7 @@ export function ServiceDetail({
           </section>
         </div>
 
-        <aside className="ms-card h-fit rounded-xl p-6 shadow-[0_20px_80px_rgba(0,0,0,0.35)] lg:sticky lg:top-32">
+        <aside className="ms-card h-fit rounded-xl p-6 shadow-[0_20px_80px_rgba(0,0,0,0.35)] order-first lg:order-last lg:sticky lg:top-32">
           <h2 className="text-lg font-medium">Configure Your Run</h2>
           {/* <div className="mt-6 inline-flex rounded-full border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-1">
             {(["USD", "EUR"] as const).map((option) => (

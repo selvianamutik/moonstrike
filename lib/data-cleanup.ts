@@ -1,5 +1,6 @@
 import { CMS_MEDIA_BUCKET, getStoragePathFromPublicUrl } from "@/lib/cms/storage";
 import { cleanupReadNotifications } from "@/lib/notifications";
+import { r2DeleteMany, r2List } from "@/lib/r2";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const DEFAULT_ANONYMOUS_CART_MAX_AGE_SECONDS = 60 * 60;
@@ -272,45 +273,15 @@ async function collectReferencedMediaPaths() {
   return paths;
 }
 
-async function listStorageFiles(prefix: string) {
-  const supabase = createAdminClient();
-  const found: StorageFile[] = [];
-
-  async function walk(folder: string) {
-    let offset = 0;
-
-    while (true) {
-      const { data, error } = await supabase.storage.from(CMS_MEDIA_BUCKET).list(folder, {
-        limit: 1000,
-        offset,
-        sortBy: { column: "name", order: "asc" },
-      });
-
-      if (error) throw error;
-      if (!data || data.length === 0) break;
-
-      for (const item of data) {
-        const path = `${folder}/${item.name}`;
-        if (item.id === null) {
-          await walk(path);
-        } else if (STORAGE_PLACEHOLDER_NAMES.has(item.name)) {
-          continue;
-        } else {
-          found.push({
-            path,
-            createdAt: item.created_at ?? null,
-            updatedAt: item.updated_at ?? null,
-          });
-        }
-      }
-
-      if (data.length < 1000) break;
-      offset += data.length;
-    }
-  }
-
-  await walk(prefix);
-  return found;
+async function listStorageFiles(prefix: string): Promise<StorageFile[]> {
+  const items = await r2List(prefix);
+  return items
+    .filter((item) => !STORAGE_PLACEHOLDER_NAMES.has(item.key.split("/").pop() ?? ""))
+    .map((item) => ({
+      path: item.key,
+      createdAt: item.lastModified?.toISOString() ?? null,
+      updatedAt: item.lastModified?.toISOString() ?? null,
+    }));
 }
 
 function isOlderThan(file: StorageFile, cutoff: string) {
@@ -339,21 +310,22 @@ async function cleanupOrphanMedia({
   const failedPaths: Array<{ path: string; error: string }> = [];
 
   if (mode === "delete" && eligiblePaths.length > 0) {
-    const supabase = createAdminClient();
-
-    for (const pathsChunk of chunk(eligiblePaths, 100)) {
-      const { data, error } = await supabase.storage.from(CMS_MEDIA_BUCKET).remove(pathsChunk);
-      if (error) {
-        failedPaths.push(...pathsChunk.map((path) => ({ path, error: error.message })));
-      } else {
-        deletedPaths.push(...(data ?? []).map((item) => item.name).filter((path): path is string => typeof path === "string"));
-      }
+    try {
+      const deleted = await r2DeleteMany(eligiblePaths)
+      deletedPaths.push(...eligiblePaths.slice(0, deleted))
+    } catch (error) {
+      failedPaths.push(
+        ...eligiblePaths.map((path) => ({
+          path,
+          error: error instanceof Error ? error.message : "Delete failed",
+        }))
+      )
     }
   }
 
   return {
     mode,
-    bucket: CMS_MEDIA_BUCKET,
+    bucket: "r2",
     scannedCount: storedFiles.length,
     referencedCount: referencedPaths.size,
     orphanCandidateCount: orphanCandidates.length,

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { PlaceholderAsset } from "@/components/asset-image";
+import { useDebounce } from "@/hooks/useDebounce";
 
 type SearchResult = {
   href: string;
@@ -18,6 +19,20 @@ type SearchPayload = {
   games?: SearchResult[];
   services?: SearchResult[];
 };
+
+// Module-level in-memory cache: query → payload, survives re-renders
+// Cleared when the module is unloaded (page navigation in SPA is fine)
+const searchCache = new Map<string, SearchPayload>();
+const CACHE_MAX_SIZE = 50;
+
+function addToCache(key: string, value: SearchPayload) {
+  if (searchCache.size >= CACHE_MAX_SIZE) {
+    // Evict oldest entry
+    const firstKey = searchCache.keys().next().value;
+    if (firstKey !== undefined) searchCache.delete(firstKey);
+  }
+  searchCache.set(key, value);
+}
 
 function ResultRow({ result, onSelect }: { result: SearchResult; onSelect: () => void }) {
   return (
@@ -47,12 +62,12 @@ function SearchSkeleton() {
     <div className="space-y-3 p-2">
       {[0, 1, 2].map((item) => (
         <div key={item} className="grid grid-cols-[56px_1fr_64px] items-center gap-3">
-          <div className="h-14 w-14 animate-pulse rounded-md bg-white/10" />
+          <div className="h-14 w-14 animate-pulse rounded-md bg-[var(--ms-border)]" />
           <div>
-            <div className="h-4 w-3/4 animate-pulse rounded bg-white/10" />
-            <div className="mt-2 h-3 w-1/2 animate-pulse rounded bg-white/10" />
+            <div className="h-4 w-3/4 animate-pulse rounded bg-[var(--ms-border)]" />
+            <div className="mt-2 h-3 w-1/2 animate-pulse rounded bg-[var(--ms-border)]" />
           </div>
-          <div className="h-6 animate-pulse rounded bg-white/10" />
+          <div className="h-6 animate-pulse rounded bg-[var(--ms-border)]" />
         </div>
       ))}
     </div>
@@ -62,12 +77,16 @@ function SearchSkeleton() {
 export function SiteSearchOverlay() {
   const router = useRouter();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<SearchPayload>({ games: [], services: [] });
 
-  const trimmedQuery = query.trim();
+  // Debounce query by 250ms — balances responsiveness vs server load
+  const debouncedQuery = useDebounce(query, 250);
+  const trimmedQuery = debouncedQuery.trim();
   const hasResults = Boolean(results.games?.length || results.services?.length);
 
   useEffect(() => {
@@ -77,36 +96,43 @@ export function SiteSearchOverlay() {
       return;
     }
 
+    // Check cache first — no fetch needed
+    const cached = searchCache.get(trimmedQuery);
+    if (cached) {
+      setResults(cached);
+      setIsLoading(false);
+      return;
+    }
+
+    // Cancel any in-flight request for previous query
+    abortRef.current?.abort();
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(async () => {
-      setIsLoading(true);
+    abortRef.current = controller;
 
-      try {
-        const response = await fetch(`/api/search?q=${encodeURIComponent(trimmedQuery)}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const payload = (await response.json().catch(() => ({}))) as SearchPayload;
+    setIsLoading(true);
 
-        if (response.ok) {
-          setResults({
-            games: Array.isArray(payload.games) ? payload.games : [],
-            services: Array.isArray(payload.services) ? payload.services : [],
-          });
-        }
-      } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
-          setResults({ games: [], services: [] });
-        }
-      } finally {
+    fetch(`/api/search?q=${encodeURIComponent(trimmedQuery)}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((r) => r.json().catch(() => ({})))
+      .then((payload: SearchPayload) => {
+        const result: SearchPayload = {
+          games: Array.isArray(payload.games) ? payload.games : [],
+          services: Array.isArray(payload.services) ? payload.services : [],
+        };
+        addToCache(trimmedQuery, result);
+        setResults(result);
+      })
+      .catch((err) => {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setResults({ games: [], services: [] });
+      })
+      .finally(() => {
         setIsLoading(false);
-      }
-    }, 220);
+      });
 
-    return () => {
-      controller.abort();
-      window.clearTimeout(timeoutId);
-    };
+    return () => controller.abort();
   }, [isOpen, trimmedQuery]);
 
   useEffect(() => {
@@ -135,13 +161,22 @@ export function SiteSearchOverlay() {
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!trimmedQuery) return;
-    closeOverlay();
-    router.push(`/services?q=${encodeURIComponent(trimmedQuery)}`);
+    const q = query.trim();
+    if (!q) return;
+    
+    // Navigate to top game if available, otherwise go to search results
+    const topGame = results.games?.[0];
+    if (topGame) {
+      closeOverlay();
+      router.push(topGame.href);
+    } else {
+      closeOverlay();
+      router.push(`/services?q=${encodeURIComponent(q)}`);
+    }
   }
 
   return (
-    <div ref={wrapperRef} className="relative hidden flex-1 lg:block">
+    <div ref={wrapperRef} className="relative hidden flex-1 xl:block">
       <form
         onSubmit={submitSearch}
         className="flex h-12 items-center rounded-md border border-[var(--ms-border)] bg-[var(--ms-bg-card)] px-4 text-[var(--ms-body)]"
@@ -185,7 +220,6 @@ export function SiteSearchOverlay() {
                   </div>
                 </section>
               ) : null}
-
               {results.services?.length ? (
                 <section className={results.games?.length ? "mt-3 border-t border-[var(--ms-border)] pt-3" : ""}>
                   <p className="mono px-2 py-2 text-[10px] uppercase tracking-[0.2em] text-[var(--ms-body)]">Services</p>

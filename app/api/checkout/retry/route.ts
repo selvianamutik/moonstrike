@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
         }
 
         await writeAuditLog({
-          action: `Stripe checkout retry initiated for expired session ${sessionId}`,
+          action: `Checkout retry initiated for expired session ${sessionId}`,
           status: "success",
           request,
           eventType: "checkout",
@@ -60,11 +60,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create a new checkout session (always Stripe for retry)
-    const checkout = await createPaymentCheckout("stripe", request);
+    // Create a new checkout session (nowpayments for retry)
+    const checkout = await createPaymentCheckout("nowpayments", request);
 
     await writeAuditLog({
-      action: `Stripe checkout retry created ${checkout.checkoutSessionId}`,
+      action: `Checkout retry created ${checkout.checkoutSessionId}`,
       status: "success",
       request,
       eventType: "checkout",
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof CheckoutError) {
       await writeAuditLog({
-        action: `Stripe checkout retry blocked: ${error.message}`,
+        action: `Checkout retry blocked: ${error.message}`,
         status: "blocked",
         request,
         eventType: "checkout",
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
 
     const message = error instanceof Error ? error.message : "Unable to retry checkout.";
     await writeAuditLog({
-      action: `Stripe checkout retry failed: ${message}`,
+      action: `Checkout retry failed: ${message}`,
       status: "critical",
       request,
       eventType: "checkout",

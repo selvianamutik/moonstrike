@@ -63,9 +63,13 @@ html[data-theme="light"] {
   --ms-heading: var(--ms-lm-navy-dark);
   --ms-body: var(--ms-lm-slate);
   --ms-price: var(--ms-lm-teal);
-  --ms-cta-bg: linear-gradient(to right, var(--ms-gradient-start), var(--ms-gradient-end));
+
+  /* ── Accent colours: yellow in light mode instead of purple ── */
+  --ms-gradient-start: var(--ms-lm-yellow-mid);
+  --ms-gradient-end: var(--ms-lm-yellow-primary);
+  --ms-cta-bg: linear-gradient(to right, var(--ms-lm-yellow-mid), var(--ms-lm-yellow-primary));
   --ms-logo-bg: linear-gradient(to right, var(--ms-gradient-start), var(--ms-gradient-end));
-  --ms-hover-bg: rgba(139, 92, 246, 0.1);
+  --ms-hover-bg: rgba(243, 198, 35, 0.12);
   --ms-hero-gradient: linear-gradient(to right, rgba(255, 255, 255, 0.80), rgba(255, 255, 255, 0.50), transparent);
 
   --background: var(--ms-bg-page);
@@ -76,9 +80,9 @@ html[data-theme="light"] {
   --text: var(--ms-heading);
   --muted: var(--ms-body);
   --muted-dark: #5b7084;
-  --primary: var(--ms-gradient-start);
-  --primary-dark: #6d28d9;
-  --accent: var(--ms-gradient-end);
+  --primary: var(--ms-lm-yellow-primary);
+  --primary-dark: var(--ms-lm-yellow-mid);
+  --accent: var(--ms-lm-yellow-primary);
   --success: #15803d;
   --danger-soft: #ef4444;
 }
@@ -196,17 +200,28 @@ html[data-theme="light"] select:autofill {
 }
 
 .ms-shell {
-  width: min(1180px, calc(100% - 48px));
+  width: min(1180px, calc(100% - 32px));
   margin-inline: auto;
+}
+
+@media (min-width: 640px) {
+  .ms-shell {
+    width: min(1180px, calc(100% - 48px));
+  }
 }
 
 .top-nav-user {
-  width: min(1580px, calc(100% - 48px));
+  width: min(1580px, calc(100% - 32px));
   margin-inline: auto;
 }
 
+@media (min-width: 640px) {
+  .top-nav-user {
+    width: min(1580px, calc(100% - 48px));
+  }
+}
+
 .ms-button {
-  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.55rem;
@@ -223,8 +238,12 @@ html[data-theme="light"] select:autofill {
 }
 
 html[data-theme="light"] .ms-button {
-  color: #ffffff;
-  box-shadow: 0 12px 28px rgba(139, 92, 246, 0.34);
+  color: var(--ms-lm-navy-dark);
+  box-shadow: 0 12px 28px rgba(243, 198, 35, 0.45);
+}
+
+html[data-theme="light"] .ms-button:hover {
+  box-shadow: 0 0 28px rgba(243, 198, 35, 0.55);
 }
 
 .ms-button > svg,
@@ -372,8 +391,148 @@ html[data-theme="light"] .ms-card-hover:hover {
 }
 
 html[data-theme="light"] :focus-visible {
-  outline-color: var(--ms-lm-teal);
+  outline: none;
 }
+
+/* ─── Chat bubble: support/admin messages ────────────────────────────────
+   Dark mode: slate bg dengan border yang terlihat
+   Light mode: solid navy bg + teks putih agar kontras optimal */
+.chat-bubble-support {
+  border: 1px solid var(--ms-border);
+  background: #1e293b;
+  color: #f1f5f9;
+}
+
+html[data-theme="light"] .chat-bubble-support {
+  border-color: rgba(14, 45, 74, 0.2);
+  background: var(--ms-lm-navy-mid);
+  color: #ffffff;
+}
+/* ─── End chat bubble support ────────────────────────────────────────── */
+
+/* ─── Footer Chat Us button ─────────────────────────────────────────────
+   Dark mode: gradient ungu
+   Light mode: navy solid dengan teks putih */
+.footer-chat-btn {
+  background: var(--ms-cta-bg);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(136, 82, 255, 0.25);
+}
+
+html[data-theme="light"] .footer-chat-btn {
+  background: var(--ms-lm-navy-dark);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(14, 45, 74, 0.25);
+}
+/* ─── End Footer Chat Us button ─────────────────────────────────────── */
+
+/* ─── Light mode dropdown / select visibility fix ───────────────────────────
+   Ensures category labels and select options are always readable in light mode
+   without requiring hover. Fixes contrast issue reported in Tampilan revision. */
+html[data-theme="light"] select option {
+  color: var(--ms-lm-navy-dark);
+  background: var(--ms-lm-bg-card);
+}
+
+html[data-theme="light"] [role="option"],
+html[data-theme="light"] [role="listbox"] [data-value] {
+  color: var(--ms-lm-navy-dark) !important;
+}
+
+html[data-theme="light"] .scrolling-tab-list button,
+html[data-theme="light"] [data-tab] {
+  color: var(--ms-lm-slate);
+}
+
+html[data-theme="light"] .scrolling-tab-list button[aria-selected="true"],
+html[data-theme="light"] [data-tab][aria-selected="true"] {
+  color: var(--ms-lm-navy-dark);
+}
+
+/* Ensure all text within dropdown panels is visible in light mode */
+html[data-theme="light"] [role="dialog"] p,
+html[data-theme="light"] [role="dialog"] span,
+html[data-theme="light"] [role="dialog"] a,
+html[data-theme="light"] [role="dialog"] h3 {
+  color: var(--ms-lm-navy-dark);
+}
+
+html[data-theme="light"] [role="dialog"] .text-white {
+  color: var(--ms-lm-navy-dark) !important;
+}
+
+/* ─── End light mode dropdown fix ───────────────────────────────────────── */
+
+/* ─── Quick Select Menu — light mode yellow theme ───────────────────────────
+   Dark mode: purple accent (ms-gradient-end)
+   Light mode: yellow accent (ms-lm-yellow-primary) */
+
+/* Bullet dot di samping nama kategori */
+.qs-bullet {
+  background: var(--ms-gradient-end);
+}
+html[data-theme="light"] .qs-bullet {
+  background: var(--ms-lm-yellow-primary);
+}
+
+/* Label nama kategori */
+.qs-category-label {
+  color: var(--ms-heading);
+}
+.qs-category-link:hover .qs-category-label {
+  color: var(--ms-gradient-end);
+}
+html[data-theme="light"] .qs-category-link:hover .qs-category-label {
+  color: var(--ms-lm-navy-dark);
+}
+
+/* Link nama service */
+.qs-service-link {
+  color: var(--ms-body);
+}
+.qs-service-link:hover {
+  color: var(--ms-gradient-end);
+}
+html[data-theme="light"] .qs-service-link {
+  color: var(--ms-lm-slate);
+}
+html[data-theme="light"] .qs-service-link:hover {
+  color: var(--ms-lm-navy-dark);
+  text-decoration-color: var(--ms-lm-yellow-primary);
+}
+
+/* Sidebar game button — idle */
+.qs-game-btn--idle {
+  color: var(--ms-heading);
+}
+.qs-game-btn--idle:hover {
+  background: var(--ms-hover-bg);
+  color: var(--ms-heading);
+}
+html[data-theme="light"] .qs-game-btn--idle {
+  color: var(--ms-lm-navy-dark);
+}
+html[data-theme="light"] .qs-game-btn--idle:hover {
+  background: var(--ms-lm-yellow-pale);
+  color: var(--ms-lm-navy-dark);
+}
+
+/* Sidebar game button — active/selected */
+.qs-game-btn--active {
+  background: var(--ms-gradient-end);
+  color: #ffffff;
+}
+html[data-theme="light"] .qs-game-btn--active {
+  background: var(--ms-lm-yellow-primary);
+  color: var(--ms-lm-navy-dark);
+}
+
+/* Focus ring untuk quick select dialog */
+html[data-theme="light"] [aria-label="Quick select game services"] :focus-visible {
+  outline-color: var(--ms-lm-yellow-primary);
+}
+
+/* ─── End Quick Select Menu light mode ──────────────────────────────────── */
 
 /* Interactive elements always get pointer cursor */
 button:not([disabled]),

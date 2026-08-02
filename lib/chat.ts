@@ -7,7 +7,6 @@ import { getUserDisplayName, getUserInitials } from '@/lib/auth/user-display'
 export const CHAT_COOKIE = 'ms_chat_session'
 const CHAT_COOKIE_MAX_AGE = 60 * 60
 const LOGGED_IN_SUPPORT_CHAT_RETENTION_DAYS = 90
-const ORDER_CHAT_RETENTION_DAYS = 30
 const DAY_MS = 24 * 60 * 60 * 1000
 
 export type ChatTicketStatus = 'open' | 'in_progress' | 'resolved'
@@ -32,8 +31,6 @@ export type ChatAttachment =
 
 export type ChatTicket = {
   id: string
-  orderId: string | null
-  orderRef: string | null
   userId: string | null
   sessionId: string | null
   subject: string
@@ -46,6 +43,8 @@ export type ChatTicket = {
   latestMessage: string
   latestMessageAt: string | null
   unreadCount: number
+  adminLastReadAt: string | null
+  customerLastReadAt: string | null
 }
 
 export type ChatMessage = {
@@ -56,6 +55,9 @@ export type ChatMessage = {
   content: string
   attachments: ChatAttachment[]
   sentAt: string
+  replyToId: string | null
+  replyToContent: string | null
+  replyToSenderRole: ChatSenderRole | null
 }
 
 export type ChatMessagePage = {
@@ -65,7 +67,6 @@ export type ChatMessagePage = {
 
 type TicketRow = {
   id: string
-  order_id: string | null
   user_id: string | null
   session_id?: string | null
   subject: string
@@ -74,22 +75,13 @@ type TicketRow = {
   updated_at: string
   admin_last_read_at?: string
   customer_last_read_at?: string
-  orders?: { order_ref: string | null } | { order_ref: string | null }[] | null
-}
-
-type RetentionOrderRow = {
-  status: string
-  completed_at: string | null
-  updated_at: string
 }
 
 type RetentionTicketRow = {
   id: string
-  order_id: string | null
   user_id: string | null
   session_id: string | null
   updated_at: string
-  orders?: RetentionOrderRow | RetentionOrderRow[] | null
 }
 
 type CookieStore = Awaited<ReturnType<typeof cookies>>
@@ -102,16 +94,25 @@ type MessageRow = {
   content: string
   attachments: ChatAttachment[] | null
   sent_at: string
+  reply_to_id: string | null
+  reply_to?: {
+    content: string
+    sender_role: ChatSenderRole
+  } | null
 }
 
 const ticketSelect =
-  'id, order_id, user_id, session_id, subject, status, created_at, updated_at, admin_last_read_at, customer_last_read_at, orders(order_ref)'
+  'id, user_id, session_id, subject, status, created_at, updated_at, admin_last_read_at, customer_last_read_at'
+
+const messageSelect =
+  'id, ticket_id, sender_id, sender_role, content, attachments, sent_at, reply_to_id, reply_to:reply_to_id(content, sender_role)'
 
 function relationOne<T>(value: T | T[] | null | undefined) {
   return Array.isArray(value) ? value[0] : value
 }
 
 function toMessage(row: MessageRow): ChatMessage {
+  const replyTo = relationOne(row.reply_to)
   return {
     id: row.id,
     ticketId: row.ticket_id,
@@ -120,6 +121,9 @@ function toMessage(row: MessageRow): ChatMessage {
     content: row.content,
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
     sentAt: row.sent_at,
+    replyToId: row.reply_to_id ?? null,
+    replyToContent: replyTo?.content ?? null,
+    replyToSenderRole: replyTo?.sender_role ?? null,
   }
 }
 
@@ -135,13 +139,10 @@ function userLabel(user: User | null | undefined, fallback: string) {
 }
 
 function toTicket(row: TicketRow, user: User | null | undefined, latestMessage?: MessageRow, unreadCount = 0): ChatTicket {
-  const order = relationOne(row.orders)
   const customer = userLabel(user, row.user_id ? 'Customer' : 'Guest')
 
   return {
     id: row.id,
-    orderId: row.order_id,
-    orderRef: order?.order_ref ?? null,
     userId: row.user_id,
     sessionId: row.session_id ?? null,
     subject: row.subject,
@@ -154,6 +155,8 @@ function toTicket(row: TicketRow, user: User | null | undefined, latestMessage?:
     latestMessage: latestMessage?.content ?? '',
     latestMessageAt: latestMessage?.sent_at ?? null,
     unreadCount,
+    adminLastReadAt: row.admin_last_read_at ?? null,
+    customerLastReadAt: row.customer_last_read_at ?? null,
   }
 }
 
@@ -161,80 +164,59 @@ function ticketSortTime(ticket: ChatTicket) {
   return ticket.latestMessageAt ?? ticket.createdAt
 }
 
-function logicalTicketKey(ticket: ChatTicket) {
-  if (ticket.orderId) return `order:${ticket.orderId}`
-  if (ticket.userId) return `customer-general:${ticket.userId}`
-  if (ticket.sessionId) return `anonymous-general:${ticket.sessionId}`
-  return `ticket:${ticket.id}`
-}
-
 function sortTicketsByLatestActivity(tickets: ChatTicket[]) {
   return tickets.sort((a, b) => ticketSortTime(b).localeCompare(ticketSortTime(a)))
 }
 
-function uniqueLogicalTickets(tickets: ChatTicket[]) {
-  const unique = new Map<string, ChatTicket>()
-
-  for (const ticket of sortTicketsByLatestActivity([...tickets])) {
-    const key = logicalTicketKey(ticket)
-    if (!unique.has(key)) unique.set(key, ticket)
-  }
-
-  return [...unique.values()]
+function isUniqueViolation(error: { code?: string }) {
+  return error.code === '23505'
 }
 
-function isUniqueViolation(error: { code?: string } | null | undefined) {
-  return error?.code === '23505'
+// ─── Cookie helpers ───────────────────────────────────────────────────────────
+
+async function getCookieStore(): Promise<CookieStore> {
+  return await cookies()
 }
 
-function setChatSessionCookie(cookieStore: CookieStore, sessionId: string) {
-  cookieStore.set(CHAT_COOKIE, sessionId, {
+export async function getCurrentChatSessionId(): Promise<string | null> {
+  const store = await getCookieStore()
+  return store.get(CHAT_COOKIE)?.value ?? null
+}
+
+async function getOrCreateChatSessionId(): Promise<string> {
+  const store = await getCookieStore()
+  const existing = store.get(CHAT_COOKIE)?.value
+  if (existing) return existing
+
+  const sessionId = randomUUID()
+  store.set(CHAT_COOKIE, sessionId, {
     httpOnly: true,
-    maxAge: CHAT_COOKIE_MAX_AGE,
-    path: '/',
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: CHAT_COOKIE_MAX_AGE,
+  })
+  return sessionId
+}
+
+async function refreshCurrentChatSession() {
+  const store = await getCookieStore()
+  const existing = store.get(CHAT_COOKIE)?.value
+  if (!existing) return
+
+  store.set(CHAT_COOKIE, existing, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: CHAT_COOKIE_MAX_AGE,
   })
 }
 
-export async function getOrCreateChatSessionId() {
-  const cookieStore = await cookies()
-  const sessionId = cookieStore.get(CHAT_COOKIE)?.value || randomUUID()
-  setChatSessionCookie(cookieStore, sessionId)
-  return sessionId
+async function clearChatSessionCookie() {
+  const store = await getCookieStore()
+  store.delete(CHAT_COOKIE)
 }
 
-export async function getCurrentChatSessionId() {
-  const cookieStore = await cookies()
-  return cookieStore.get(CHAT_COOKIE)?.value ?? null
-}
-
-export async function refreshCurrentChatSession() {
-  const cookieStore = await cookies()
-  const sessionId = cookieStore.get(CHAT_COOKIE)?.value
-  if (!sessionId) return null
-
-  setChatSessionCookie(cookieStore, sessionId)
-  return sessionId
-}
-
-export async function clearChatSessionCookie() {
-  const cookieStore = await cookies()
-  cookieStore.delete(CHAT_COOKIE)
-}
-
-async function userMapForTickets(userIds: string[]) {
-  const supabase = createAdminClient()
-  const uniqueIds = [...new Set(userIds.filter(Boolean))]
-  const entries = await Promise.all(
-    uniqueIds.map(async (id) => {
-      const { data } = await supabase.auth.admin.getUserById(id)
-      return [id, data.user ?? null] as const
-    }),
-  )
-
-  return new Map(entries)
-}
+// ─── Internal helpers ─────────────────────────────────────────────────────────
 
 async function latestMessagesForTickets(ticketIds: string[]) {
   if (ticketIds.length === 0) return new Map<string, MessageRow>()
@@ -242,14 +224,14 @@ async function latestMessagesForTickets(ticketIds: string[]) {
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('messages')
-    .select('id, ticket_id, sender_id, sender_role, content, attachments, sent_at')
+    .select('ticket_id, content, sent_at')
     .in('ticket_id', ticketIds)
     .order('sent_at', { ascending: false })
 
   if (error) throw error
 
   const latest = new Map<string, MessageRow>()
-  for (const row of (data ?? []) as MessageRow[]) {
+  for (const row of (data ?? []) as (MessageRow & { ticket_id: string })[]) {
     if (!latest.has(row.ticket_id)) latest.set(row.ticket_id, row)
   }
   return latest
@@ -307,50 +289,44 @@ async function unreadAdminMessagesForTickets(rows: TicketRow[]) {
   return unread
 }
 
-export async function getOrCreateCustomerTicket(user: User, orderRef?: string | null) {
+async function userMapForTickets(userIds: string[]) {
+  if (userIds.length === 0) return new Map<string, User>()
+
   const supabase = createAdminClient()
-  let orderId: string | null = null
-  let subject = 'General Support'
+  const { data, error } = await supabase.auth.admin.listUsers()
+  if (error) throw error
 
-  if (orderRef) {
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .select('id, order_ref')
-      .eq('user_id', user.id)
-      .eq('order_ref', orderRef)
-      .maybeSingle<{ id: string; order_ref: string }>()
-
-    if (orderError) throw orderError
-    if (!order) throw new Error('Order not found.')
-
-    orderId = order.id
-    subject = `Order ${order.order_ref}`
+  const map = new Map<string, User>()
+  for (const user of data.users) {
+    if (userIds.includes(user.id)) map.set(user.id, user as User)
   }
+  return map
+}
+
+// ─── Customer ticket ──────────────────────────────────────────────────────────
+
+export async function getOrCreateCustomerTicket(user: User) {
+  const supabase = createAdminClient()
 
   async function findExistingTicket() {
-    let query = supabase
+    return supabase
       .from('support_tickets')
       .select(ticketSelect)
       .eq('user_id', user.id)
       .order('created_at', { ascending: true })
       .limit(1)
-
-    query = orderId ? query.eq('order_id', orderId) : query.is('order_id', null)
-
-    return query.maybeSingle<TicketRow>()
+      .maybeSingle<TicketRow>()
   }
 
   const { data: existing, error: existingError } = await findExistingTicket()
   if (existingError) throw existingError
-
   if (existing) return toTicket(existing, user)
 
   const { data: ticket, error: insertError } = await supabase
     .from('support_tickets')
     .insert({
-      order_id: orderId,
       user_id: user.id,
-      subject,
+      subject: 'Support',
       status: 'open',
     })
     .select(ticketSelect)
@@ -362,130 +338,13 @@ export async function getOrCreateCustomerTicket(user: User, orderRef?: string | 
       if (racedLookupError) throw racedLookupError
       if (racedTicket) return toTicket(racedTicket, user)
     }
-
     throw insertError
   }
 
   return toTicket(ticket, user)
 }
 
-export async function getOrCreateOrderTicketForAdmin(orderRef: string) {
-  const supabase = createAdminClient()
-
-  const { data: order, error: orderError } = await supabase
-    .from('orders')
-    .select('id, user_id, order_ref')
-    .eq('order_ref', orderRef)
-    .maybeSingle<{ id: string; user_id: string; order_ref: string }>()
-
-  if (orderError) throw orderError
-  if (!order) throw new Error('Order not found.')
-  const resolvedOrder = order
-
-  async function findExistingTicket() {
-    return supabase
-      .from('support_tickets')
-      .select(ticketSelect)
-      .eq('order_id', resolvedOrder.id)
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle<TicketRow>()
-  }
-
-  const { data: existing, error: existingError } = await findExistingTicket()
-  if (existingError) throw existingError
-
-  const { data: userData } = await supabase.auth.admin.getUserById(resolvedOrder.user_id)
-  const user = userData.user ?? null
-
-  if (existing) return toTicket(existing, user)
-
-  const { data: ticket, error: insertError } = await supabase
-    .from('support_tickets')
-    .insert({
-      order_id: resolvedOrder.id,
-      user_id: resolvedOrder.user_id,
-      subject: `Order ${resolvedOrder.order_ref}`,
-      status: 'open',
-    })
-    .select(ticketSelect)
-    .single<TicketRow>()
-
-  if (insertError) {
-    if (isUniqueViolation(insertError)) {
-      const { data: racedTicket, error: racedLookupError } = await findExistingTicket()
-      if (racedLookupError) throw racedLookupError
-      if (racedTicket) return toTicket(racedTicket, user)
-    }
-
-    throw insertError
-  }
-
-  return toTicket(ticket, user)
-}
-
-async function findAuthUserByEmail(email: string) {
-  const supabase = createAdminClient()
-  const normalizedEmail = email.trim().toLowerCase()
-  let page = 1
-
-  while (page <= 20) {
-    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 })
-    if (error) throw error
-
-    const user = data.users.find((item) => item.email?.toLowerCase() === normalizedEmail)
-    if (user) return user
-    if (data.users.length < 1000) break
-    page += 1
-  }
-
-  return null
-}
-
-export async function getOrCreateSupportTicketForAdmin(customerEmail: string) {
-  const user = await findAuthUserByEmail(customerEmail)
-  if (!user) throw new Error('Customer not found.')
-  const customerUser = user
-
-  const supabase = createAdminClient()
-
-  async function findExistingTicket() {
-    return supabase
-      .from('support_tickets')
-      .select(ticketSelect)
-      .eq('user_id', customerUser.id)
-      .is('order_id', null)
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle<TicketRow>()
-  }
-
-  const { data: existing, error: existingError } = await findExistingTicket()
-  if (existingError) throw existingError
-  if (existing) return toTicket(existing, customerUser)
-
-  const { data: ticket, error: insertError } = await supabase
-    .from('support_tickets')
-    .insert({
-      user_id: customerUser.id,
-      subject: 'General Support',
-      status: 'open',
-    })
-    .select(ticketSelect)
-    .single<TicketRow>()
-
-  if (insertError) {
-    if (isUniqueViolation(insertError)) {
-      const { data: racedTicket, error: racedLookupError } = await findExistingTicket()
-      if (racedLookupError) throw racedLookupError
-      if (racedTicket) return toTicket(racedTicket, customerUser)
-    }
-
-    throw insertError
-  }
-
-  return toTicket(ticket, customerUser)
-}
+// ─── Anonymous ticket ─────────────────────────────────────────────────────────
 
 export async function getOrCreateAnonymousTicket() {
   const supabase = createAdminClient()
@@ -497,7 +356,6 @@ export async function getOrCreateAnonymousTicket() {
       .select(ticketSelect)
       .eq('session_id', sessionId)
       .is('user_id', null)
-      .is('order_id', null)
       .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle<TicketRow>()
@@ -512,7 +370,7 @@ export async function getOrCreateAnonymousTicket() {
     .from('support_tickets')
     .insert({
       session_id: sessionId,
-      subject: 'General Support',
+      subject: 'Support',
       status: 'open',
     })
     .select(ticketSelect)
@@ -524,7 +382,6 @@ export async function getOrCreateAnonymousTicket() {
       if (racedLookupError) throw racedLookupError
       if (racedTicket) return toTicket(racedTicket, null)
     }
-
     throw insertError
   }
 
@@ -547,6 +404,8 @@ export async function getTicketForAnonymous(ticketId: string) {
   if (data) await refreshCurrentChatSession()
   return data
 }
+
+// ─── Cleanup ──────────────────────────────────────────────────────────────────
 
 export async function cleanupExpiredAnonymousChatTickets(maxAgeSeconds = CHAT_COOKIE_MAX_AGE) {
   const supabase = createAdminClient()
@@ -576,17 +435,6 @@ export async function cleanupExpiredAnonymousChatTickets(maxAgeSeconds = CHAT_CO
   return { deletedCount: ticketIds.length, expiresBefore }
 }
 
-function latestTimestamp(...values: Array<string | null | undefined>) {
-  const timestamps = values
-    .filter((value): value is string => Boolean(value))
-    .map((value) => {
-      const timestamp = new Date(value).getTime()
-      return Number.isNaN(timestamp) ? 0 : timestamp
-    })
-
-  return timestamps.length > 0 ? Math.max(...timestamps) : 0
-}
-
 async function deleteTicketsByIds(ticketIds: string[]) {
   if (ticketIds.length === 0) return 0
 
@@ -603,58 +451,43 @@ async function deleteTicketsByIds(ticketIds: string[]) {
 export async function cleanupExpiredChatTickets({
   anonymousMaxAgeSeconds = CHAT_COOKIE_MAX_AGE,
   loggedInSupportRetentionDays = LOGGED_IN_SUPPORT_CHAT_RETENTION_DAYS,
-  orderChatRetentionDays = ORDER_CHAT_RETENTION_DAYS,
 } = {}) {
   const supabase = createAdminClient()
   const now = Date.now()
   const anonymousExpiresBefore = new Date(now - anonymousMaxAgeSeconds * 1000).toISOString()
   const loggedInSupportExpiresBefore = new Date(now - loggedInSupportRetentionDays * DAY_MS).toISOString()
-  const orderChatExpiresBeforeMs = now - orderChatRetentionDays * DAY_MS
 
   const { data: ticketRows, error: lookupError } = await supabase
     .from('support_tickets')
-    .select('id, order_id, user_id, session_id, updated_at, orders(status, completed_at, updated_at)')
+    .select('id, user_id, session_id, updated_at')
 
   if (lookupError) throw lookupError
 
   const expiredAnonymous: string[] = []
   const expiredLoggedInSupport: string[] = []
-  const expiredOrderChats: string[] = []
 
   for (const ticket of (ticketRows ?? []) as RetentionTicketRow[]) {
-    if (!ticket.user_id && ticket.session_id && !ticket.order_id && ticket.updated_at < anonymousExpiresBefore) {
+    if (!ticket.user_id && ticket.session_id && ticket.updated_at < anonymousExpiresBefore) {
       expiredAnonymous.push(ticket.id)
       continue
     }
 
-    if (ticket.user_id && !ticket.order_id && ticket.updated_at < loggedInSupportExpiresBefore) {
+    if (ticket.user_id && ticket.updated_at < loggedInSupportExpiresBefore) {
       expiredLoggedInSupport.push(ticket.id)
-      continue
-    }
-
-    const order = relationOne(ticket.orders)
-    if (!ticket.order_id || !order || !['completed', 'refunded'].includes(order.status)) continue
-
-    const lastImportantActivity = latestTimestamp(ticket.updated_at, order.completed_at, order.updated_at)
-    if (lastImportantActivity > 0 && lastImportantActivity < orderChatExpiresBeforeMs) {
-      expiredOrderChats.push(ticket.id)
     }
   }
 
-  const deletedCount = await deleteTicketsByIds([...expiredAnonymous, ...expiredLoggedInSupport, ...expiredOrderChats])
+  const deletedCount = await deleteTicketsByIds([...expiredAnonymous, ...expiredLoggedInSupport])
 
   return {
     deletedCount,
     anonymousDeletedCount: expiredAnonymous.length,
     loggedInSupportDeletedCount: expiredLoggedInSupport.length,
-    orderChatDeletedCount: expiredOrderChats.length,
     anonymousExpiresBefore,
     loggedInSupportExpiresBefore,
-    orderChatExpiresBefore: new Date(orderChatExpiresBeforeMs).toISOString(),
     retention: {
       anonymousMaxAgeSeconds,
       loggedInSupportRetentionDays,
-      orderChatRetentionDays,
     },
   }
 }
@@ -678,6 +511,8 @@ export async function mergeAnonymousChatTickets(userId: string) {
   await clearChatSessionCookie()
 }
 
+// ─── List tickets ─────────────────────────────────────────────────────────────
+
 export async function listCustomerTickets(user: User) {
   const supabase = createAdminClient()
   const { data, error } = await supabase
@@ -691,7 +526,7 @@ export async function listCustomerTickets(user: User) {
   const rows = (data ?? []) as TicketRow[]
   const latest = await latestMessagesForTickets(rows.map((row) => row.id))
   const unread = await unreadAdminMessagesForTickets(rows)
-  return uniqueLogicalTickets(rows.map((row) => toTicket(row, user, latest.get(row.id), unread.get(row.id) ?? 0)))
+  return rows.map((row) => toTicket(row, user, latest.get(row.id), unread.get(row.id) ?? 0))
 }
 
 export async function listAnonymousTickets() {
@@ -711,7 +546,7 @@ export async function listAnonymousTickets() {
   const rows = (data ?? []) as TicketRow[]
   const latest = await latestMessagesForTickets(rows.map((row) => row.id))
   const unread = await unreadAdminMessagesForTickets(rows)
-  return uniqueLogicalTickets(rows.map((row) => toTicket(row, null, latest.get(row.id), unread.get(row.id) ?? 0)))
+  return rows.map((row) => toTicket(row, null, latest.get(row.id), unread.get(row.id) ?? 0))
 }
 
 export async function listAdminTickets() {
@@ -728,9 +563,7 @@ export async function listAdminTickets() {
   const users = await userMapForTickets(rows.map((row) => row.user_id).filter((id): id is string => Boolean(id)))
   const latest = await latestMessagesForTickets(rows.map((row) => row.id))
   const unread = await unreadCustomerMessagesForTickets(rows)
-  return uniqueLogicalTickets(
-    rows.map((row) => toTicket(row, row.user_id ? users.get(row.user_id) : null, latest.get(row.id), unread.get(row.id) ?? 0)),
-  )
+  return rows.map((row) => toTicket(row, row.user_id ? users.get(row.user_id) : null, latest.get(row.id), unread.get(row.id) ?? 0))
 }
 
 export async function getAdminUnreadTicketCount() {
@@ -750,6 +583,8 @@ export async function getCustomerUnreadSummary(user: User | null) {
     unreadMessageCount: tickets.reduce((total, ticket) => total + ticket.unreadCount, 0),
   }
 }
+
+// ─── Mark read ────────────────────────────────────────────────────────────────
 
 export async function markAdminTicketRead(ticketId: string) {
   const supabase = createAdminClient()
@@ -785,6 +620,8 @@ export async function markCustomerTicketRead(ticketId: string, userId: string | 
   return Boolean(data)
 }
 
+// ─── Get ticket ───────────────────────────────────────────────────────────────
+
 export async function getTicketForCustomer(ticketId: string, userId: string) {
   const supabase = createAdminClient()
   const { data, error } = await supabase
@@ -798,13 +635,81 @@ export async function getTicketForCustomer(ticketId: string, userId: string) {
   return data
 }
 
+// ─── Messages ─────────────────────────────────────────────────────────────────
+
+// ─── Deleted-game scrubbing ───────────────────────────────────────────────────
+
+/**
+ * Extract a game slug from a chat link-attachment href.
+ * Hrefs are stored as absolute paths like "/{game-slug}" or
+ * "/{game-slug}/{category-slug}/{service-slug}".
+ */
+function gameSlugFromHref(href: string): string | null {
+  try {
+    const pathname = href.startsWith('http') ? new URL(href).pathname : href
+    const slug = pathname.split('/').filter(Boolean)[0]
+    return slug ?? null
+  } catch {
+    return null
+  }
+}
+
+const GAME_DELETED_SENTINEL: Extract<ChatAttachment, { type: 'link' }> = {
+  type: 'link',
+  linkType: 'game',
+  title: 'game no longer exist',
+  href: '#',
+  image: undefined,
+  meta: undefined,
+}
+
+/**
+ * For a batch of messages, find every link attachment that references a game
+ * slug, bulk-query the games table to check which slugs still exist, and
+ * replace stale attachments with the sentinel so the UI shows
+ * "game no longer exist".
+ */
+async function scrubDeletedGameAttachments(messages: ChatMessage[]): Promise<ChatMessage[]> {
+  // Collect all unique game slugs referenced by link attachments
+  const slugSet = new Set<string>()
+  for (const msg of messages) {
+    for (const att of msg.attachments) {
+      if (att.type === 'link') {
+        const slug = gameSlugFromHref(att.href)
+        if (slug) slugSet.add(slug)
+      }
+    }
+  }
+
+  if (slugSet.size === 0) return messages
+
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('games')
+    .select('slug')
+    .in('slug', Array.from(slugSet))
+
+  const existingSlugs = new Set((data ?? []).map((r: { slug: string }) => r.slug))
+
+  return messages.map((msg) => {
+    const patchedAttachments = msg.attachments.map((att) => {
+      if (att.type !== 'link') return att
+      const slug = gameSlugFromHref(att.href)
+      if (slug && !existingSlugs.has(slug)) return GAME_DELETED_SENTINEL
+      return att
+    })
+    if (patchedAttachments === msg.attachments) return msg
+    return { ...msg, attachments: patchedAttachments }
+  })
+}
+
 export async function listMessages(ticketId: string, options: { limit?: number; before?: string | null } = {}): Promise<ChatMessagePage> {
-  const limit = Math.min(Math.max(options.limit ?? 10, 1), 50)
+  const limit = Math.min(Math.max(options.limit ?? 20, 1), 50)
   const supabase = createAdminClient()
 
   let query = supabase
     .from('messages')
-    .select('id, ticket_id, sender_id, sender_role, content, attachments, sent_at')
+    .select(messageSelect)
     .eq('ticket_id', ticketId)
     .order('sent_at', { ascending: false })
     .limit(limit + 1)
@@ -817,11 +722,12 @@ export async function listMessages(ticketId: string, options: { limit?: number; 
 
   if (error) throw error
 
-  const rows = (data ?? []) as MessageRow[]
+  const rows = (data ?? []) as unknown as MessageRow[]
   const pageRows = rows.slice(0, limit)
+  const messages = await scrubDeletedGameAttachments(pageRows.reverse().map(toMessage))
 
   return {
-    messages: pageRows.reverse().map(toMessage),
+    messages,
     hasMore: rows.length > limit,
   }
 }
@@ -832,12 +738,14 @@ export async function sendChatMessage({
   senderRole,
   content,
   attachments = [],
+  replyToId,
 }: {
   ticketId: string
   senderId: string
   senderRole: ChatSenderRole
   content: string
   attachments?: ChatAttachment[]
+  replyToId?: string | null
 }) {
   const trimmed = content.trim()
   if (trimmed.length < 1 && attachments.length === 0) throw new Error('Message cannot be empty.')
@@ -852,17 +760,16 @@ export async function sendChatMessage({
       sender_role: senderRole,
       content: trimmed,
       attachments,
+      reply_to_id: replyToId ?? null,
     })
-    .select('id, ticket_id, sender_id, sender_role, content, attachments, sent_at')
+    .select(messageSelect)
     .single<MessageRow>()
 
   if (error) throw error
 
   await supabase
     .from('support_tickets')
-    .update({
-      updated_at: new Date().toISOString(),
-    })
+    .update({ updated_at: new Date().toISOString() })
     .eq('id', ticketId)
 
   return toMessage(data)

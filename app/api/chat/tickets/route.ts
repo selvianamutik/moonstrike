@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth/session'
 import { getOrCreateAnonymousTicket, getOrCreateCustomerTicket, listAnonymousTickets, listCustomerTickets } from '@/lib/chat'
 
@@ -13,13 +13,11 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   const user = await getCurrentUser()
-  const body = await request.json().catch(() => null)
-  const orderRef = typeof body?.orderRef === 'string' && body.orderRef.trim() ? body.orderRef.trim() : null
 
   try {
-    const ticket = user ? await getOrCreateCustomerTicket(user, orderRef) : await getOrCreateAnonymousTicket()
+    const ticket = user ? await getOrCreateCustomerTicket(user) : await getOrCreateAnonymousTicket()
     return NextResponse.json({ ticket })
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to create ticket.' }, { status: 500 })

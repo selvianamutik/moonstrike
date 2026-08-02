@@ -1,8 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { writeAuditLog } from "@/lib/admin/audit";
 import { getAdminSession } from "@/lib/admin/session";
-import { CMS_MEDIA_BUCKET } from "@/lib/cms/storage";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { r2DeleteMany } from "@/lib/r2";
 
 const allowedPrefixes = ["games/", "services/", "cms/", "admins/"];
 
@@ -33,27 +32,29 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ ok: true, deleted: 0 });
   }
 
-  const supabase = createAdminClient();
-  const { error } = await supabase.storage.from(CMS_MEDIA_BUCKET).remove(paths);
+  try {
+    const deleted = await r2DeleteMany(paths);
 
-  if (error) {
     await writeAuditLog({
-      action: `Media cleanup failed: ${error.message}`,
+      action: `Cleaned up unsaved media: ${deleted} file${deleted === 1 ? "" : "s"}`,
+      status: "success",
+      request,
+      admin,
+      eventType: "cms",
+    });
+
+    return NextResponse.json({ ok: true, deleted });
+  } catch (error) {
+    await writeAuditLog({
+      action: `Media cleanup failed: ${error instanceof Error ? error.message : "Unknown error"}`,
       status: "critical",
       request,
       admin,
       eventType: "cms",
     });
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Delete failed." },
+      { status: 500 }
+    );
   }
-
-  await writeAuditLog({
-    action: `Cleaned up unsaved media: ${paths.length} file${paths.length === 1 ? "" : "s"}`,
-    status: "success",
-    request,
-    admin,
-    eventType: "cms",
-  });
-
-  return NextResponse.json({ ok: true, deleted: paths.length });
 }

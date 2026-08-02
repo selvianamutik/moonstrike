@@ -9,6 +9,7 @@ import {
 import { writeAuditLog } from '@/lib/admin/audit'
 import { getAdminSessionTimeoutSeconds } from '@/lib/admin/settings'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { verifyTurnstileToken } from '@/lib/turnstile'
 
 const WINDOW_MS = 15 * 60 * 1000
 const MAX_IP_REQUESTS = 20
@@ -75,11 +76,28 @@ export async function POST(request: NextRequest) {
     typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
   const password = typeof body?.password === 'string' ? body.password : ''
   const remember = body?.remember === true
+  const turnstileToken = typeof body?.turnstileToken === 'string' ? body.turnstileToken : ''
 
   if (!email || !password) {
     return NextResponse.json(
       { error: 'Email and password are required.' },
       { status: 400 }
+    )
+  }
+
+  // Verify Turnstile token
+  const turnstileResult = await verifyTurnstileToken(turnstileToken)
+  if (!turnstileResult.success) {
+    await writeAuditLog({
+      action: `Admin login Turnstile verification failed for ${email}`,
+      status: 'blocked',
+      request,
+      actorLabel: email,
+    })
+    
+    return NextResponse.json(
+      { error: turnstileResult.error || 'Security verification failed. Please try again.' },
+      { status: 403 }
     )
   }
 

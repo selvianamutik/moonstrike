@@ -1,7 +1,17 @@
+import type { Metadata } from "next";
 import { GamesCatalog } from "@/components/games-catalog";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { listActiveCatalogGames } from "@/lib/cms/games";
+
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://moonstrike.pro';
+
+export const metadata: Metadata = {
+  title: "Browse Games",
+  description: "Browse all supported games on Moon Strike. Find boosting, coaching, and item services for your favorite titles.",
+  alternates: { canonical: `${BASE_URL}/games` },
+  openGraph: { url: `${BASE_URL}/games` },
+};
 
 type GamesPageProps = {
   searchParams?: Promise<{

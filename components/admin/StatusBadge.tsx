@@ -74,17 +74,21 @@ export function StatusBadge({ status, className = "" }: StatusBadgeProps) {
       styleClasses = "bg-amber-500/10 text-amber-500 border-amber-500/20";
       break;
     case "delivered":
-    case "refund_requested":
       styleClasses = "bg-purple-500/10 text-purple-400 border-purple-500/20";
+      break;
+    case "refund_requested":
+      styleClasses = "bg-red-500/10 text-red-400 border-red-500/20";
       break;
     case "Draft":
     case "DRAFT":
     case "draft":
+    case "resolved":
+      styleClasses = "bg-gray-500/10 text-gray-400 border-gray-500/20";
+      break;
     case "Refunded":
     case "REFUNDED":
     case "refunded":
-    case "resolved":
-      styleClasses = "bg-gray-500/10 text-gray-400 border-gray-500/20";
+      styleClasses = "bg-red-500/10 text-red-500 border-red-500/20";
       break;
     case "Critical":
     case "CRITICAL":

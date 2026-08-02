@@ -175,6 +175,7 @@ export async function listActiveServices() {
     .from('services')
     .select(SERVICE_SELECT)
     .eq('status', 'active')
+    .not('game_id', 'is', null) // Exclude services with deleted games
     .order('title', { ascending: true })
     .returns<RawServiceRow[]>()
 
@@ -182,6 +183,7 @@ export async function listActiveServices() {
 
   return (data ?? [])
     .map(rawServiceToRow)
+    .filter((service) => service.game_id != null) // Double-check game exists
     .sort(
       (a, b) =>
         a.game_name.localeCompare(b.game_name) ||
@@ -198,6 +200,7 @@ export async function listActiveServicesForGame(gameSlug: string) {
     .select(SERVICE_SELECT)
     .eq('status', 'active')
     .eq('games.slug', gameSlug)
+    .not('game_id', 'is', null) // Exclude services with deleted games
     .order('title', { ascending: true })
     .returns<RawServiceRow[]>()
 
@@ -205,7 +208,7 @@ export async function listActiveServicesForGame(gameSlug: string) {
 
   return (data ?? [])
     .map(rawServiceToRow)
-    .filter((service) => service.game_slug === gameSlug)
+    .filter((service) => service.game_slug === gameSlug && service.game_id != null)
     .sort(
       (a, b) =>
         (a.service_category_sort_order ?? 999) - (b.service_category_sort_order ?? 999) ||

@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getAdminSession } from "@/lib/admin/session";
 import { writeAuditLog } from "@/lib/admin/audit";
-import { CMS_MEDIA_BUCKET, getStoragePathFromPublicUrl } from "@/lib/cms/storage";
+import { getStoragePathFromPublicUrl } from "@/lib/cms/storage";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { r2Delete } from "@/lib/r2";
 
 function stringValue(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -96,9 +97,8 @@ export async function PATCH(request: NextRequest) {
 
   if (previousAvatar && previousAvatar !== adminAvatar) {
     const previousPath = getStoragePathFromPublicUrl(previousAvatar);
-
     if (previousPath?.startsWith("admins/")) {
-      await supabase.storage.from(CMS_MEDIA_BUCKET).remove([previousPath]);
+      await r2Delete(previousPath).catch(() => null);
     }
   }
 

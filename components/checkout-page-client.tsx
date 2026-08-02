@@ -38,12 +38,11 @@ export function CheckoutPageClient() {
   const [items, setItems] = useState<CheckoutCartItem[]>([]);
   const [paymentSettings, setPaymentSettings] = useState<PaymentSetting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [submittingProvider, setSubmittingProvider] = useState<"stripe" | "nowpayments" | "paypal" | null>(null);
+  const [submittingProvider, setSubmittingProvider] = useState<"nowpayments" | "paypal" | null>(null);
   const [error, setError] = useState("");
-  const [selectedPayment, setSelectedPayment] = useState<'stripe' | 'paypal' | 'crypto'>('stripe');
+  const [selectedPayment, setSelectedPayment] = useState<'paypal' | 'crypto'>('paypal');
 
   const handlePrimaryCheckout = () => {
-    if (selectedPayment === 'stripe') handleStripeCheckout();
     if (selectedPayment === 'paypal') handlePayPalCheckout();
     if (selectedPayment === 'crypto') handleCryptoCheckout();
   };
@@ -92,6 +91,7 @@ export function CheckoutPageClient() {
   );
   const taxInfo = useMemo(() => getTaxInfo(
     selectedPayment === "crypto" ? "nowpayments" : selectedPayment
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   ), [selectedPayment, paymentSettings]);
   const taxAmount = useMemo(
     () => taxInfo ? Number((total * taxInfo.rate).toFixed(2)) : 0,
@@ -116,36 +116,6 @@ export function CheckoutPageClient() {
     return { rate: setting.tax_rate, label: setting.tax_label || "Tax" };
   }
 
-  async function handleStripeCheckout() {
-    setSubmittingProvider("stripe");
-    setError("");
-
-    try {
-      const response = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currency }),
-      });
-      const payload = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        setError(payload.error ?? "Unable to place this order.");
-        return;
-      }
-
-      if (!payload.redirectTo) {
-        setError("Stripe did not return a checkout URL.");
-        return;
-      }
-
-      window.location.href = payload.redirectTo;
-    } catch {
-      setError("Unable to reach checkout service.");
-    } finally {
-      setSubmittingProvider(null);
-    }
-  }
-
   async function handlePayPalCheckout() {
     setSubmittingProvider("paypal");
     setError("");
@@ -168,16 +138,7 @@ export function CheckoutPageClient() {
         return;
       }
 
-      // Open PayPal in new window
-      const paypalWindow = window.open(payload.redirectTo, "paypal-checkout", "width=800,height=700,scrollbars=yes");
-      
-      if (!paypalWindow) {
-        // Popup blocked, fallback to redirect
-        setError("Please allow pop-ups for this site to open PayPal in a new window.");
-        setTimeout(() => {
-          window.location.href = payload.redirectTo;
-        }, 2000);
-      }
+      window.open(payload.redirectTo, "_blank", "noopener,noreferrer");
     } catch {
       setError("Unable to reach PayPal checkout service.");
     } finally {
@@ -207,16 +168,7 @@ export function CheckoutPageClient() {
         return;
       }
 
-      // Open crypto payment in new window
-      const cryptoWindow = window.open(payload.redirectTo, "crypto-checkout", "width=800,height=700,scrollbars=yes");
-      
-      if (!cryptoWindow) {
-        // Popup blocked, fallback to redirect
-        setError("Please allow pop-ups for this site to open payment in a new window.");
-        setTimeout(() => {
-          window.location.href = payload.redirectTo;
-        }, 2000);
-      }
+      window.open(payload.redirectTo, "_blank", "noopener,noreferrer");
     } catch {
       setError("Unable to reach crypto checkout service.");
     } finally {
@@ -243,7 +195,7 @@ export function CheckoutPageClient() {
         <p className="mt-2 text-sm sm:text-base text-[var(--ms-body)]">Complete your transaction to dominate the game.</p>
 
         {error ? (
-          <p className="mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          <p className="mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600 dark:text-red-300">
             {error}
           </p>
         ) : null}
@@ -262,10 +214,9 @@ export function CheckoutPageClient() {
           <div className="mt-10 grid gap-10 lg:grid-cols-[1fr_380px]">
             <div>
               <h2 className="text-2xl font-black">Payment Method</h2>
-              <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 {[
-                  { id: "stripe" as const, method: "stripe", label: "Stripe", logo: "/payment/stripe.svg", desc: "Credit card, Apple Pay, Google Pay & more" },
-                  { id: "paypal" as const, method: "paypal", label: "PayPal", logo: "/payment/paypal.svg", desc: "PayPal balance, bank & credit card" },
+                  { id: "paypal" as const, method: "paypal", label: "PayPal", logo: "/payment/paypal.svg", desc: "PayPal, Visa, Mastercard, Apple Pay, Google Pay" },
                   { id: "crypto" as const, method: "nowpayments", label: "Crypto", logo: null, desc: "BTC, ETH, USDT & 100+ cryptocurrencies" },
                 ].map((provider) => {
                   const tax = getTaxInfo(provider.method);
@@ -283,7 +234,7 @@ export function CheckoutPageClient() {
                       {provider.logo ? (
                         <Image src={provider.logo} alt={provider.label} width={100} height={36} className="object-contain h-9 w-auto" />
                       ) : (
-                        <span className="text-base font-black tracking-wider text-white">CRYPTO</span>
+                        <span className="text-base font-black tracking-wider text-[var(--ms-heading)]">CRYPTO</span>
                       )}
                       <p className="mt-2 text-xs text-[var(--ms-body)]">{provider.desc}</p>
                       {tax ? (
@@ -301,7 +252,6 @@ export function CheckoutPageClient() {
                 onClick={handlePrimaryCheckout}
                 className="mt-6 w-full rounded-xl bg-[var(--primary)] py-4 text-center text-sm font-bold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {selectedPayment === 'stripe' && (submittingProvider === 'stripe' ? 'Opening Stripe...' : 'Pay with Stripe')}
                 {selectedPayment === 'paypal' && (submittingProvider === 'paypal' ? 'Opening PayPal...' : 'Pay with PayPal')}
                 {selectedPayment === 'crypto' && (submittingProvider === 'nowpayments' ? 'Opening Crypto...' : 'Pay with Crypto')}
               </button>

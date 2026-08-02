@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CartItemRow } from "@/lib/cart";
 import type { CheckoutSnapshotItem } from "@/lib/checkout/snapshot";
 
-export type PaymentProviderId = "stripe" | "nowpayments" | "paypal";
+export type PaymentProviderId = "nowpayments" | "paypal";
 export type CheckoutCurrency = "USD" | "EUR";
 export type RefundMode = "automatic" | "manual";
 

@@ -1,10 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { writeAuditLog } from '@/lib/admin/audit'
 import { getAdminSession } from '@/lib/admin/session'
-import { CMS_MEDIA_BUCKET, getStoragePathFromPublicUrl } from '@/lib/cms/storage'
+import { getStoragePathFromPublicUrl } from '@/lib/cms/storage'
 import { serializeServiceRequirements } from '@/lib/cms/service-requirements'
 import { slugifyService } from '@/lib/cms/services'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { r2Delete } from '@/lib/r2'
 import { usdToEur } from '@/lib/currency/convert'
 import { revalidatePath } from 'next/cache'
 
@@ -216,13 +217,10 @@ export async function PATCH(
 
   if (existing?.image && existing.image !== payload.image) {
     const oldPath = getStoragePathFromPublicUrl(existing.image)
-
     if (oldPath) {
-      const { error: removeError } = await supabase.storage.from(CMS_MEDIA_BUCKET).remove([oldPath])
-
-      if (removeError) {
-        console.error('Failed to remove replaced service image', removeError.message)
-      }
+      await r2Delete(oldPath).catch((err: Error) => {
+        console.error('Failed to remove replaced service image', err.message)
+      })
     }
   }
 
@@ -268,11 +266,9 @@ export async function DELETE(
   const imagePath = existing.image ? getStoragePathFromPublicUrl(existing.image) : null
 
   if (imagePath) {
-    const { error: removeError } = await supabase.storage.from(CMS_MEDIA_BUCKET).remove([imagePath])
-
-    if (removeError) {
-      console.error('Failed to remove deleted service image', removeError.message)
-    }
+    await r2Delete(imagePath).catch((err: Error) => {
+      console.error('Failed to remove deleted service image', err.message)
+    })
   }
 
   await writeAuditLog({
