@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, Lock } from 'lucide-react'
@@ -8,7 +8,7 @@ import { AuthCardSkeleton } from '@/components/storefront-skeletons'
 import { useAuth, readLockout } from '@/hooks/useAuth'
 import { authProviders, hasEmailPassword } from '@/lib/auth/providers'
 import { createClient } from '@/lib/supabase/client'
-import { Turnstile } from '@/components/Turnstile'
+import { Turnstile, type TurnstileHandle } from '@/components/Turnstile'
 
 type AuthMode = 'login' | 'register' | 'reset'
 
@@ -119,6 +119,7 @@ function AuthCard() {
   const [resendCooldown, setResendCooldown] = useState(0)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const turnstileRef = useRef<TurnstileHandle>(null)
   // Lockout state - lazy initializer reads from localStorage immediately on
   // first render to avoid the hydration gap that caused the countdown to reset.
   const [lockedUntil, setLockedUntil] = useState<Date | null>(() => {
@@ -280,6 +281,7 @@ function AuthCard() {
     const { error: signInError } = await signIn(email, password, turnstileToken)
     setIsSubmitting(false)
     setTurnstileToken(null) // Reset token after use
+    turnstileRef.current?.reset() // Re-solve the widget so the user can retry without a reload
 
     if (signInError) {
       if (signInError.message.toLowerCase().includes('email not confirmed')) {
@@ -340,6 +342,7 @@ function AuthCard() {
     const { data, error: signUpError } = await signUp(email, password, username.trim(), turnstileToken)
     setIsSubmitting(false)
     setTurnstileToken(null) // Reset token after use
+    turnstileRef.current?.reset() // Re-solve the widget so the user can retry without a reload
 
     if (signUpError) {
       setError(signUpError.message)
@@ -552,6 +555,7 @@ function AuthCard() {
 
             <div className="mt-6 flex justify-center">
               <Turnstile
+                ref={turnstileRef}
                 onSuccess={(token) => setTurnstileToken(token)}
                 onError={() => setTurnstileToken(null)}
                 onExpire={() => setTurnstileToken(null)}
@@ -678,6 +682,7 @@ function AuthCard() {
 
               <div className="mt-6 flex justify-center">
                 <Turnstile
+                  ref={turnstileRef}
                   onSuccess={(token) => setTurnstileToken(token)}
                   onError={() => setTurnstileToken(null)}
                   onExpire={() => setTurnstileToken(null)}

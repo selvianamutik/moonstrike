@@ -12,7 +12,9 @@ export type NotificationEventType =
   | "order_completed"
   | "refund_requested"
   | "refund_approved"
-  | "refund_denied";
+  | "refund_denied"
+  | "payment_confirmed"
+  | "invoice_reminder";
 
 export type NotificationRecord = {
   id: string;
@@ -66,7 +68,17 @@ type OrderNotificationContextRow = {
     | null;
 };
 
-type CustomerEmailKind = "order_delivered" | "refund_approved" | "refund_denied";
+type CustomerEmailKind = "order_delivered" | "refund_approved" | "refund_denied" | "payment_confirmed" | "order_completed";
+
+type PaymentAmount = {
+  amount: number;
+  currency: string;
+};
+
+function formatPaymentAmount({ amount, currency }: PaymentAmount) {
+  const symbol = currency === "EUR" ? "€" : "$";
+  return `${symbol}${amount.toFixed(2)} ${currency}`;
+}
 
 function mapNotification(row: NotificationRow): NotificationRecord {
   return {
@@ -133,7 +145,7 @@ async function customerEmailAddress(userId: string) {
   return data.user?.email ?? null;
 }
 
-async function sendCustomerOrderEmail(input: OrderNotificationInput, kind: CustomerEmailKind) {
+async function sendCustomerOrderEmail(input: OrderNotificationInput, kind: CustomerEmailKind, payment?: PaymentAmount) {
   const email = await customerEmailAddress(input.userId);
   if (!email) return;
 
@@ -154,6 +166,16 @@ async function sendCustomerOrderEmail(input: OrderNotificationInput, kind: Custo
       subject: "Your MoonStrike refund request was denied",
       title: "Refund request denied",
       body: `${input.orderRef} has returned to its previous order status.`,
+    },
+    payment_confirmed: {
+      subject: "Your MoonStrike payment was received",
+      title: "Payment received, thank you!",
+      body: `We received ${payment ? formatPaymentAmount(payment) : "your payment"} for ${input.orderRef}. Your order is now confirmed and will be processed shortly.`,
+    },
+    order_completed: {
+      subject: "Your MoonStrike order was completed",
+      title: "Your order was completed",
+      body: `${input.orderRef} has been marked completed. Thank you for choosing MoonStrike.`,
     },
   };
 
@@ -296,7 +318,7 @@ export async function notifyOrderStatusChanged(input: OrderNotificationInput, st
 export async function notifyOrderCompleted(input: OrderNotificationInput) {
   const settings = await notificationSettings();
 
-  await createNotification({
+  const created = await createNotification({
     recipientType: "customer",
     userId: input.userId,
     eventType: "order_completed",
@@ -306,6 +328,8 @@ export async function notifyOrderCompleted(input: OrderNotificationInput) {
     metadata: { orderId: input.orderId, orderRef: input.orderRef },
     dedupeKey: `customer_order_completed:${input.orderId}`,
   });
+
+  if (created) await sendCustomerOrderEmail(input, "order_completed");
 
   if (!settings.notifyOrderCompleted) return;
 
@@ -317,6 +341,21 @@ export async function notifyOrderCompleted(input: OrderNotificationInput) {
     metadata: { orderId: input.orderId, orderRef: input.orderRef },
     dedupeKey: `admin_order_completed:${input.orderId}`,
   });
+}
+
+export async function notifyOrderPaymentConfirmed(input: OrderNotificationInput, payment: PaymentAmount) {
+  const created = await createNotification({
+    recipientType: "customer",
+    userId: input.userId,
+    eventType: "payment_confirmed",
+    title: "Payment received",
+    body: `We received ${formatPaymentAmount(payment)} for ${input.orderRef}. Your order is now confirmed and will be processed shortly.`,
+    href: `/profile/orders/${input.orderRef}`,
+    metadata: { orderId: input.orderId, orderRef: input.orderRef, amount: payment.amount, currency: payment.currency },
+    dedupeKey: `payment_confirmed:${input.orderId}`,
+  });
+
+  if (created) await sendCustomerOrderEmail(input, "payment_confirmed", payment);
 }
 
 export async function notifyRefundRequested(input: OrderNotificationInput) {

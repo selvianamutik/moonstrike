@@ -3,7 +3,7 @@
 import React, { useState, useTransition, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AlertTriangle, ArrowRight, CheckCircle2, CreditCard, Database, MessageSquareWarning, RotateCcw, Sparkles, Users } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, CreditCard, MessageSquareWarning, RefreshCw, RotateCcw, Sparkles, Users } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { StatusBadge, type StatusType } from "@/components/admin/StatusBadge";
@@ -36,6 +36,9 @@ export function DashboardClient({ initialDashboard, adminRole }: { initialDashbo
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
   const isSuperAdmin = adminRole === "super_admin";
+  const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
+  const [syncMessage, setSyncMessage] = useState("");
+  const [syncTarget, setSyncTarget] = useState<"orders" | "transactions" | "all">("all");
 
   function loadDashboard(days: AdminDashboardPeriodDays) {
     setSelectedDays(days);
@@ -52,6 +55,50 @@ export function DashboardClient({ initialDashboard, adminRole }: { initialDashbo
 
       setDashboard(payload.dashboard as AdminDashboardData);
     });
+  }
+
+  async function handleSyncSheets() {
+    if (syncStatus === "syncing") return;
+
+    setSyncStatus("syncing");
+    setSyncMessage("");
+
+    try {
+      const response = await fetch("/api/admin/google-sheets/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: syncTarget }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setSyncStatus("error");
+        setSyncMessage(payload.error ?? "Sync failed.");
+        return;
+      }
+
+      const processedCount = Number(payload.processedCount ?? 0);
+      const failedCount = Number(payload.failedCount ?? 0);
+
+      if (failedCount > 0) {
+        const firstError = Array.isArray(payload.results)
+          ? payload.results.find((result: { status?: string }) => result?.status === "failed")?.error
+          : undefined;
+        setSyncStatus("error");
+        setSyncMessage(firstError ?? `Sync completed with ${failedCount} failed job(s).`);
+        return;
+      }
+
+      setSyncStatus("success");
+      setSyncMessage(`Successfully synced ${processedCount} sheet(s) to Google Sheets.`);
+      window.setTimeout(() => {
+        setSyncStatus("idle");
+        setSyncMessage("");
+      }, 5000);
+    } catch {
+      setSyncStatus("error");
+      setSyncMessage("Unable to reach the sync service.");
+    }
   }
 
   return (
@@ -71,8 +118,32 @@ export function DashboardClient({ initialDashboard, adminRole }: { initialDashbo
             Live store health from orders, transactions, customers, and support messages.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {isPending ? <span className="text-xs font-medium text-[#64748B]">Refreshing...</span> : null}
+          {isSuperAdmin ? (
+            <div className="flex items-center gap-2">
+              <select
+                value={syncTarget}
+                onChange={(event) => setSyncTarget(event.target.value as "orders" | "transactions" | "all")}
+                disabled={syncStatus === "syncing"}
+                className="rounded-lg border border-[#172554] bg-[#0F172A] px-3 py-2.5 text-sm font-medium text-white outline-none transition-colors hover:border-[#8B5CF6] focus:border-[#8B5CF6] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="all">All Sheets</option>
+                <option value="orders">Orders Only</option>
+                <option value="transactions">Transactions Only</option>
+              </select>
+              <button
+                type="button"
+                onClick={handleSyncSheets}
+                disabled={syncStatus === "syncing"}
+                className="flex items-center gap-2 rounded-lg border border-[#172554] bg-[#0F172A] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-[#8B5CF6] disabled:cursor-not-allowed disabled:opacity-50"
+                title="Sync store data to Google Sheets"
+              >
+                <RefreshCw size={16} className={syncStatus === "syncing" ? "animate-spin" : ""} />
+                {syncStatus === "syncing" ? "Syncing..." : "Sync Sheets"}
+              </button>
+            </div>
+          ) : null}
           <select
             value={selectedDays}
             onChange={(event) => loadDashboard(Number(event.target.value) as AdminDashboardPeriodDays)}
@@ -86,6 +157,23 @@ export function DashboardClient({ initialDashboard, adminRole }: { initialDashbo
           </select>
         </div>
       </div>
+
+      {syncMessage ? (
+        <div
+          className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm ${
+            syncStatus === "success"
+              ? "border-green-500/30 bg-green-500/10 text-green-300"
+              : "border-red-500/30 bg-red-500/10 text-red-300"
+          }`}
+        >
+          {syncStatus === "success" ? (
+            <CheckCircle2 size={16} className="shrink-0" />
+          ) : (
+            <AlertTriangle size={16} className="shrink-0" />
+          )}
+          <span>{syncMessage}</span>
+        </div>
+      ) : null}
 
       {error ? (
         <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
@@ -332,8 +420,6 @@ export function DashboardClient({ initialDashboard, adminRole }: { initialDashbo
           </table>
         </div>
       </section>
-
-      {isSuperAdmin && <StorageMigrationPanel />}
     </div>
   );
 }
@@ -389,103 +475,6 @@ function AttentionCard({ title, value, href, description, icon }: { title: strin
       </div>
     </Link>
   );
-}
-
-// ─── Storage Migration Panel (temporary — remove after migration complete) ────
-
-type MigrationResult = {
-  total: number
-  migrated: number
-  skipped: number
-  failed: number
-  errors: Array<{ path: string; error: string }>
-  dryRun: boolean
-  message: string
-}
-
-function StorageMigrationPanel() {
-  const [status, setStatus] = useState<"idle" | "running" | "done" | "error">("idle")
-  const [result, setResult] = useState<MigrationResult | null>(null)
-  const [prefix, setPrefix] = useState("")
-
-  async function run(dryRun: boolean) {
-    setStatus("running")
-    setResult(null)
-    try {
-      const res = await fetch("/api/admin/migrate-storage-to-r2", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dryRun, prefix: prefix.trim() || undefined }),
-      })
-      const data = await res.json()
-      setResult(data)
-      setStatus(data.ok === false ? "error" : "done")
-    } catch (err) {
-      setResult({ total: 0, migrated: 0, skipped: 0, failed: 0, errors: [], dryRun, message: err instanceof Error ? err.message : "Request failed" })
-      setStatus("error")
-    }
-  }
-
-  return (
-    <section className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <Database size={18} className="text-amber-400 shrink-0" />
-        <div>
-          <h2 className="text-base font-bold text-white">Supabase → R2 Storage Migration</h2>
-          <p className="text-xs text-[#94A3B8] mt-0.5">One-time migration. Remove this panel after use.</p>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <input
-          type="text"
-          value={prefix}
-          onChange={(e) => setPrefix(e.target.value)}
-          placeholder="Filter prefix (e.g. games) — leave empty for all"
-          className="h-9 flex-1 min-w-[220px] rounded-md border border-[#172554] bg-[#050816] px-3 text-sm text-white placeholder:text-[#475569] outline-none"
-        />
-        <button
-          type="button"
-          disabled={status === "running"}
-          onClick={() => run(true)}
-          className="h-9 rounded-md border border-[#22D3EE]/40 px-4 text-xs font-bold uppercase tracking-[0.1em] text-[#22D3EE] hover:bg-[#22D3EE]/10 disabled:opacity-50"
-        >
-          {status === "running" ? "Running..." : "Dry Run"}
-        </button>
-        <button
-          type="button"
-          disabled={status === "running"}
-          onClick={() => run(false)}
-          className="h-9 rounded-md bg-amber-500 px-4 text-xs font-bold uppercase tracking-[0.1em] text-black hover:bg-amber-400 disabled:opacity-50"
-        >
-          {status === "running" ? "Migrating..." : "Run Migration"}
-        </button>
-      </div>
-
-      {status === "running" && (
-        <p className="text-sm text-[#94A3B8] animate-pulse">Migration in progress — do not close this page...</p>
-      )}
-
-      {result && (
-        <div className="mt-3 rounded-lg border border-[#172554] bg-[#050816] p-4 text-sm space-y-2">
-          <p className={`font-bold ${status === "error" ? "text-red-400" : "text-green-400"}`}>{result.message}</p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 text-xs text-[#94A3B8]">
-            <span>Total: <span className="text-white font-bold">{result.total}</span></span>
-            <span>Migrated: <span className="text-green-400 font-bold">{result.migrated}</span></span>
-            <span>Skipped: <span className="text-[#22D3EE] font-bold">{result.skipped}</span></span>
-            <span>Failed: <span className="text-red-400 font-bold">{result.failed}</span></span>
-          </div>
-          {result.errors.length > 0 && (
-            <div className="mt-2 max-h-40 overflow-y-auto space-y-1">
-              {result.errors.map((e, i) => (
-                <p key={i} className="text-xs text-red-300"><span className="text-red-500">{e.path}</span>: {e.error}</p>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </section>
-  )
 }
 
 function TopServiceItem({ name, image, category, revenue }: { name: string; image: string | null; category: string; revenue: string }) {

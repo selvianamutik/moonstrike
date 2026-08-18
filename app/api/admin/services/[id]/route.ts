@@ -15,6 +15,7 @@ const OPTION_TYPES = new Set([
   'radio',
   'checkbox_group',
   'range',
+  'range_pair',
   'number_stepper',
   'quantity',
   'toggle',
@@ -22,7 +23,7 @@ const OPTION_TYPES = new Set([
   'textarea',
 ])
 const CHOICE_OPTION_TYPES = new Set(['dropdown', 'radio', 'checkbox_group'])
-const UNIT_OPTION_TYPES = new Set(['range', 'number_stepper'])
+const UNIT_OPTION_TYPES = new Set(['range', 'range_pair', 'number_stepper'])
 
 function parseNumber(value: unknown) {
   const parsed = Number(value)
@@ -49,6 +50,7 @@ function sanitizeOptionsSchema(value: unknown) {
           required: option?.required !== false,
           min,
           max: rawMax > 0 ? Math.max(rawMax, min) : undefined,
+          step: Math.max(1, parseNumber(option?.step)),
           pricePerUnitUSD: parseNumber(option?.pricePerUnitUSD),
           pricePerUnitEUR: parseNumber(option?.pricePerUnitEUR),
         }
@@ -154,7 +156,7 @@ async function convertPayloadPrices(payload: Record<string, unknown>) {
           option.priceEUR = await usdToEur(Number(option.priceUSD) || 0)
         }
 
-        if (option.type === 'range' || option.type === 'number_stepper') {
+        if (option.type === 'range' || option.type === 'range_pair' || option.type === 'number_stepper') {
           option.pricePerUnitEUR = await usdToEur(Number(option.pricePerUnitUSD) || 0)
         }
 
@@ -259,9 +261,15 @@ export async function DELETE(
   if (lookupError) return NextResponse.json({ error: lookupError.message }, { status: 500 })
   if (!existing) return NextResponse.json({ error: 'Service not found.' }, { status: 404 })
 
-  const { error } = await supabase.from('services').delete().eq('id', id)
+  // Hard delete: the service and every order (with its transactions and
+  // checkout sessions) that ever referenced it are removed in one transaction.
+  const { data: result, error: rpcError } = await supabase.rpc('delete_service_with_orders', {
+    p_service_id: id,
+  })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (rpcError) return NextResponse.json({ error: rpcError.message }, { status: 500 })
+
+  const deletedOrders = Number((result as Array<{ deleted_orders: number }> | null)?.[0]?.deleted_orders) || 0
 
   const imagePath = existing.image ? getStoragePathFromPublicUrl(existing.image) : null
 
@@ -272,7 +280,10 @@ export async function DELETE(
   }
 
   await writeAuditLog({
-    action: `Deleted service: ${existing.title}`,
+    action:
+      deletedOrders > 0
+        ? `Deleted service: ${existing.title} (${deletedOrders} order(s) removed)`
+        : `Deleted service: ${existing.title}`,
     status: 'success',
     request,
     admin,
@@ -282,5 +293,5 @@ export async function DELETE(
   revalidatePath('/')
   revalidatePath('/games')
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, deletedOrders })
 }

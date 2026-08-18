@@ -7,15 +7,20 @@ import { PlaceholderAsset } from "@/components/asset-image";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui";
+import { CustomerRangeSlider } from "@/components/CustomerRangeSlider";
 import { useCurrency, type Currency } from "@/hooks/useCurrency";
 import { notifyCartUpdated } from "@/lib/cart-events";
-import type { ServiceOption, ServiceRow } from "@/lib/cms/services";
+import type { RangePairValue, ServiceOption, ServiceRow } from "@/lib/cms/services";
+import type { ServiceRequirement } from "@/lib/cms/service-requirements";
+import { RequiredServicesModal, type RequiredServiceItem } from "@/components/required-services-modal";
+import "@/app/customer-range-slider.css";
 
 function optionLabel(option: ServiceOption) {
   if (option.type === "dropdown") return "Dropdown";
   if (option.type === "radio" || option.type === "single_choice") return "Single Choice";
   if (option.type === "checkbox_group" || option.type === "multiple_choice") return "Multiple Choice";
   if (option.type === "range") return "Range";
+  if (option.type === "range_pair") return "Custom Range";
   if (option.type === "number_stepper" || option.type === "scalar") return "Stepper";
   if (option.type === "quantity") return "Quantity";
   if (option.type === "toggle") return "Toggle";
@@ -24,7 +29,7 @@ function optionLabel(option: ServiceOption) {
   return "Quantity";
 }
 
-type SelectionValue = string | string[] | number | boolean;
+type SelectionValue = string | string[] | number | boolean | RangePairValue;
 
 function isMultiChoice(option: ServiceOption) {
   return option.type === "multiple_choice" || option.type === "checkbox_group";
@@ -38,17 +43,57 @@ function isQuantity(option: ServiceOption) {
   return option.type === "scalar" || option.type === "range" || option.type === "number_stepper";
 }
 
+function isRangePair(option: ServiceOption) {
+  return option.type === "range_pair";
+}
+
 function isQuantityOption(option: ServiceOption) {
   return option.type === "quantity";
+}
+
+function isRangePairValue(value: SelectionValue | undefined): value is RangePairValue {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    "start" in value &&
+    "end" in value
+  );
 }
 
 function getDefaultSelection(option: ServiceOption): SelectionValue {
   if (isMultiChoice(option)) return [];
   if (isQuantityOption(option)) return option.min ?? 1;
   if (isQuantity(option)) return option.min ?? 1;
+  if (isRangePair(option)) {
+    return { start: option.min ?? 1, end: option.max ?? (option.min ?? 1) + 1 };
+  }
   if (option.type === "toggle") return false;
   if (option.type === "text" || option.type === "textarea") return "";
   return option.options?.[0]?.label ?? "";
+}
+
+function getRangeSelection(option: ServiceOption, selections: Record<string, SelectionValue>): RangePairValue {
+  const value = selections[option.label] ?? getDefaultSelection(option);
+  return isRangePairValue(value) ? value : (getDefaultSelection(option) as RangePairValue);
+}
+
+function defaultSelectionsForOptions(options: ServiceOption[]) {
+  return Object.fromEntries(options.map((option) => [option.label, getDefaultSelection(option)]));
+}
+
+function isOptionFulfilled(option: ServiceOption, value: SelectionValue | undefined) {
+  if (!option.required) return true;
+  if (option.type === "text" || option.type === "textarea") {
+    return typeof value === "string" && value.trim().length > 0;
+  }
+  if (isMultiChoice(option)) {
+    return Array.isArray(value) && value.length > 0;
+  }
+  if (isRangePair(option)) {
+    return isRangePairValue(value) && Number.isFinite(Number(value.start)) && Number.isFinite(Number(value.end));
+  }
+  return value !== undefined && value !== null && value !== "";
 }
 
 function formatMoney(value: number, currency: Currency) {
@@ -61,6 +106,12 @@ function formatMoney(value: number, currency: Currency) {
 
 function calculateOptionTotal(option: ServiceOption, value: SelectionValue, currency: Currency) {
   if (isQuantityOption(option)) return 0;
+
+  if (isRangePair(option)) {
+    const unitPrice = currency === "EUR" ? option.pricePerUnitEUR ?? 0 : option.pricePerUnitUSD ?? 0;
+    const range = isRangePairValue(value) ? value : { start: 0, end: 0 };
+    return Math.max(0, (Number(range.end) || 0) - (Number(range.start) || 0)) * unitPrice;
+  }
 
   if (isQuantity(option)) {
     const unitPrice = currency === "EUR" ? option.pricePerUnitEUR ?? 0 : option.pricePerUnitUSD ?? 0;
@@ -96,11 +147,13 @@ function ServiceOptions({
   options,
   selections,
   currency,
+  flashLabels,
   onChange,
 }: {
   options: ServiceOption[];
   selections: Record<string, SelectionValue>;
   currency: Currency;
+  flashLabels: string[];
   onChange: (key: string, value: SelectionValue) => void;
 }) {
   if (options.length === 0) {
@@ -117,7 +170,14 @@ function ServiceOptions({
   return (
     <div className="space-y-4">
       {options.map((option, index) => (
-        <div key={`${option.label}-${index}`} className="rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)] p-5">
+        <div
+          key={`${option.label}-${index}`}
+          className={`rounded-xl border bg-[var(--ms-bg-card)] p-5 ${
+            flashLabels.includes(option.label)
+              ? "border-red-500 animate-[ms-required-flash_0.6s_ease-in-out_3]"
+              : "border-[var(--ms-border)]"
+          }`}
+        >
           <div className="flex items-center justify-between gap-3">
             <p className="font-medium text-[var(--ms-heading)]">{option.label}</p>
             <span className="mono text-xs uppercase tracking-[0.16em] text-[var(--ms-gradient-end)]">
@@ -181,6 +241,59 @@ function ServiceOptions({
                   }}
                   className="h-10 w-24 rounded-md border border-[var(--ms-border)] bg-transparent px-3 text-center text-sm outline-none focus:border-[var(--ms-gradient-end)]"
                 />
+                <span className="mono text-[var(--ms-price)]">
+                  + {formatMoney(calculateOptionTotal(option, selections[option.label] ?? getDefaultSelection(option), currency), currency)}
+                </span>
+              </div>
+            </div>
+          ) : option.type === "range_pair" ? (
+            <div className="mt-4">
+              <CustomerRangeSlider
+                min={option.min ?? 1}
+                max={option.max ?? 10}
+                step={option.step ?? 1}
+                value={[getRangeSelection(option, selections).start, getRangeSelection(option, selections).end]}
+                onChange={(newRange) => {
+                  onChange(option.label, { start: newRange[0], end: newRange[1] });
+                }}
+                label={option.label}
+              />
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={option.min ?? 1}
+                    max={getRangeSelection(option, selections).end}
+                    step={option.step ?? 1}
+                    value={getRangeSelection(option, selections).start}
+                    onChange={(event) => {
+                      const range = getRangeSelection(option, selections);
+                      const val = Number(event.target.value);
+                      if (!isNaN(val)) {
+                        onChange(option.label, { ...range, start: Math.max(option.min ?? 1, Math.min(range.end, val)) });
+                      }
+                    }}
+                    className="mono h-10 w-20 rounded-md border border-[var(--ms-border)] bg-transparent px-3 text-center text-sm text-[var(--ms-heading)] outline-none focus:border-[var(--ms-gradient-end)]"
+                    aria-label={`${option.label} start value`}
+                  />
+                  <span className="text-sm text-[var(--ms-body)]">to</span>
+                  <input
+                    type="number"
+                    min={getRangeSelection(option, selections).start}
+                    max={option.max}
+                    step={option.step ?? 1}
+                    value={getRangeSelection(option, selections).end}
+                    onChange={(event) => {
+                      const range = getRangeSelection(option, selections);
+                      const val = Number(event.target.value);
+                      if (!isNaN(val)) {
+                        onChange(option.label, { ...range, end: Math.max(range.start, Math.min(option.max ?? val, val)) });
+                      }
+                    }}
+                    className="mono h-10 w-20 rounded-md border border-[var(--ms-border)] bg-transparent px-3 text-center text-sm text-[var(--ms-heading)] outline-none focus:border-[var(--ms-gradient-end)]"
+                    aria-label={`${option.label} end value`}
+                  />
+                </div>
                 <span className="mono text-[var(--ms-price)]">
                   + {formatMoney(calculateOptionTotal(option, selections[option.label] ?? getDefaultSelection(option), currency), currency)}
                 </span>
@@ -373,11 +486,24 @@ export function ServiceDetail({
   const { currency, setCurrency } = useCurrency();
   const [cartStatus, setCartStatus] = useState<"idle" | "adding" | "buying">("idle");
   const [cartMessage, setCartMessage] = useState("");
+  const [flashLabels, setFlashLabels] = useState<string[]>([]);
   const [selections, setSelections] = useState<Record<string, SelectionValue>>(() =>
     Object.fromEntries(service.options_schema.map((option) => [option.label, getDefaultSelection(option)]))
   );
+  const [requiredModal, setRequiredModal] = useState<{
+    items: RequiredServiceItem[];
+    nextAction: "stay" | "cart";
+  } | null>(null);
   const quantityOption = service.options_schema.find(isQuantityOption);
   const quantity = quantityOption ? Number(selections[quantityOption.label] ?? getDefaultSelection(quantityOption)) || 1 : 1;
+  const missingRequired = useMemo(
+    () =>
+      service.options_schema
+        .filter((option) => !isOptionFulfilled(option, selections[option.label]))
+        .map((option) => option.label),
+    [selections, service.options_schema]
+  );
+  const isConfigComplete = missingRequired.length === 0;
   const optionsTotal = useMemo(
     () =>
       service.options_schema.reduce(
@@ -391,22 +517,51 @@ export function ServiceDetail({
   const unitTotal = basePrice + optionsTotal;
   const total = unitTotal * quantity;
 
-  async function addToCart(nextAction: "stay" | "cart") {
-    if (previewMode || cartStatus !== "idle") return;
+  async function fetchRequiredServiceItems(refs: ServiceRequirement[]) {
+    const results = await Promise.all(
+      refs.map(async (ref) => {
+        if (!ref.serviceId) return null;
+        try {
+          const response = await fetch(`/api/services/${ref.serviceId}`);
+          if (!response.ok) return null;
+          const data = await response.json();
+          return { ...data, requirementText: ref.text } as RequiredServiceItem;
+        } catch {
+          return null;
+        }
+      })
+    );
+    return results.filter((item): item is RequiredServiceItem => Boolean(item));
+  }
+
+  async function submitCartItems(
+    items: Array<{ serviceId: string; selectedOptions: Record<string, SelectionValue> }>,
+    nextAction: "stay" | "cart"
+  ) {
+    if (cartStatus !== "idle") return;
 
     setCartMessage("");
     setCartStatus(nextAction === "cart" ? "buying" : "adding");
 
     try {
-      const response = await fetch("/api/cart/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ serviceId: service.id, selectedOptions: selections }),
-      });
-      const payload = await response.json().catch(() => ({}));
+      const results = await Promise.all(
+        items.map(async (item) => {
+          const response = await fetch("/api/cart/items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(item),
+          });
+          const payload = await response.json().catch(() => ({}));
+          return { ok: response.ok, payload };
+        })
+      );
 
-      if (!response.ok) {
-        setCartMessage(payload.error ?? "Unable to add this service to cart.");
+      const failed = results.filter((result) => !result.ok);
+      if (failed.length > 0) {
+        const message = failed[0]?.payload?.error;
+        setCartMessage(
+          typeof message === "string" ? message : `Unable to add ${failed.length} item(s) to cart.`
+        );
         return;
       }
 
@@ -424,6 +579,52 @@ export function ServiceDetail({
     } finally {
       setCartStatus("idle");
     }
+  }
+
+  async function handleRequiredConfirm(serviceIds: string[]) {
+    if (!requiredModal) return;
+
+    const { items, nextAction } = requiredModal;
+    const added = items.filter((item) => serviceIds.includes(item.id));
+
+    await submitCartItems(
+      [
+        { serviceId: service.id, selectedOptions: selections },
+        ...added.map((item) => ({
+          serviceId: item.id,
+          selectedOptions: defaultSelectionsForOptions(item.optionsSchema),
+        })),
+      ],
+      nextAction
+    );
+    setRequiredModal(null);
+  }
+
+  async function addToCart(nextAction: "stay" | "cart") {
+    if (previewMode || cartStatus !== "idle") return;
+
+    if (!isConfigComplete) {
+      setCartMessage("Please complete all required options to continue.");
+      setFlashLabels(missingRequired);
+      window.setTimeout(() => setFlashLabels([]), 1800);
+      return;
+    }
+
+    const requiredRefs = Array.from(
+      new Map(
+        service.requirements.filter((ref) => ref.serviceId).map((ref) => [ref.serviceId!, ref])
+      ).values()
+    );
+
+    if (requiredRefs.length > 0) {
+      const items = await fetchRequiredServiceItems(requiredRefs);
+      if (items.length > 0) {
+        setRequiredModal({ items, nextAction });
+        return;
+      }
+    }
+
+    await submitCartItems([{ serviceId: service.id, selectedOptions: selections }], nextAction);
   }
 
   return (
@@ -549,6 +750,7 @@ export function ServiceDetail({
               options={service.options_schema}
               selections={selections}
               currency={currency}
+              flashLabels={flashLabels}
               onChange={(key, value) => setSelections((current) => ({ ...current, [key]: value }))}
             />
           </div>
@@ -598,7 +800,9 @@ export function ServiceDetail({
                     type="button"
                     disabled={cartStatus !== "idle"}
                     onClick={() => addToCart("stay")}
-                    className="h-12 rounded-md border border-[var(--ms-border)] text-center mono leading-[3rem] hover:bg-[var(--ms-hover-bg)] disabled:cursor-not-allowed disabled:opacity-60"
+                    className={`h-12 rounded-md border border-[var(--ms-border)] text-center mono leading-[3rem] disabled:cursor-not-allowed disabled:opacity-60 ${
+                      isConfigComplete ? "hover:bg-[var(--ms-hover-bg)]" : "cursor-not-allowed opacity-60"
+                    }`}
                   >
                     {cartStatus === "adding" ? "Adding..." : "Add to Cart"}
                   </button>
@@ -606,7 +810,9 @@ export function ServiceDetail({
                     type="button"
                     disabled={cartStatus !== "idle"}
                     onClick={() => addToCart("cart")}
-                    className="ms-button h-14 w-full mono disabled:cursor-not-allowed disabled:opacity-60"
+                    className={`ms-button h-14 w-full mono disabled:cursor-not-allowed disabled:opacity-60 ${
+                      isConfigComplete ? "" : "cursor-not-allowed opacity-60"
+                    }`}
                   >
                     {cartStatus === "buying" ? "Opening Cart..." : "Buy Now"}
                   </button>
@@ -618,6 +824,17 @@ export function ServiceDetail({
         </aside>
       </section>
       {showSiteChrome ? <SiteFooter /> : null}
+      {requiredModal ? (
+        <RequiredServicesModal
+          services={requiredModal.items}
+          currency={currency}
+          submitting={cartStatus !== "idle"}
+          onCancel={() => {
+            if (cartStatus === "idle") setRequiredModal(null);
+          }}
+          onConfirm={handleRequiredConfirm}
+        />
+      ) : null}
     </main>
   );
 }

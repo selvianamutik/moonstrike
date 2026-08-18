@@ -5,7 +5,6 @@ const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://moonstrike.pro'
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
-      // Allow all major crawlers including AI bots
       {
         userAgent: '*',
         allow: '/',
@@ -20,13 +19,15 @@ export default function robots(): MetadataRoute.Robots {
           '/auth/',
         ],
       },
-      // Explicitly allow AI crawlers on public content
-      { userAgent: 'GPTBot', allow: '/' },
-      { userAgent: 'ClaudeBot', allow: '/' },
-      { userAgent: 'PerplexityBot', allow: '/' },
-      { userAgent: 'Google-Extended', allow: '/' },
-      { userAgent: 'Applebot-Extended', allow: '/' },
-      { userAgent: 'Bytespider', allow: '/' },
+      {
+        userAgent: 'Googlebot',
+        allow: ['/'],
+        disallow: '/private/',
+      },
+      {
+        userAgent: ['Applebot', 'Bingbot'],
+        disallow: ['/'],
+      },
     ],
     sitemap: `${BASE_URL}/sitemap.xml`,
   }

@@ -31,3 +31,5 @@ phase_docs.md
 revision_plan.md
 UAT.md
 TURNSTILE_SETUP.md
+scripts/apps-script/Code.gs
+supabase/email-templates

@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 export type ServiceStatus = 'active' | 'draft' | 'archived'
 export type ServiceBenefit = { icon: string; title: string; description: string }
+export type RangePairValue = { start: number; end: number }
 export type ServiceOption = {
   id?: string
   label: string
@@ -16,6 +17,7 @@ export type ServiceOption = {
     | 'radio'
     | 'checkbox_group'
     | 'range'
+    | 'range_pair'
     | 'number_stepper'
     | 'quantity'
     | 'toggle'

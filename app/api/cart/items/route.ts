@@ -35,6 +35,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Service is not available.' }, { status: 404 })
   }
 
+  const missingRequired = validateRequiredOptions(service.options_schema, selectedOptions)
+
+  if (missingRequired.length > 0) {
+    return NextResponse.json(
+      { error: `Please complete all required options: ${missingRequired.join(', ')}` },
+      { status: 400 }
+    )
+  }
+
   const cartId = await getOrCreateCartId()
   const snapshot = calculateCartSnapshot(service, selectedOptions)
 
@@ -58,6 +67,32 @@ export async function POST(request: NextRequest) {
   await touchCart(cartId)
 
   return NextResponse.json({ itemId: item.id })
+}
+
+function validateRequiredOptions(
+  options: unknown,
+  selected: Record<string, unknown>
+): string[] {
+  if (!Array.isArray(options)) return []
+
+  return (options as Array<{ label?: unknown; type?: unknown; required?: unknown }>)
+    .filter((option) => option?.required === true)
+    .filter((option) => {
+      const value = selected[String(option.label ?? '')]
+      const type = String(option.type ?? '')
+
+      if (type === 'text' || type === 'textarea') {
+        return !(typeof value === 'string' && value.trim().length > 0)
+      }
+
+      if (type === 'checkbox_group' || type === 'multiple_choice') {
+        return !(Array.isArray(value) && value.length > 0)
+      }
+
+      return value === undefined || value === null || value === ''
+    })
+    .map((option) => String(option.label ?? ''))
+    .filter(Boolean)
 }
 
 async function handlePrivateOffer(body: Record<string, unknown>, _request: NextRequest) {

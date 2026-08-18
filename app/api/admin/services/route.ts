@@ -13,6 +13,7 @@ const OPTION_TYPES = new Set([
   'radio',
   'checkbox_group',
   'range',
+  'range_pair',
   'number_stepper',
   'quantity',
   'toggle',
@@ -20,7 +21,7 @@ const OPTION_TYPES = new Set([
   'textarea',
 ])
 const CHOICE_OPTION_TYPES = new Set(['dropdown', 'radio', 'checkbox_group'])
-const UNIT_OPTION_TYPES = new Set(['range', 'number_stepper'])
+const UNIT_OPTION_TYPES = new Set(['range', 'range_pair', 'number_stepper'])
 
 function parseNumber(value: unknown) {
   const parsed = Number(value)
@@ -47,6 +48,7 @@ function sanitizeOptionsSchema(value: unknown) {
           required: option?.required !== false,
           min,
           max: rawMax > 0 ? Math.max(rawMax, min) : undefined,
+          step: Math.max(1, parseNumber(option?.step)),
           pricePerUnitUSD: parseNumber(option?.pricePerUnitUSD),
           pricePerUnitEUR: parseNumber(option?.pricePerUnitEUR),
         }
@@ -152,7 +154,7 @@ async function convertPayloadPrices(payload: Record<string, unknown>) {
           option.priceEUR = await usdToEur(Number(option.priceUSD) || 0)
         }
 
-        if (option.type === 'range' || option.type === 'number_stepper') {
+        if (option.type === 'range' || option.type === 'range_pair' || option.type === 'number_stepper') {
           option.pricePerUnitEUR = await usdToEur(Number(option.pricePerUnitUSD) || 0)
         }
 

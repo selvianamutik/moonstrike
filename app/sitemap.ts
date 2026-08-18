@@ -2,6 +2,7 @@ import { MetadataRoute } from 'next'
 import { listActiveCatalogGames } from '@/lib/cms/games'
 import { listActiveServices } from '@/lib/cms/services'
 import { getGameServiceDetailHref } from '@/lib/cms/game-services'
+import { listCustomPagesByCategory } from '@/lib/admin/custom-pages'
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://moonstrike.pro'
 
@@ -28,6 +29,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: path === '' ? 1.0 : 0.8,
     })
   })
+
+  // Dynamic blog & guide pages
+  try {
+    for (const category of ['blog', 'guide'] as const) {
+      const pages = await listCustomPagesByCategory(category)
+
+      pages.forEach((page) => {
+        sitemap.push({
+          url: `${BASE_URL}/${category}/${page.slug}`,
+          lastModified: new Date(page.updated_at),
+          changeFrequency: 'weekly',
+          priority: 0.7,
+        })
+      })
+    }
+  } catch (error) {
+    console.error('Error generating custom page sitemap entries:', error)
+  }
 
   // Dynamic game pages
   try {

@@ -1,8 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_ADMIN_SETTINGS, getAdminSettings } from "@/lib/admin/settings";
+import type { RangePairValue } from "@/lib/cms/services";
 
 export type OrderCurrency = "USD" | "EUR";
-export type OrderOptionValue = string | number | boolean | string[];
+export type OrderOptionValue = string | number | boolean | string[] | RangePairValue;
 export type OrderOptionSnapshot = Record<
   string,
   {
@@ -335,5 +336,8 @@ export function formatPaymentProvider(value: string) {
 export function formatOrderOptionValue(value: OrderOptionValue) {
   if (Array.isArray(value)) return value.join(", ");
   if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "object" && value !== null && "start" in value && "end" in value) {
+    return `${value.start} - ${value.end}`;
+  }
   return String(value);
 }

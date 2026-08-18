@@ -1077,7 +1077,7 @@ const {data: settings} = await supabase.from('system_settings').select('*').eq('
 | Refund router | in-progress | Admin can choose automatic provider refund or manual refund recording. Stripe supports automatic + manual. NOWPayments is manual-only; automatic attempts are rejected with a warning and do not mark the order refunded. Future providers should declare refund capabilities behind the same interface. |
 | Rate limiting | in-progress | Auth/admin login/password-reset/register limits exist. Broader API limits pending. |
 | Audit log (admin/system/customer actions) | in-progress | Covers admin auth/CMS/settings/order actions plus checkout creation/block/failure, payment webhook signature/fulfillment outcomes, refund success/failure/block, customer refund requests, customer completion confirmation, and auto-complete cron outcomes. |
-| Google Sheets integration | in-progress | Orders + Transactions tabs are wired through service-account auth, admin manual sync buttons, queued `sheets_sync_jobs`, and `/api/cron/sheets/sync`. Orders include selected option and item breakdown columns for readable operations review. |
+| Google Sheets integration | in-progress | Orders + Transactions tabs are wired through a bound Google Apps Script Web App (`GOOGLE_APPS_SCRIPT_URL` + shared secret), admin manual sync buttons, queued `sheets_sync_jobs`, and `/api/cron/sheets/sync`. Orders include selected option and item breakdown columns for readable operations review. |
 | Real-time chat | in-progress | Uses fast protected API refresh and local update events instead of exposing private message payloads through browser-side table subscriptions. Active chats, ticket previews, and unread badges update without manual reload. |
 | Admin second factor | removed | Extra login factors intentionally out of scope. |
 | Anonymous cart API routes | in-progress | Browser-session cart uses `ms_cart_session` and server-side service role routes for add/list/remove plus checkout readout. |
@@ -1822,15 +1822,16 @@ Resend is used in two ways:
 
 ### Google Sheets Integration
 
-**Why it needs auth:** Google's API requires authentication even for your own spreadsheets - it doesn't allow anonymous writes. You authenticate using a **service account**: a bot Google identity that your backend acts as. The spreadsheet is shared with the service account's email address, and your backend uses a JSON key to sign API requests. Zero cost, one-time setup, key lives in env vars.
+**Why it needs auth:** Google's API requires authentication even for your own spreadsheets - it doesn't allow anonymous writes. We use a **Google Apps Script Web App** as the bridge: the script is bound to the spreadsheet (so it has direct access) and exposes an HTTP endpoint protected by a secret token. The Next.js backend POSTs the data, and the script writes it to Sheets. No service account, no JWT signing, no Google Cloud project needed.
 
-**Setup:**
-1. Go to Google Cloud Console - Create a project (or use existing)
-2. Enable the Google Sheets API
-3. Create a Service Account - generate a JSON key - download it
-4. Add the key to env: `GOOGLE_SERVICE_ACCOUNT_JSON` (the full JSON as a compact string). Local development can alternatively use `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` pointing at an ignored JSON file.
-5. Create your Google Spreadsheet - Share it with the service account's email (Editor access)
-6. Copy the Spreadsheet ID from the URL - add to env: `GOOGLE_SHEET_ID`
+**Setup:** Full guide in `docs/GOOGLE_APPS_SCRIPT_SETUP.md`. Summary:
+1. Open your spreadsheet > Extensions > Apps Script
+2. Paste the code from `scripts/apps-script/Code.gs`
+3. Change `SECRET_TOKEN` to a strong random token (e.g. `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`)
+4. Save > Deploy > New deployment > Web app (Execute as: Me, Who has access: Anyone)
+5. Copy the Web App URL into env: `GOOGLE_APPS_SCRIPT_URL`
+6. Set the same token in env: `GOOGLE_APPS_SCRIPT_SECRET`
+7. `GOOGLE_SHEET_ID` is no longer used by the backend (the script is bound to the sheet), but can stay in env for reference
 
 One spreadsheet, two tabs. The app rewrites the exported tab contents instead of appending duplicate rows, so Sheets stays a readable mirror of current order and transaction state.
 
@@ -1880,10 +1881,18 @@ Not written to Sheets: user registrations, admin actions unrelated to orders/tra
 
 Pending jobs are collapsed by target. If three order changes happen before cron runs, the cron may report one processed `orders` job because the final export rewrites the whole Orders tab with the latest state.
 
+**How the sync works now (Apps Script):**
+1. `syncGoogleSheets(target)` in `lib/admin/google-sheets-sync.ts` fetches rows from Supabase (same column layout as above)
+2. `pushToGoogleSheets()` in `lib/google-sheets-apps-script.ts` POSTs `{ token, target, data|ordersData|transactionsData }` to the Apps Script Web App URL
+3. The script verifies the token, clears the target sheet, writes the new values, formats the header, and returns `{ success, result }`
+4. For `target: "all"`, both datasets are sent in one request and written in one execution
+
 **Important rules:**
-- Google service account JSON files are secrets. Keep them ignored and use env vars in Vercel.
-- `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` is only a local convenience. Production should use `GOOGLE_SERVICE_ACCOUNT_JSON`.
+- `GOOGLE_APPS_SCRIPT_SECRET` is a secret. Keep it ignored and use env vars in Vercel.
+- The token in the Apps Script (`SECRET_TOKEN`) MUST match `GOOGLE_APPS_SCRIPT_SECRET`, otherwise syncs fail with `Unauthorized`.
+- Apps Script has a 6-minute execution limit and ~10M cells per spreadsheet. `MAX_ROWS_PER_BATCH` (default 10000) guards against timeouts; keep row counts well below it.
 - Sheets sync is best-effort reporting. Checkout/order writes should not depend on Google Sheets being available.
+- To update the script: edit in Apps Script editor > Save > Deploy > Manage deployments > edit > New version. The Web App URL stays the same, no env changes needed.
 
 ---
 
@@ -2309,9 +2318,9 @@ Follow these during development - not as a post-launch fix.
 | `RESEND_API_KEY` | Backend | Runtime | From resend.com dashboard. Used by MoonStrike app transactional emails. Supabase Auth email may also use Resend SMTP from Supabase dashboard config. |
 | `RESEND_FROM_EMAIL` | Backend | Runtime | Sender address for app transactional emails. Use `onboarding@resend.dev` only for local testing; production should use a verified domain sender. |
 | `EMAIL_TEST_TO` | Seed/test script | Local testing | Recipient used by `npm run email:test`. |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | Backend | Runtime | Full service account JSON key contents as a compact string. From Google Cloud Console - Service Accounts. Preferred for production/Vercel Sheets writes. |
-| `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` | Backend | Local testing | Optional local-only fallback path to an ignored service account JSON file. Do not use this in Vercel unless the file is intentionally present at runtime. |
-| `GOOGLE_SHEET_ID` | Backend | Runtime | Spreadsheet ID from the Google Sheets URL. The sheet must be shared with the service account email. |
+| `GOOGLE_APPS_SCRIPT_URL` | Backend | Runtime | Web App deployment URL from the bound Apps Script (`https://script.google.com/macros/s/.../exec`). See `docs/GOOGLE_APPS_SCRIPT_SETUP.md`. |
+| `GOOGLE_APPS_SCRIPT_SECRET` | Backend | Runtime | Secret token. MUST match `SECRET_TOKEN` inside the Apps Script `Code.gs`. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. |
+| `GOOGLE_SHEET_ID` | Backend | Legacy | No longer used by the backend (the Apps Script is bound to the sheet). Kept only for reference/documentation. |
 | `NEXT_PUBLIC_CLOUDFLARE_IMAGES_ACCOUNT_HASH` | Frontend | Build + Runtime | From Cloudflare Images dashboard. Used to construct CDN image URLs. |
 
 ### Setup Order
@@ -2323,7 +2332,7 @@ Set these up in this order - each depends on the service being configured first:
 3. Stripe - create account, get publishable + secret key, set up webhook and copy signing secret
 4. NowPayments: create account, get API key, configure IPN and copy secret WARNING
 5. Resend - create account, verify domain, copy API key, configure Supabase SMTP
-6. Google Cloud - create project, enable Sheets API, create service account, download JSON key, create spreadsheet, share with service account email
+6. Google Sheets - open/create the spreadsheet, paste Apps Script from `scripts/apps-script/Code.gs`, set `SECRET_TOKEN`, deploy as Web App, copy URL + token into env (`GOOGLE_APPS_SCRIPT_URL`, `GOOGLE_APPS_SCRIPT_SECRET`)
 7. Cloudflare Images - enable in Cloudflare dashboard, copy account hash
 
 ### Local Development
@@ -2346,8 +2355,8 @@ NOWPAYMENTS_IPN_SECRET=...
 RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=MoonStrike <noreply@yourdomain.com>
 EMAIL_TEST_TO=you@example.com
-GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"..."}
-GOOGLE_SERVICE_ACCOUNT_JSON_PATH=moonstrike-test-service-account.json
+GOOGLE_APPS_SCRIPT_URL=https://script.google.com/macros/s/xxxx/exec
+GOOGLE_APPS_SCRIPT_SECRET=your-64-char-random-token
 GOOGLE_SHEET_ID=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms
 NEXT_PUBLIC_CLOUDFLARE_IMAGES_ACCOUNT_HASH=abc123xyz
 ```

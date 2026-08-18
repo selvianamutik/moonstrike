@@ -107,6 +107,7 @@ export function ServicesPageClient({
   const [deletingServiceId, setDeletingServiceId] = useState("");
   const [pendingDeleteCategory, setPendingDeleteCategory] = useState<ServiceCategoryRow | null>(null);
   const [pendingDeleteService, setPendingDeleteService] = useState<ServiceRow | null>(null);
+  const [notice, setNotice] = useState("");
 
   const availableCategories = useMemo(
     () => getCategoryFilterOptions(categoryRows, gameFilter),
@@ -284,11 +285,12 @@ export function ServicesPageClient({
     if (deletingServiceId) return;
 
     setError("");
+    setNotice("");
     setDeletingServiceId(service.id);
 
     try {
       const response = await fetch(`/api/admin/services/${service.id}`, { method: "DELETE" });
-      const result = (await response.json().catch(() => null)) as { error?: string } | null;
+      const result = (await response.json().catch(() => null)) as { error?: string; deletedOrders?: number } | null;
 
       if (!response.ok) {
         setError(result?.error ?? "Unable to delete service.");
@@ -296,6 +298,11 @@ export function ServicesPageClient({
       }
 
       setServiceRows((current) => current.filter((item) => item.id !== service.id));
+      setNotice(
+        typeof result?.deletedOrders === "number" && result.deletedOrders > 0
+          ? `"${service.title}" was deleted together with ${result.deletedOrders} order(s).`
+          : `"${service.title}" was deleted.`
+      );
     } catch {
       setError("Unable to reach the services endpoint.");
     } finally {
@@ -393,6 +400,12 @@ export function ServicesPageClient({
       {error && (
         <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
           {error}
+        </p>
+      )}
+
+      {notice && (
+        <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+          {notice}
         </p>
       )}
 
@@ -591,7 +604,11 @@ export function ServicesPageClient({
       <ConfirmDialog
         open={Boolean(pendingDeleteService)}
         title="Delete service?"
-        description={pendingDeleteService ? `This removes ${pendingDeleteService.title} from the service catalog.` : ""}
+        description={
+          pendingDeleteService
+            ? `This permanently deletes ${pendingDeleteService.title} together with every order (and its payment transactions) that was ever made with it. This cannot be undone.`
+            : ""
+        }
         confirmLabel="Delete Service"
         variant="danger"
         isLoading={Boolean(pendingDeleteService && deletingServiceId === pendingDeleteService.id)}

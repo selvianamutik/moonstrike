@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Search, Trash2, X } from "lucide-react";
 import { AdminButton } from "@/components/admin/AdminButton";
 import { AdminFormField, adminInputClass, adminSelectClass, adminTextareaClass } from "@/components/admin/AdminFormField";
+import { RangeSliderPreview } from "@/components/admin/RangeSliderPreview";
 import { cleanupUploadedMedia } from "@/lib/cms/client-media-cleanup";
 import type { GameRow } from "@/lib/cms/games";
 import type { ServiceCategoryRow } from "@/lib/cms/service-categories";
@@ -16,6 +17,7 @@ const optionTypes: Array<[ServiceOption["type"], string]> = [
   ["radio", "Radio Buttons"],
   ["checkbox_group", "Checkbox Group"],
   ["range", "Range Slider"],
+  ["range_pair", "Custom Range (Two Sliders)"],
   ["number_stepper", "Number Stepper"],
   ["quantity", "Quantity"],
   ["toggle", "Toggle"],
@@ -118,6 +120,10 @@ function isUnitType(type: ServiceOption["type"]) {
   return type === "range" || type === "number_stepper";
 }
 
+function isRangePairType(type: ServiceOption["type"]) {
+  return type === "range_pair";
+}
+
 function isQuantityType(type: ServiceOption["type"]) {
   return type === "quantity";
 }
@@ -137,6 +143,10 @@ function optionPreview(option: ServiceOption) {
 
   if (isUnitType(option.type)) {
     return `${option.min ?? 1}-${option.max ?? 10}, USD ${option.pricePerUnitUSD ?? 0}`;
+  }
+
+  if (isRangePairType(option.type)) {
+    return `range ${option.min ?? 1}-${option.max ?? 10}, USD ${option.pricePerUnitUSD ?? 0}/unit`;
   }
 
   if (isQuantityType(option.type)) {
@@ -369,7 +379,7 @@ export function ServiceForm({
       };
     }
 
-    if (isUnitType(nextType)) {
+    if (isUnitType(nextType) || isRangePairType(nextType)) {
       return {
         ...option,
         type: nextType,
@@ -479,12 +489,13 @@ export function ServiceForm({
         }
       }
 
-      if (isUnitType(option.type) || isQuantityType(option.type)) {
+      if (isUnitType(option.type) || isRangePairType(option.type) || isQuantityType(option.type)) {
         const min = Number(option.min ?? 1);
         const max = Number(option.max ?? min);
 
         if (!Number.isFinite(min) || !Number.isFinite(max)) return `${optionName} needs valid minimum and maximum values.`;
         if (min < 0 || max < min) return `${optionName} maximum must be greater than or equal to minimum.`;
+        if (isRangePairType(option.type) && max <= min) return `${optionName} must allow a range wider than a single value (maximum greater than minimum).`;
         if (isQuantityType(option.type) && min < 1) return `${optionName} minimum quantity must be at least 1.`;
       }
     }
@@ -919,6 +930,37 @@ export function ServiceForm({
                           </p>
                         )}
                       </div>
+                    ) : null}
+
+                    {isRangePairType(option.type) ? (
+                      <>
+                        <div className="mt-4 grid gap-3 md:grid-cols-4">
+                          <AdminFormField label="Minimum">
+                            <input type="text" inputMode="numeric" className={adminInputClass} value={option.min ?? 1} onChange={(e) => updateOption(optionIndex, { min: Number(e.target.value) })} />
+                          </AdminFormField>
+                          <AdminFormField label="Maximum">
+                            <input type="text" inputMode="numeric" className={adminInputClass} value={option.max ?? 10} onChange={(e) => updateOption(optionIndex, { max: Number(e.target.value) })} />
+                          </AdminFormField>
+                          <AdminFormField label="Step">
+                            <input type="text" inputMode="numeric" className={adminInputClass} value={option.step ?? 1} onChange={(e) => updateOption(optionIndex, { step: Number(e.target.value) })} />
+                          </AdminFormField>
+                          <AdminFormField label="USD / Unit">
+                            <input type="text" inputMode="decimal" className={adminInputClass} value={option.pricePerUnitUSD ?? 0} onChange={(e) => updateOption(optionIndex, { pricePerUnitUSD: Number(e.target.value) })} />
+                          </AdminFormField>
+                          <p className="text-xs leading-5 text-[#94A3B8] md:col-span-4">
+                            Customers pick a custom range inside these bounds (for example 5-10, 2-8, or 5-7) using two
+                            sliders. The option price is (end - start) x USD / Unit.
+                          </p>
+                        </div>
+                        <div className="mt-6">
+                          <RangeSliderPreview
+                            min={option.min ?? 1}
+                            max={option.max ?? 10}
+                            pricePerUnit={option.pricePerUnitUSD ?? 0}
+                            label={option.label || "Range Slider Preview"}
+                          />
+                        </div>
+                      </>
                     ) : null}
 
                     {isQuantityType(option.type) ? (

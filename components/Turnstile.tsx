@@ -1,7 +1,11 @@
 "use client";
 
 import { Turnstile as TurnstileWidget, TurnstileInstance } from "@marsidev/react-turnstile";
-import { useRef } from "react";
+import { forwardRef, useImperativeHandle, useRef } from "react";
+
+export interface TurnstileHandle {
+  reset: () => void;
+}
 
 interface TurnstileProps {
   onSuccess: (token: string) => void;
@@ -10,9 +14,16 @@ interface TurnstileProps {
   theme?: "light" | "dark" | "auto";
 }
 
-export function Turnstile({ onSuccess, onError, onExpire, theme = "auto" }: TurnstileProps) {
-  const ref = useRef<TurnstileInstance>(null);
+export const Turnstile = forwardRef<TurnstileHandle, TurnstileProps>(function Turnstile(
+  { onSuccess, onError, onExpire, theme = "auto" },
+  ref
+) {
+  const widgetRef = useRef<TurnstileInstance>(null);
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
+  useImperativeHandle(ref, () => ({
+    reset: () => widgetRef.current?.reset(),
+  }));
 
   if (!siteKey) {
     console.error("NEXT_PUBLIC_TURNSTILE_SITE_KEY is not set");
@@ -21,7 +32,7 @@ export function Turnstile({ onSuccess, onError, onExpire, theme = "auto" }: Turn
 
   return (
     <TurnstileWidget
-      ref={ref}
+      ref={widgetRef}
       siteKey={siteKey}
       onSuccess={onSuccess}
       onError={onError}
@@ -32,4 +43,4 @@ export function Turnstile({ onSuccess, onError, onExpire, theme = "auto" }: Turn
       }}
     />
   );
-}
+});

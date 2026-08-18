@@ -322,6 +322,11 @@ html[data-theme="light"] .ms-button:hover {
   to   { opacity: 1; }
 }
 
+@keyframes ms-required-flash {
+  0%, 100% { border-color: var(--ms-border); box-shadow: none; }
+  50%      { border-color: #ef4444; box-shadow: 0 0 0 4px rgb(239 68 68 / 0.25); }
+}
+
 .ms-genre-exit-next     { animation: ms-genre-exit-next     240ms ease-in  both; }
 .ms-genre-exit-previous { animation: ms-genre-exit-previous 240ms ease-in  both; }
 .ms-genre-enter-next    { animation: ms-genre-enter-next    240ms ease-out both; }
@@ -541,4 +546,74 @@ label[for],
 select,
 summary {
   cursor: pointer;
+}
+
+/* ─── Dual-thumb range slider (range_pair option) ─────────────────────── */
+.ms-dual-range {
+  position: relative;
+  height: 1.5rem;
+  background: linear-gradient(to right, var(--ms-border), var(--ms-border)) no-repeat center;
+  background-size: 100% 4px;
+  border-radius: 2px;
+}
+.ms-dual-range .ms-dual-range__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  outline: none;
+}
+.ms-dual-range .ms-dual-range__input::-webkit-slider-runnable-track {
+  background: transparent;
+  border: none;
+  height: 4px;
+}
+.ms-dual-range .ms-dual-range__input::-moz-range-track,
+.ms-dual-range .ms-dual-range__input::-moz-range-progress {
+  background: transparent;
+  border: none;
+}
+.ms-dual-range .ms-dual-range__input::-webkit-slider-thumb {
+  pointer-events: auto;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  border-radius: 9999px;
+  background: var(--ms-gradient-end);
+  border: 3px solid var(--ms-bg-card);
+  box-shadow: 0 0 0 1px var(--ms-gradient-end), 0 4px 10px rgba(0, 0, 0, 0.45);
+  cursor: grab;
+}
+.ms-dual-range .ms-dual-range__input::-moz-range-thumb {
+  pointer-events: auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: var(--ms-gradient-end);
+  border: 3px solid var(--ms-bg-card);
+  box-shadow: 0 0 0 1px var(--ms-gradient-end), 0 4px 10px rgba(0, 0, 0, 0.45);
+  cursor: grab;
+}
+.ms-dual-range .ms-dual-range__input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px var(--ms-hover-bg), 0 0 0 3px var(--ms-gradient-end);
+}
+.ms-dual-range .ms-dual-range__input:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 2px var(--ms-hover-bg), 0 0 0 3px var(--ms-gradient-end);
+}
+.ms-dual-range .ms-dual-range__input--end::-webkit-slider-thumb,
+.ms-dual-range .ms-dual-range__input--end::-moz-range-thumb {
+  background: var(--ms-heading);
+  box-shadow: 0 0 0 1px var(--ms-gradient-end), 0 4px 10px rgba(0, 0, 0, 0.45);
+}
+.ms-dual-range .ms-dual-range__input--end:focus-visible::-webkit-slider-thumb,
+.ms-dual-range .ms-dual-range__input--end:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 2px var(--ms-hover-bg), 0 0 0 3px var(--ms-gradient-end);
 }

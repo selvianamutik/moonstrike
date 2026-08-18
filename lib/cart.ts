@@ -1,10 +1,10 @@
 import { cookies } from 'next/headers'
 import { randomUUID } from 'crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
-import type { ServiceOption } from '@/lib/cms/services'
+import type { RangePairValue, ServiceOption } from '@/lib/cms/services'
 
 export type Currency = 'USD' | 'EUR'
-export type SelectionValue = string | string[] | number | boolean
+export type SelectionValue = string | string[] | number | boolean | RangePairValue
 
 export const CART_COOKIE = 'ms_cart_session'
 const CART_COOKIE_MAX_AGE = 60 * 60 * 1
@@ -172,6 +172,20 @@ function isUnitQuantity(option: ServiceOption) {
   return option.type === 'scalar' || option.type === 'range' || option.type === 'number_stepper'
 }
 
+function isRangePair(option: ServiceOption) {
+  return option.type === 'range_pair'
+}
+
+function isRangePairValue(value: SelectionValue): value is RangePairValue {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    'start' in value &&
+    'end' in value
+  )
+}
+
 function isQuantityOption(option: ServiceOption) {
   return option.type === 'quantity'
 }
@@ -179,6 +193,9 @@ function isQuantityOption(option: ServiceOption) {
 function defaultSelection(option: ServiceOption): SelectionValue {
   if (isMultiChoice(option)) return []
   if (isUnitQuantity(option) || isQuantityOption(option)) return option.min ?? 1
+  if (isRangePair(option)) {
+    return { start: option.min ?? 1, end: option.max ?? (option.min ?? 1) + 1 }
+  }
   if (option.type === 'toggle') return false
   if (option.type === 'text' || option.type === 'textarea') return ''
   return option.options?.[0]?.label ?? ''
@@ -186,6 +203,15 @@ function defaultSelection(option: ServiceOption): SelectionValue {
 
 function optionPrices(option: ServiceOption, value: SelectionValue) {
   if (isQuantityOption(option)) return { priceUSD: 0, priceEUR: 0 }
+
+  if (isRangePair(option)) {
+    const range = isRangePairValue(value) ? value : { start: 0, end: 0 }
+    const count = Math.max(0, Number(range.end) - Number(range.start))
+    return {
+      priceUSD: count * (option.pricePerUnitUSD ?? 0),
+      priceEUR: count * (option.pricePerUnitEUR ?? 0),
+    }
+  }
 
   if (isUnitQuantity(option)) {
     const count = Number(value) || 0

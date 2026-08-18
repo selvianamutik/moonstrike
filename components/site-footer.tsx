@@ -66,7 +66,7 @@ export function SiteFooter() {
         <div className="grid gap-10 sm:gap-12 grid-cols-1 lg:grid-cols-[1fr_auto]">
           <div className="flex flex-col items-start">
             <Link href="/" className="font-display text-5xl font-black tracking-[-0.06em] sm:text-7xl">
-              <img src={"/logo/logo.png"} className="w-[220px] sm:w-[320px] md:w-[420px] max-w-full" />
+              <img src={"/logo/logo.png"} className="w-[220px] sm:w-[320px] md:w-[420px] max-w-full" alt="logo"/>
             </Link>
             <p className="mt-5 max-w-xl text-lg leading-8">
               Dominate the Game. Premium boosting, coaching, progression, and item services for competitive players.

@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       status: "success",
     });
 
-    return NextResponse.json({ ok: true, target, ...result });
+    return NextResponse.json({ ok: true, ...result, target });
   } catch (error) {
     await writeAuditLog({
       admin,

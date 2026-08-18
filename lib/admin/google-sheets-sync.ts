@@ -1,6 +1,6 @@
 import { listAdminOrders } from "@/lib/admin/orders";
 import { listAdminTransactions } from "@/lib/admin/transactions";
-import { replaceSheetValues } from "@/lib/google-sheets";
+import { pushToGoogleSheets } from "@/lib/google-sheets-apps-script";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type GoogleSheetsSyncTarget = "orders" | "transactions" | "all";
@@ -98,19 +98,34 @@ function transactionRows() {
 }
 
 export async function syncGoogleSheets(target: GoogleSheetsSyncTarget = "all") {
-  const results = [];
+  let result;
 
-  if (target === "orders" || target === "all") {
-    results.push(await replaceSheetValues("Orders", await orderRows()));
-  }
+  if (target === "all") {
+    // For "all" target, fetch both datasets and send in single request
+    const [ordersData, transactionsData] = await Promise.all([
+      orderRows(),
+      transactionRows(),
+    ]);
 
-  if (target === "transactions" || target === "all") {
-    results.push(await replaceSheetValues("Transactions", await transactionRows()));
+    result = await pushToGoogleSheets(
+      "all",
+      undefined,
+      ordersData,
+      transactionsData
+    );
+  } else if (target === "orders") {
+    const ordersData = await orderRows();
+    result = await pushToGoogleSheets("orders", ordersData);
+  } else if (target === "transactions") {
+    const transactionsData = await transactionRows();
+    result = await pushToGoogleSheets("transactions", transactionsData);
+  } else {
+    throw new Error(`Invalid sync target: ${target}`);
   }
 
   return {
     syncedAt: new Date().toISOString(),
-    results,
+    ...result,
   };
 }
 

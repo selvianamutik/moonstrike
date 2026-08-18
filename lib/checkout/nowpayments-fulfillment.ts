@@ -1,7 +1,7 @@
 import { isCheckoutSnapshotItems, type CheckoutSnapshotItem } from "@/lib/checkout/snapshot";
 import { calculateTaxAmount, getPaymentTaxRate } from "@/lib/checkout/tax";
 import { enqueueGoogleSheetsSync } from "@/lib/admin/google-sheets-sync";
-import { notifyOrderCreated } from "@/lib/notifications";
+import { notifyOrderCreated, notifyOrderPaymentConfirmed } from "@/lib/notifications";
 import { createOrderReference, createTransactionReference } from "@/lib/order-ref";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -161,6 +161,16 @@ export async function fulfillNowPaymentsCheckout(payload: NowPaymentsIpnPayload)
     userId: checkoutSession.user_id,
     serviceNames: checkoutSession.items.map((item) => item.product.name),
   });
+
+  await notifyOrderPaymentConfirmed(
+    {
+      orderId: order.id,
+      orderRef,
+      userId: checkoutSession.user_id,
+      serviceNames: checkoutSession.items.map((item) => item.product.name),
+    },
+    { amount: orderTotal, currency },
+  );
 
   await supabase.from("cart_items").delete().eq("cart_id", checkoutSession.cart_id);
   await supabase

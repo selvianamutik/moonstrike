@@ -145,6 +145,9 @@ function formatDate(value: string) {
 function formatOptionValue(value: OrderOptionValue) {
   if (Array.isArray(value)) return value.join(", ");
   if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "object" && value !== null && "start" in value && "end" in value) {
+    return `${value.start} - ${value.end}`;
+  }
   return String(value);
 }
 

@@ -1,7 +1,7 @@
 import { isCheckoutSnapshotItems, type CheckoutSnapshotItem } from "@/lib/checkout/snapshot";
 import { calculateTaxAmount, getPaymentTaxRate } from "@/lib/checkout/tax";
 import { enqueueGoogleSheetsSync } from "@/lib/admin/google-sheets-sync";
-import { notifyOrderCreated } from "@/lib/notifications";
+import { notifyOrderCreated, notifyOrderPaymentConfirmed } from "@/lib/notifications";
 import { createOrderReference, createTransactionReference } from "@/lib/order-ref";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { capturePayPalOrder, getPayPalOrder } from "@/lib/paypal";
@@ -161,6 +161,18 @@ export async function fulfillPayPalCheckoutSession(checkoutSessionId: string, pa
     userId: checkoutSession.user_id,
     serviceNames: items.map((item) => item.product.name),
   }).catch(() => {
+    // Notification failure is non-critical
+  });
+
+  await notifyOrderPaymentConfirmed(
+    {
+      orderId: order.id,
+      orderRef,
+      userId: checkoutSession.user_id,
+      serviceNames: items.map((item) => item.product.name),
+    },
+    { amount: totalAmount, currency: checkoutSession.currency },
+  ).catch(() => {
     // Notification failure is non-critical
   });
 

@@ -94,6 +94,22 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const returnTo = `${pathname}${request.nextUrl.search}`
 
+  // OAuth fallback: when the Supabase Auth redirect URL list is missing
+  // /auth/callback, Supabase redirects back to the Site URL (e.g. /?code=...).
+  // Forward any auth payload (OAuth code, email token_hash, or error) that
+  // lands on another page to the callback route.
+  if (
+    pathname !== '/auth/callback' &&
+    !pathname.startsWith('/api/') &&
+    (request.nextUrl.searchParams.has('code') ||
+      request.nextUrl.searchParams.has('token_hash') ||
+      request.nextUrl.searchParams.has('error'))
+  ) {
+    const callbackUrl = request.nextUrl.clone()
+    callbackUrl.pathname = '/auth/callback'
+    return NextResponse.redirect(callbackUrl)
+  }
+
   const supabase = createServerClient(
     getSupabaseUrl(),
     getSupabasePublishableKey(),

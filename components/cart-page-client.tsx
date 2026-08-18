@@ -12,7 +12,10 @@ import { notifyCartUpdated, subscribeToCartUpdates } from "@/lib/cart-events";
 
 type CartApiItem = {
   id: string;
-  selectedOptionsSnapshot: Record<string, { value: string | string[] | number | boolean; priceUSD: number; priceEUR: number }>;
+  selectedOptionsSnapshot: Record<
+    string,
+    { value: string | string[] | number | boolean | { start: number; end: number }; priceUSD: number; priceEUR: number }
+  >;
   priceUSD: number;
   priceEUR: number;
   service: {
@@ -35,9 +38,12 @@ function formatMoney(value: number, currency: "USD" | "EUR") {
   }).format(value);
 }
 
-function optionValue(value: string | string[] | number | boolean) {
+function optionValue(value: string | string[] | number | boolean | { start: number; end: number }) {
   if (Array.isArray(value)) return value.join(", ");
   if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "object" && value !== null && "start" in value && "end" in value) {
+    return `${value.start} - ${value.end}`;
+  }
   return String(value);
 }
 
@@ -161,7 +167,13 @@ export function CartPageClient() {
             <div className="mt-8 space-y-5">
               {items.map((item) => {
                 const price = currency === "EUR" ? item.priceEUR : item.priceUSD;
-                const options = Object.entries(item.selectedOptionsSnapshot ?? {});
+                const options = Object.entries(item.selectedOptionsSnapshot ?? {}).filter(([_, snapshot]) => {
+                  const val = snapshot.value;
+                  // Filter out empty values: "", null, undefined, empty array []
+                  if (val === "" || val == null) return false;
+                  if (Array.isArray(val) && val.length === 0) return false;
+                  return true;
+                });
 
                 return (
                   <article key={item.id} className="ms-card ms-card-hover rounded-xl p-5">
@@ -178,7 +190,7 @@ export function CartPageClient() {
                             {item.service?.gameName ?? "Game"}
                           </span>
                         </div>
-                        <p className="mt-2 text-sm leading-6 text-[var(--ms-body)]">{item.service?.description}</p>
+                        <p className="mt-2 text-sm leading-6 text-[var(--ms-body)] line-clamp-3">{item.service?.description}</p>
                         {options.length > 0 ? (
                           <div className="mt-4 grid gap-2 md:grid-cols-2">
                             {options.map(([label, snapshot]) => (

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AtSign, Eye, EyeOff, Lock, LogIn, Shield, ShieldCheck } from "lucide-react";
-import { Turnstile } from "@/components/Turnstile";
+import { Turnstile, type TurnstileHandle } from "@/components/Turnstile";
 
 const LOCKOUT_KEY = "ms_admin_login_lockout";
 
@@ -34,6 +34,7 @@ export default function AdminLogin() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   // Lazy initializer — reads localStorage immediately to avoid hydration gap
   const [lockedUntil, setLockedUntil] = useState<Date | null>(() => {
@@ -119,6 +120,7 @@ export default function AdminLogin() {
 
         setError(result?.error ?? "Admin login failed.");
         setTurnstileToken(null); // Reset token after failed attempt
+        turnstileRef.current?.reset(); // Re-solve the widget so the user can retry without a reload
         return;
       }
 
@@ -219,6 +221,7 @@ export default function AdminLogin() {
 
           <div className="flex justify-center mb-4">
             <Turnstile
+              ref={turnstileRef}
               onSuccess={(token) => setTurnstileToken(token)}
               onError={() => setTurnstileToken(null)}
               onExpire={() => setTurnstileToken(null)}
