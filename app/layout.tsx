@@ -31,6 +31,7 @@ export const metadata: Metadata = {
   description:
     "Moon Strike helps gamers order boosting, coaching, and item services through a premium cosmic marketplace.",
   keywords: [
+    // General boosting terms
     "game boosting",
     "elo boost",
     "game coaching",
@@ -38,6 +39,64 @@ export const metadata: Metadata = {
     "carry service",
     "gaming marketplace",
     "boosting service",
+    "power leveling",
+    "account boosting",
+    "competitive boosting",
+    
+    // Specific game boosting
+    "Guild Wars 2 boosting",
+    "GW2 boosting",
+    "Guild Wars 2 carry",
+    "GW2 legendary armor",
+    "GW2 raids boosting",
+    "Black Desert Online boosting",
+    "BDO boosting",
+    "BDO enhancement service",
+    "BDO grinding service",
+    "Maplestory boosting",
+    "Maplestory meso farming",
+    "Maplestory leveling service",
+    "Crimson Desert boosting",
+    
+    // Geo-targeted keywords - North America
+    "game boosting USA",
+    "game boosting Canada",
+    "boosting service North America",
+    "US game carry service",
+    "Canadian gaming boosting",
+    
+    // Geo-targeted keywords - Europe
+    "game boosting UK",
+    "game boosting Europe",
+    "EU boosting service",
+    "European game carry",
+    "game boosting Germany",
+    "game boosting France",
+    "game boosting Spain",
+    
+    // Geo-targeted keywords - Asia Pacific
+    "game boosting Australia",
+    "game boosting Singapore",
+    "game boosting Japan",
+    "game boosting Korea",
+    "APAC gaming services",
+    "OCE boosting service",
+    
+    // Service-specific keywords
+    "MMO boosting",
+    "MMORPG carry service",
+    "raid boosting",
+    "dungeon carry",
+    "achievement boosting",
+    "gear farming service",
+    "gold farming service",
+    "arena boosting",
+    "battleground carry",
+    
+    // Platform keywords
+    "PC game boosting",
+    "Steam game boosting",
+    "online gaming marketplace",
   ],
   authors: [{ name: "Moon Strike", url: BASE_URL }],
   creator: "Moon Strike",
