@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { ShieldCheck, Eye, CreditCard, Search, Settings, BarChart3, CheckCircle } from "lucide-react";
 import { PlaceholderAsset } from "@/components/asset-image";
 import { TrustpilotReviewCollector } from "@/components/trustpilot-review-collector";
 import type { LandingBenefitsData, LandingStepsData } from "@/lib/cms/landing";
@@ -29,15 +30,18 @@ export function Frame18Sections({ benefits, steps }: { benefits: LandingBenefits
 
       <div className="mx-auto mt-6 grid max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
         {benefits.items.length > 0 ? (
-          benefits.items.map((item) => (
-            <article key={item.title} className="ms-card ms-card-hover rounded-lg p-7">
-              <span className="mono flex h-12 w-12 items-center justify-center rounded-full border border-[var(--ms-gradient-end)] text-lg font-bold text-[var(--ms-gradient-end)]">
-                {item.icon}
-              </span>
-              <h3 className="mt-5 text-xl font-bold text-[var(--ms-heading)]">{item.title}</h3>
-              <p className="mt-3 text-sm leading-6 text-[var(--ms-body)]">{item.detail}</p>
-            </article>
-          ))
+          benefits.items.map((item, index) => {
+            const IconComponent = index === 0 ? ShieldCheck : index === 1 ? Eye : CreditCard;
+            return (
+              <article key={item.title} className="ms-card ms-card-hover rounded-lg p-7">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--ms-gradient-end)] text-[var(--ms-gradient-end)]">
+                  <IconComponent size={24} />
+                </span>
+                <h3 className="mt-5 text-xl font-bold text-[var(--ms-heading)]">{item.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-[var(--ms-body)]">{item.detail}</p>
+              </article>
+            );
+          })
         ) : (
           <p className="col-span-full py-8 text-center text-sm text-[var(--ms-body)]">Benefits content is not yet configured.</p>
         )}
@@ -51,25 +55,31 @@ export function Frame18Sections({ benefits, steps }: { benefits: LandingBenefits
       </div>
 
       <div className="mx-auto mt-10 grid max-w-4xl grid-cols-1 overflow-hidden rounded-xl border border-[var(--ms-border)] md:grid-cols-2">
-        {steps.items.map((step, index) => (
-          <article key={step.title} className="relative min-h-56 overflow-hidden bg-[var(--ms-bg-card)] p-8">
-            <div
-              className={`absolute h-72 w-72 rounded-full bg-[var(--primary)] opacity-70 shadow-[0_0_22px_rgba(139,92,246,0.45)] ${
-                index === 0
-                  ? "-bottom-24 -right-24"
-                  : index === 1
-                    ? "-top-52 left-8"
-                    : index === 2
-                      ? "-bottom-56 left-2"
-                      : "-bottom-28 -left-28"
-              }`}
-            />
-            <div className="relative z-10 max-w-72">
-              <h3 className="font-bold text-[var(--ms-heading)]">{step.title}</h3>
-              <p className="mt-3 leading-6 text-[var(--ms-body)]">{step.description}</p>
-            </div>
-          </article>
-        ))}
+        {steps.items.map((step, index) => {
+          const StepIcon = index === 0 ? Search : index === 1 ? Settings : index === 2 ? BarChart3 : CheckCircle;
+          return (
+            <article key={step.title} className="relative min-h-56 overflow-hidden bg-[var(--ms-bg-card)] p-8">
+              <div
+                className={`absolute h-72 w-72 rounded-full bg-[var(--primary)] opacity-70 shadow-[0_0_22px_rgba(139,92,246,0.45)] ${
+                  index === 0
+                    ? "-bottom-24 -right-24"
+                    : index === 1
+                      ? "-top-52 left-8"
+                      : index === 2
+                        ? "-bottom-56 left-2"
+                        : "-bottom-28 -left-28"
+                }`}
+              />
+              <div className="relative z-10 max-w-72">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[var(--ms-gradient-end)] bg-[var(--ms-bg-card)] text-[var(--ms-gradient-end)]">
+                  <StepIcon size={24} />
+                </div>
+                <h3 className="mt-5 font-bold text-[var(--ms-heading)]">{step.title}</h3>
+                <p className="mt-3 leading-6 text-[var(--ms-body)]">{step.description}</p>
+              </div>
+            </article>
+          );
+        })}
       </div>
 
       <div className="mt-20 text-center">

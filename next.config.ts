@@ -19,6 +19,12 @@ const nextConfig: NextConfig = {
         hostname: "*.r2.dev",
         pathname: "/**",
       },
+      // Cloudflare R2 via custom domain
+      {
+        protocol: "https",
+        hostname: "media.moonstrike.pro",
+        pathname: "/**",
+      },
       // Cloudflare R2 via custom domain (set R2_PUBLIC_URL to a custom domain)
       ...(process.env.R2_PUBLIC_URL
         ? (() => {

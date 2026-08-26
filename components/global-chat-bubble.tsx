@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CornerUpLeft, Send, X } from "lucide-react";
+import { CornerUpLeft, Send, X, MessageCircle } from "lucide-react";
 import { notifyChatUpdated } from "@/lib/chat-events";
 import type { ChatMessage, ChatTicket } from "@/lib/chat";
 
@@ -332,9 +332,9 @@ export function GlobalChatBubble() {
           type="button"
           onClick={() => setIsOpen(true)}
           aria-label="Open support chat"
-          className="relative flex h-16 w-16 cursor-pointer items-center justify-center rounded-full border border-[var(--ms-gradient-end)] bg-[var(--ms-bg-card)] font-display text-xl font-black shadow-[0_16px_45px_rgba(0,0,0,0.45),0_0_22px_rgba(34,211,238,0.35)] hover:bg-[var(--ms-hover-bg)]"
+          className="relative flex h-16 w-16 cursor-pointer items-center justify-center rounded-full border border-[var(--ms-gradient-end)] bg-[var(--ms-bg-card)] shadow-[0_16px_45px_rgba(0,0,0,0.45),0_0_22px_rgba(34,211,238,0.35)] hover:bg-[var(--ms-hover-bg)]"
         >
-          MS
+          <MessageCircle size={28} className="text-[var(--ms-gradient-end)]" />
           {unreadCount > 0 ? (
             <span className="absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--ms-danger)] px-1 mono text-[10px] text-white">
               {unreadCount > 9 ? "9+" : unreadCount}
