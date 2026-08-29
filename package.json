@@ -50,6 +50,7 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "tailwindcss": "latest",
+    "tsx": "^4.23.12",
     "typescript": "latest"
   }
 }

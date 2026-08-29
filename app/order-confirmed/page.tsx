@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import Script from "next/script";
 import { PlaceholderAsset } from "@/components/asset-image";
 import { LivePageRefresh } from "@/components/live-page-refresh";
 import { SiteFooter } from "@/components/site-footer";
@@ -186,6 +187,16 @@ export default async function OrderConfirmedPage({ searchParams }: OrderConfirme
 
   return (
     <main className="min-h-screen bg-[var(--ms-bg-page)] text-[var(--ms-heading)]">
+      <Script id="google-ads-conversion" strategy="afterInteractive">
+        {`
+          gtag('event', 'conversion', {
+            'send_to': 'AW-18331220288/CZxwCO-AgN8cEMDygKVE',
+            'value': ${order.total},
+            'currency': '${order.currency}',
+            'transaction_id': '${order.transactionId}'
+          });
+        `}
+      </Script>
       <SiteHeader />
       <section className="ms-shell py-16">
         <div className="mx-auto max-w-4xl text-center">

@@ -16,7 +16,7 @@ const badgeClassNames: Record<BadgeVariant, string> = {
   hot: "bg-[var(--ms-danger)] text-white",
   new: "bg-[var(--ms-gradient-end)]/20 text-[var(--ms-gradient-end)]",
   soon: "bg-[var(--ms-hover-bg)] text-[var(--ms-body)]",
-  featured: "bg-[var(--ms-gradient-start)]/20 text-[var(--ms-gradient-end)]",
+  featured: "bg-[var(--ms-gradient-start)]/20 text-[var(--ms-heading)]",
 };
 
 export function Badge({ variant = "featured", children }: { variant?: BadgeVariant; children?: React.ReactNode }) {
