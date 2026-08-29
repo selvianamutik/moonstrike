@@ -35,7 +35,7 @@
   --ms-hover-bg: rgba(23, 37, 84, 0.76);
   --ms-danger: #ef4444;
   --ms-success: #22c55e;
-  --ms-hero-gradient: linear-gradient(to right, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.35), transparent);
+  --ms-hero-gradient: linear-gradient(to right, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.16), transparent);
 
   /* Backward-compatible aliases for existing pages. */
   --background: var(--ms-bg-page);
@@ -70,7 +70,7 @@ html[data-theme="light"] {
   --ms-cta-bg: linear-gradient(to right, var(--ms-lm-yellow-mid), var(--ms-lm-yellow-primary));
   --ms-logo-bg: linear-gradient(to right, var(--ms-gradient-start), var(--ms-gradient-end));
   --ms-hover-bg: rgba(243, 198, 35, 0.12);
-  --ms-hero-gradient: linear-gradient(to right, rgba(255, 255, 255, 0.80), rgba(255, 255, 255, 0.50), transparent);
+  --ms-hero-gradient: linear-gradient(to right, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.26), transparent);
 
   --background: var(--ms-bg-page);
   --panel: var(--ms-bg-card);
