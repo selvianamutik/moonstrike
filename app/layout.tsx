@@ -20,7 +20,7 @@ const cabin = Cabin({
   display: "swap",
 });
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://moonstrike.pro';
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.moonstrike.pro';
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),

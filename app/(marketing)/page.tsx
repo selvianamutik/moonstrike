@@ -11,7 +11,7 @@ import { listActiveCatalogGames } from "@/lib/cms/games";
 import { getActiveHeroSlides, getActiveLandingCms } from "@/lib/cms/landing";
 import { listActiveHotOffers, serviceRowToCatalogService } from "@/lib/cms/services";
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://moonstrike.pro';
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.moonstrike.pro';
 
 export const metadata: Metadata = {
   title: "Moon Strike | Game Boosting Marketplace",

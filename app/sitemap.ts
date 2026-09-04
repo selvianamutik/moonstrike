@@ -4,7 +4,7 @@ import { listActiveServices } from '@/lib/cms/services'
 import { getGameServiceDetailHref } from '@/lib/cms/game-services'
 import { listCustomPagesByCategory } from '@/lib/admin/custom-pages'
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://moonstrike.pro'
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.moonstrike.pro'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const sitemap: MetadataRoute.Sitemap = []

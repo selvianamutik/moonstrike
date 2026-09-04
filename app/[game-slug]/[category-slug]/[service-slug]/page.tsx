@@ -5,7 +5,7 @@ import { getActiveGameBySlug, getServiceForGame } from "@/lib/cms/game-services"
 
 import { JsonLd } from "@/components/JsonLd";
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://moonstrike.pro';
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.moonstrike.pro';
 
 export async function generateMetadata({
   params,

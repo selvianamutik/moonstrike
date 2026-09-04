@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://moonstrike.pro";
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.moonstrike.pro";
 
 type JsonLdProps = {
   type: "website" | "game-page" | "service-page";
