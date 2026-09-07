@@ -332,7 +332,7 @@ export default function EditBannerPage({ params }: { params: Promise<{ id: strin
         </AdminFormField>
 
         <AdminFormField label="Title">
-          <input className={adminInputClass} value={form0.title} onChange={(e) => setForm((c) => c ? { ...c, title: e.target.value } : c)} required />
+          <input className={adminInputClass} value={form0.title} onChange={(e) => setForm((c) => c ? { ...c, title: e.target.value } : c)} />
         </AdminFormField>
 
         <AdminFormField label="Sort order">
@@ -378,11 +378,11 @@ export default function EditBannerPage({ params }: { params: Promise<{ id: strin
         </AdminFormField>
 
         <AdminFormField label="Description">
-          <textarea className={adminTextareaClass} value={form0.description} onChange={(e) => setForm((c) => c ? { ...c, description: e.target.value } : c)} required />
+          <textarea className={adminTextareaClass} value={form0.description} onChange={(e) => setForm((c) => c ? { ...c, description: e.target.value } : c)} />
         </AdminFormField>
 
         <AdminFormField label="CTA label">
-          <input className={adminInputClass} value={form0.ctaLabel} onChange={(e) => setForm((c) => c ? { ...c, ctaLabel: e.target.value } : c)} required />
+          <input className={adminInputClass} value={form0.ctaLabel} onChange={(e) => setForm((c) => c ? { ...c, ctaLabel: e.target.value } : c)} />
         </AdminFormField>
         <AdminFormField label="CTA type">
           <select className={adminSelectClass} value={form0.ctaType} onChange={(e) => setForm((c) => c ? { ...c, ctaType: e.target.value as CtaType, ctaHref: e.target.value === "custom" ? c.ctaHref : "", ctaTitle: "", ctaMeta: "" } : c)}>
@@ -394,7 +394,7 @@ export default function EditBannerPage({ params }: { params: Promise<{ id: strin
 
         {form0.ctaType === "custom" ? (
           <AdminFormField label="CTA URL">
-            <input className={adminInputClass} value={form0.ctaHref} onChange={(e) => setForm((c) => c ? { ...c, ctaHref: e.target.value } : c)} required />
+            <input className={adminInputClass} value={form0.ctaHref} onChange={(e) => setForm((c) => c ? { ...c, ctaHref: e.target.value } : c)} />
           </AdminFormField>
         ) : (
           <AdminFormField label={`Search ${form0.ctaType}`}>

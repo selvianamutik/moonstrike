@@ -82,6 +82,7 @@ export function Frame18Sections({ benefits, steps }: { benefits: LandingBenefits
         })}
       </div>
 
+      {/* Rate Us section — temporarily hidden
       <div className="mt-20 text-center">
         <h2 className="font-display text-4xl font-black tracking-[-0.04em]">
           Rate <span className="section-accent">Us</span>
@@ -93,6 +94,7 @@ export function Frame18Sections({ benefits, steps }: { benefits: LandingBenefits
           <TrustpilotReviewCollector />
         </div>
       </div>
+      */}
 
       <div className="mt-16 flex flex-wrap items-center justify-center gap-10">
         {[

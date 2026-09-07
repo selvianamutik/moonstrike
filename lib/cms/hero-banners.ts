@@ -198,7 +198,7 @@ export function normalizeHeroBannerInput(value: unknown): HeroBannerInput {
     storagePath: typeof body.storagePath === "string" ? body.storagePath.trim() : "",
     thumbnailPath: typeof body.thumbnailPath === "string" ? body.thumbnailPath.trim() : "",
     badges,
-    ctaLabel: typeof body.ctaLabel === "string" && body.ctaLabel.trim() ? body.ctaLabel.trim() : "View Details",
+    ctaLabel: typeof body.ctaLabel === "string" ? body.ctaLabel.trim() : "",
     ctaType: ctaType === "game" || ctaType === "service" || ctaType === "custom" ? ctaType : "custom",
     ctaHref: typeof body.ctaHref === "string" && body.ctaHref.trim() ? body.ctaHref.trim() : "/games",
     ctaTitle: typeof body.ctaTitle === "string" ? body.ctaTitle.trim() : "",
@@ -212,7 +212,7 @@ export function normalizeHeroBannerInput(value: unknown): HeroBannerInput {
 
 export function heroBannerPayload(input: HeroBannerInput) {
   return {
-    slug: input.slug ?? slugify(input.title),
+    slug: input.slug || slugify(input.title) || `banner-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
     title: input.title,
     description: input.description,
     image: input.image,

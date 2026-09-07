@@ -143,7 +143,7 @@ export function HeroBannersManager({
                     </div>
                   )}
                   <div>
-                    <div className="font-medium text-white">{item.title}</div>
+                    <div className="font-medium text-white">{item.title || "Untitled banner"}</div>
                     <div className="mt-1 line-clamp-1 text-xs text-[#64748B]">{item.description}</div>
                     {item.kind === "hero_banner" && item.banner.badges.length > 0 ? (
                       <div className="mt-2 flex flex-wrap gap-1">

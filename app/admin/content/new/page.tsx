@@ -53,7 +53,7 @@ const emptyForm: FormState = {
   storagePath: "",
   thumbnailPath: "",
   badges: [],
-  ctaLabel: "View Details",
+  ctaLabel: "",
   ctaType: "custom",
   ctaHref: "/games",
   ctaTitle: "",
@@ -210,6 +210,12 @@ export default function NewContentPage() {
     let nextStoragePath = form.storagePath;
     let nextThumbnailPath = form.thumbnailPath;
 
+    if (!draftImageFile && !nextImage) {
+      setError("Banner image is required.");
+      setIsSaving(false);
+      return;
+    }
+
     try {
       if (draftImageFile) {
         const uploaded = await uploadImage(draftImageFile);
@@ -288,7 +294,7 @@ export default function NewContentPage() {
         {form.contentType === "hero_banner" ? (
           <>
             <AdminFormField label="Title">
-              <input className={adminInputClass} value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} required />
+              <input className={adminInputClass} value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} />
             </AdminFormField>
 
             <AdminFormField label="Sort order">
@@ -349,11 +355,11 @@ export default function NewContentPage() {
             </AdminFormField>
 
             <AdminFormField label="Description">
-              <textarea className={adminTextareaClass} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} required />
+              <textarea className={adminTextareaClass} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
             </AdminFormField>
 
             <AdminFormField label="CTA label">
-              <input className={adminInputClass} value={form.ctaLabel} onChange={(event) => setForm((current) => ({ ...current, ctaLabel: event.target.value }))} required />
+              <input className={adminInputClass} value={form.ctaLabel} onChange={(event) => setForm((current) => ({ ...current, ctaLabel: event.target.value }))} />
             </AdminFormField>
             <AdminFormField label="CTA type">
               <select className={adminSelectClass} value={form.ctaType} onChange={(event) => setForm((current) => ({ ...current, ctaType: event.target.value as CtaType, ctaHref: event.target.value === "custom" ? current.ctaHref : "", ctaTitle: "", ctaMeta: "" }))}>
@@ -365,7 +371,7 @@ export default function NewContentPage() {
 
             {form.ctaType === "custom" ? (
               <AdminFormField label="CTA URL" className="lg:col-span-2">
-                <input className={adminInputClass} value={form.ctaHref} onChange={(event) => setForm((current) => ({ ...current, ctaHref: event.target.value }))} required />
+                <input className={adminInputClass} value={form.ctaHref} onChange={(event) => setForm((current) => ({ ...current, ctaHref: event.target.value }))} />
               </AdminFormField>
             ) : (
               <AdminFormField label={`Search ${form.ctaType}`} className="lg:col-span-2">

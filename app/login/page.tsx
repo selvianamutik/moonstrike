@@ -670,7 +670,7 @@ function AuthCard() {
                 <label htmlFor="register-terms" className="text-sm leading-6 text-[var(--ms-body)] cursor-pointer">
                   I accept the{' '}
                   <a
-                    href="/terms"
+                    href="/p/terms-of-service"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[var(--ms-gradient-end)] hover:underline"

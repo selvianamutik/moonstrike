@@ -47,7 +47,14 @@ export function HeroCarousel({ heroes }: HeroCarouselProps) {
 
   const currentHero = heroes[currentIndex];
   const ctaClassName = "ms-button mt-6 h-11 px-6";
-  const cta = isExternalHref(currentHero.ctaHref) ? (
+
+  const hasBadges = Boolean(currentHero.badges?.length);
+  const hasHeadline = Boolean(currentHero.headline);
+  const hasSubtext = Boolean(currentHero.subtext);
+  const hasCta = Boolean(currentHero.ctaText && currentHero.ctaHref);
+  const hasOverlayContent = hasBadges || hasHeadline || hasSubtext || hasCta;
+
+  const cta = hasCta && (isExternalHref(currentHero.ctaHref) ? (
     <a href={currentHero.ctaHref} target="_blank" rel="noopener noreferrer" className={ctaClassName}>
       {currentHero.ctaText}
     </a>
@@ -55,7 +62,7 @@ export function HeroCarousel({ heroes }: HeroCarouselProps) {
     <Link href={currentHero.ctaHref} className={ctaClassName}>
       {currentHero.ctaText}
     </Link>
-  );
+  ));
 
   return (
     <div className="relative">
@@ -80,26 +87,30 @@ export function HeroCarousel({ heroes }: HeroCarouselProps) {
           ) : (
             <PlaceholderAsset alt="Hero banner" className="min-h-[450px]" priority imageClassName="p-20" isHidden={true} />
           )}
-          <div className="absolute inset-0" style={{ background: "var(--ms-hero-gradient)" }} />
+          {/* <div className="absolute inset-0" style={{ background: "var(--ms-hero-gradient)" }} /> */}
 
-          <div className="absolute bottom-16 left-24 z-20 max-w-xl pr-16">
-            <div className="flex max-w-lg flex-wrap gap-2">
-              {currentHero.badges?.length ? (
-                currentHero.badges.map((badge) => (
-                  <Badge key={badge} variant="featured">
-                    {badge}
-                  </Badge>
-                ))
-              ) : (
-                <Badge variant={currentHero.badgeVariant} />
-              )}
+          {hasOverlayContent ? (
+            <div className="absolute bottom-16 left-24 z-20 max-w-xl pr-16">
+              {hasBadges ? (
+                <div className="flex max-w-lg flex-wrap gap-2">
+                  {currentHero.badges?.map((badge) => (
+                    <Badge key={badge} variant="featured">
+                      {badge}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+              {hasHeadline ? (
+                <h1 className="font-display mt-5 text-4xl font-black tracking-[-0.04em] sm:text-6xl">
+                  {currentHero.headline}
+                </h1>
+              ) : null}
+              {hasSubtext ? (
+                <p className="mt-4 max-w-lg text-lg leading-8 text-[var(--ms-body)]">{currentHero.subtext}</p>
+              ) : null}
+              {hasCta ? cta : null}
             </div>
-            <h1 className="font-display mt-5 text-4xl font-black tracking-[-0.04em] sm:text-6xl">
-              {currentHero.headline}
-            </h1>
-            <p className="mt-4 max-w-lg text-lg leading-8 text-[var(--ms-body)]">{currentHero.subtext}</p>
-            {cta}
-          </div>
+          ) : null}
 
           {heroes.length > 1 ? (
             <>
@@ -147,29 +158,23 @@ export function HeroCarousel({ heroes }: HeroCarouselProps) {
             heroes
               .filter((_, index) => index !== currentIndex)
               .slice(0, 3)
-              .map((hero) => (
-                <div key={hero.headline} className="mt-5 flex gap-4">
+              .map((hero, previewIndex) => (
+                <div
+                  key={hero.storagePath || hero.imageUrl || previewIndex}
+                  className="mt-5 h-32 overflow-hidden rounded-lg border border-[var(--ms-border)]"
+                >
                   {hero.thumbnailUrl ? (
-                    <div className="relative h-12 w-20 flex-shrink-0 overflow-hidden rounded">
-                      <Image
-                        src={hero.thumbnailUrl}
-                        alt={`${hero.headline} preview`}
-                        fill
-                        sizes="80px"
-                        className="object-cover"
-                      />
-                    </div>
+                    <Image
+                      src={hero.thumbnailUrl}
+                      alt={`${hero.headline || "Hero banner"} preview`}
+                      width={640}
+                      height={256}
+                      sizes="280px"
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
-                    <PlaceholderAsset alt={`${hero.headline} preview`} className="h-12 w-20 rounded" imageClassName="p-3" isHidden={false} />
+                    <PlaceholderAsset alt={`${hero.headline || "Hero banner"} preview`} className="h-full w-full" imageClassName="p-8" isHidden={false} />
                   )}
-                  <p className="text-sm leading-4">
-                    {hero.badges?.length ? (
-                      <Badge variant="featured">{hero.badges[0]}</Badge>
-                    ) : (
-                      <Badge variant={hero.badgeVariant} />
-                    )}
-                    <span className="mt-2 block text-[var(--ms-body)]">{hero.headline}</span>
-                  </p>
                 </div>
               ))
           ) : (

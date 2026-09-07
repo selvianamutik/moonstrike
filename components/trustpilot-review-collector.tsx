@@ -43,9 +43,7 @@ export function TrustpilotReviewCollector() {
         data-style-width="100%"
         data-token="8bdcb767-9b54-44cc-8ff9-a34d1b6cd99d"
       >
-        <a href="https://www.trustpilot.com/review/pytagotech.com" target="_blank" rel="noopener noreferrer">
-          Trustpilot
-        </a>
+        <span>Trustpilot</span>
       </div>
     </>
   );

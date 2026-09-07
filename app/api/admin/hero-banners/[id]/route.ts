@@ -59,8 +59,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { id } = await params;
   const input = normalizeHeroBannerInput(await request.json().catch(() => null));
 
-  if (!input.title || !input.description || !input.image) {
-    return NextResponse.json({ error: "Title, description, and image are required." }, { status: 400 });
+  if (!input.image) {
+    return NextResponse.json({ error: "Banner image is required." }, { status: 400 });
   }
 
   if (input.status === "scheduled" && !input.startsAt) {
