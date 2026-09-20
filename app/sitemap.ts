@@ -16,9 +16,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/services',
     '/guide',
     '/blog',
-    '/login',
-    '/register',
-    '/cart',
   ]
 
   staticPages.forEach((path) => {

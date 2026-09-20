@@ -14,7 +14,7 @@ import { listActiveHotOffers, serviceRowToCatalogService } from "@/lib/cms/servi
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.moonstrike.pro';
 
 export const metadata: Metadata = {
-  title: "Moon Strike | Game Boosting Marketplace",
+  title: { absolute: "Moon Strike | Game Boosting Marketplace" },
   description:
     "Moon Strike helps gamers order boosting, coaching, and item services through a premium cosmic marketplace.",
   alternates: {

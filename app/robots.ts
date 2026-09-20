@@ -24,10 +24,6 @@ export default function robots(): MetadataRoute.Robots {
         allow: ['/'],
         disallow: '/private/',
       },
-      {
-        userAgent: ['Applebot', 'Bingbot'],
-        disallow: ['/'],
-      },
     ],
     sitemap: `${BASE_URL}/sitemap.xml`,
   }
