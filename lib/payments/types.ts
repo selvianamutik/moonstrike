@@ -17,6 +17,16 @@ export type PaymentCheckoutInput = {
   supabase: SupabaseClient;
   taxRate?: number;
   taxLabel?: string;
+  voucher?: {
+    code: string;
+    discountPercentage: number;
+    id?: string;
+  };
+  vouchers?: Array<{
+    id: string;
+    code: string;
+    discountPercentage: number;
+  }>;
 };
 
 export type PaymentCheckoutResult = {

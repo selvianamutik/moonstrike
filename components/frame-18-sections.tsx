@@ -2,11 +2,19 @@
 
 import Image from "next/image";
 import { ShieldCheck, Eye, CreditCard, Search, Settings, BarChart3, CheckCircle } from "lucide-react";
-import { PlaceholderAsset } from "@/components/asset-image";
 import { TrustpilotReviewCollector } from "@/components/trustpilot-review-collector";
-import type { LandingBenefitsData, LandingStepsData } from "@/lib/cms/landing";
+import { BenefitsCarousel } from "@/components/benefits-carousel";
+import type { LandingBenefitsData, LandingStepsData, BenefitsImage } from "@/lib/cms/landing";
 
 export function Frame18Sections({ benefits, steps }: { benefits: LandingBenefitsData; steps: LandingStepsData }) {
+  // Resolve slide list: prefer images[], fall back to legacy single imageUrl
+  const carouselImages: BenefitsImage[] =
+    benefits.images && benefits.images.length > 0
+      ? [...benefits.images].sort((a, b) => a.displayOrder - b.displayOrder)
+      : benefits.imageUrl
+        ? [{ imageUrl: benefits.imageUrl, thumbnailUrl: benefits.thumbnailUrl, storagePath: benefits.storagePath, thumbnailPath: benefits.thumbnailPath, displayOrder: 0 }]
+        : [];
+
   return (
     <section id="about" className="ms-shell mt-24 text-[var(--ms-heading)]">
       <h2 className="font-display text-center text-4xl font-black tracking-[-0.04em]">
@@ -14,19 +22,7 @@ export function Frame18Sections({ benefits, steps }: { benefits: LandingBenefits
         <span className="section-accent">{benefits.accent}</span>?
       </h2>
 
-      {benefits.imageUrl ? (
-        <div className="relative mx-auto mt-8 h-72 max-w-5xl overflow-hidden rounded-xl border border-[var(--ms-border)] bg-[var(--ms-bg-card)]">
-          <img src={benefits.imageUrl} alt={benefits.imageAlt} className="h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/35" />
-        </div>
-      ) : (
-        <PlaceholderAsset
-          isHidden={false}
-          alt={benefits.imageAlt}
-          className="mx-auto mt-8 h-72 max-w-5xl rounded-xl border border-[var(--ms-border)]"
-          priority
-        />
-      )}
+      <BenefitsCarousel images={carouselImages} alt={benefits.imageAlt} />
 
       <div className="mx-auto mt-6 grid max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
         {benefits.items.length > 0 ? (

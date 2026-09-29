@@ -26,6 +26,14 @@ export type LandingBenefitItem = {
   detail: string
 }
 
+export type BenefitsImage = {
+  imageUrl: string
+  thumbnailUrl: string
+  storagePath: string
+  thumbnailPath: string
+  displayOrder: number
+}
+
 export type LandingBenefitsData = {
   title: string
   accent: string
@@ -35,6 +43,7 @@ export type LandingBenefitsData = {
   thumbnailPath: string
   imageAlt: string
   items: LandingBenefitItem[]
+  images?: BenefitsImage[]
 }
 
 export type ContentBlockRow = {
@@ -121,6 +130,7 @@ export const DEFAULT_LANDING_BENEFITS: LandingBenefitsData = {
         'Payment flow stays separated from frontend UI and routes through supported providers.',
     },
   ],
+  images: [],
 }
 
 function stringValue(value: unknown, fallback: string) {
@@ -183,6 +193,20 @@ export function normalizeLandingHeroData(data: unknown): LandingHeroData {
   }
 }
 
+function normalizeBenefitsImages(value: unknown): BenefitsImage[] {
+  const rawImages = Array.isArray(value) ? value : []
+  return rawImages
+    .filter((img): img is Record<string, unknown> => img !== null && typeof img === 'object')
+    .map((img, index) => ({
+      imageUrl: stringValue(img.imageUrl, ''),
+      thumbnailUrl: stringValue(img.thumbnailUrl, ''),
+      storagePath: stringValue(img.storagePath, ''),
+      thumbnailPath: stringValue(img.thumbnailPath, ''),
+      displayOrder: typeof img.displayOrder === 'number' ? img.displayOrder : index,
+    }))
+    .filter((img) => img.imageUrl !== '')
+}
+
 export function normalizeLandingBenefitsData(data: unknown): LandingBenefitsData {
   const value = data && typeof data === 'object' ? data : {}
   const record = value as Record<string, unknown>
@@ -205,6 +229,7 @@ export function normalizeLandingBenefitsData(data: unknown): LandingBenefitsData
     ),
     imageAlt: stringValue(record.imageAlt, DEFAULT_LANDING_BENEFITS.imageAlt),
     items: normalizeBenefitItems(record.items),
+    images: normalizeBenefitsImages(record.images),
   }
 }
 

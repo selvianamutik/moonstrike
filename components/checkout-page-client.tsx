@@ -3,9 +3,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { VoucherInput } from "@/components/cart/voucher-input";
 import { OrderSummary } from "@/components/order-summary";
 import { CheckoutSkeleton } from "@/components/storefront-skeletons";
 import { useCurrency } from "@/hooks/useCurrency";
+import { calculateDiscount, calculateTotalDiscount } from "@/lib/vouchers/calculator";
+import type { AppliedVoucher } from "@/lib/vouchers/types";
 
 type CheckoutCartItem = {
   id: string;
@@ -41,11 +44,25 @@ export function CheckoutPageClient() {
   const [submittingProvider, setSubmittingProvider] = useState<"nowpayments" | "paypal" | null>(null);
   const [error, setError] = useState("");
   const [selectedPayment, setSelectedPayment] = useState<'paypal' | 'crypto'>('paypal');
+  const [vouchers, setVouchers] = useState<AppliedVoucher[]>([]);
 
   const handlePrimaryCheckout = () => {
     if (selectedPayment === 'paypal') handlePayPalCheckout();
     if (selectedPayment === 'crypto') handleCryptoCheckout();
   };
+
+  function handleVoucherApplied(nextVoucher: AppliedVoucher) {
+    setVouchers([nextVoucher]);
+  }
+
+  async function handleVoucherRemoved() {
+    try {
+      await fetch("/api/cart/voucher", { method: "DELETE" });
+    } catch {
+      // ignore
+    }
+    setVouchers([]);
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -68,6 +85,14 @@ export function CheckoutPageClient() {
 
         if (isMounted) {
           setItems(Array.isArray(cartPayload.items) ? cartPayload.items : []);
+          if (cartPayload.voucher) {
+            setVouchers([{
+              code: cartPayload.voucher.code,
+              discountPercentage: cartPayload.voucher.discountPercentage,
+            }]);
+          } else {
+            setVouchers([]);
+          }
           const settings = await settingsRes.json().catch(() => []);
           setPaymentSettings(Array.isArray(settings) ? settings : []);
         }
@@ -89,15 +114,20 @@ export function CheckoutPageClient() {
     () => items.reduce((sum, item) => sum + (currency === "EUR" ? item.priceEUR : item.priceUSD), 0),
     [currency, items],
   );
+  const voucherDiscount = useMemo(
+    () => calculateTotalDiscount(total, vouchers),
+    [total, vouchers],
+  );
+  const discountedTotal = Math.max(0, total - voucherDiscount);
   const taxInfo = useMemo(() => getTaxInfo(
     selectedPayment === "crypto" ? "nowpayments" : selectedPayment
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ), [selectedPayment, paymentSettings]);
   const taxAmount = useMemo(
-    () => taxInfo ? Number((total * taxInfo.rate).toFixed(2)) : 0,
-    [total, taxInfo],
+    () => taxInfo ? Number((discountedTotal * taxInfo.rate).toFixed(2)) : 0,
+    [discountedTotal, taxInfo],
   );
-  const grandTotal = useMemo(() => total + taxAmount, [total, taxAmount]);
+  const grandTotal = useMemo(() => discountedTotal + taxAmount, [discountedTotal, taxAmount]);
   const summaryItems = useMemo(
     () =>
       items.map((item) => ({
@@ -124,7 +154,7 @@ export function CheckoutPageClient() {
       const response = await fetch("/api/checkout/paypal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currency }),
+        body: JSON.stringify({ currency, voucherCodes: vouchers.map((v) => v.code) }),
       });
       const payload = await response.json().catch(() => ({}));
 
@@ -154,7 +184,7 @@ export function CheckoutPageClient() {
       const response = await fetch("/api/checkout/nowpayments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currency }),
+        body: JSON.stringify({ currency, voucherCodes: vouchers.map((v) => v.code) }),
       });
       const payload = await response.json().catch(() => ({}));
 
@@ -261,16 +291,27 @@ export function CheckoutPageClient() {
               </p>
             </div>
 
-            <div className="lg:sticky lg:top-10 self-start">
+            <div className="space-y-4 lg:sticky lg:top-10 self-start">
+              <VoucherInput
+                appliedVouchers={vouchers}
+                onVoucherApplied={handleVoucherApplied}
+                onVoucherRemoved={handleVoucherRemoved}
+              />
               <OrderSummary
                 items={summaryItems}
-                rows={taxInfo ? [
+                rows={[
                   { label: "Subtotal", value: formatMoney(total, currency) },
-                  { label: `${taxInfo.label} (${(taxInfo.rate * 100).toFixed(1)}%)`, value: formatMoney(taxAmount, currency) },
-                ] : []}
+                  ...(taxInfo ? [{ label: `${taxInfo.label} (${(taxInfo.rate * 100).toFixed(1)}%)`, value: formatMoney(taxAmount, currency) }] : []),
+                ]}
                 serviceName={`${items.length} configured services`}
                 serviceMeta={`Checkout priced in ${currency}`}
                 total={formatMoney(grandTotal, currency)}
+                vouchers={vouchers.map((v) => ({
+                  code: v.code,
+                  discountAmount: formatMoney(calculateDiscount(total, v.discountPercentage), currency),
+                  discountPercentage: v.discountPercentage,
+                }))}
+                onVoucherRemoved={handleVoucherRemoved}
               />
             </div>
           </div>

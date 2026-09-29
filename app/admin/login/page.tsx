@@ -28,7 +28,7 @@ function readLockout(): Date | null {
 export default function AdminLogin() {
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("admin@moonstrike.io");
+  const [email, setEmail] = useState("admin@moonstrike.pro");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
@@ -158,7 +158,7 @@ export default function AdminLogin() {
               autoComplete="email"
               disabled={!!lockedUntil}
               className="w-full bg-[#050816] border border-[#172554] text-white rounded-lg px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-[#8B5CF6] focus:border-[#8B5CF6] placeholder-[#475569] disabled:opacity-50 disabled:cursor-not-allowed"
-              placeholder="admin@moonstrike.io"
+              placeholder="admin@moonstrike.pro"
             />
           </div>
 

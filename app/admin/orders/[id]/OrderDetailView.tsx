@@ -223,10 +223,14 @@ export function OrderDetailView({ order: initialOrder }: { order: AdminOrderReco
                 ))}
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-3 gap-4 rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] p-4 text-sm">
+            <div className="mt-4 grid grid-cols-4 gap-4 rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] p-4 text-sm">
                 <div>
                   <p className="text-[#64748B] text-xs uppercase mb-1">Base Price</p>
                   <p className="text-white">{new Intl.NumberFormat("en-US", { style: "currency", currency: order.currency }).format(order.basePrice)}</p>
+                </div>
+                <div>
+                  <p className="text-[#64748B] text-xs uppercase mb-1">Voucher Discount</p>
+                  <p className="text-emerald-400 font-medium">-{new Intl.NumberFormat("en-US", { style: "currency", currency: order.currency }).format(order.voucherDiscount)}</p>
                 </div>
                 <div>
                   <p className="text-[#64748B] text-xs uppercase mb-1">Tax ({order.taxAmount > 0 ? (order.taxAmount / (order.basePrice || 1) * 100).toFixed(2) : 0}%)</p>

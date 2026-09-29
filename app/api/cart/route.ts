@@ -1,29 +1,35 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getCartService, getCurrentCartId, getPrivateOffer, getPrivateOfferGame, getServiceCategory, getServiceGame, type CartItemRow } from '@/lib/cart'
+import { getCartService, getCurrentCartId, getCurrentCartVoucher, getPrivateOffer, getPrivateOfferGame, getServiceCategory, getServiceGame, type CartItemRow } from '@/lib/cart'
 
 export async function GET() {
   const cartId = await getCurrentCartId()
 
   if (!cartId) {
-    return NextResponse.json({ items: [] })
+    return NextResponse.json({ items: [], voucher: null })
   }
 
   const supabase = createAdminClient()
-  const { data, error } = await supabase
-    .from('cart_items')
-    .select(
-      'id, cart_id, service_id, private_offer_id, selected_options, selected_options_snapshot, price_usd, price_eur, added_at, services(id, title, slug, image, description, base_price_usd, base_price_eur, options_schema, games(name, slug), service_categories(name, slug)), private_offers!left(id, title, slug, category, quantity, platform, additional_info, discount_percent, price_usd, games!inner(name, slug, image))',
-    )
-    .eq('cart_id', cartId)
-    .order('added_at', { ascending: false })
-    .returns<CartItemRow[]>()
+  const [cartItemsResult, voucher] = await Promise.all([
+    supabase
+      .from('cart_items')
+      .select(
+        'id, cart_id, service_id, private_offer_id, selected_options, selected_options_snapshot, price_usd, price_eur, added_at, services(id, title, slug, image, description, base_price_usd, base_price_eur, options_schema, games(name, slug), service_categories(name, slug)), private_offers!left(id, title, slug, category, quantity, platform, additional_info, discount_percent, price_usd, games!inner(name, slug, image))',
+      )
+      .eq('cart_id', cartId)
+      .order('added_at', { ascending: false })
+      .returns<CartItemRow[]>(),
+    getCurrentCartVoucher(cartId),
+  ])
+
+  const { data, error } = cartItemsResult
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
   return NextResponse.json({
+    voucher,
     items: (data ?? []).map((item) => {
       const service = getCartService(item)
       const game = getServiceGame(service)

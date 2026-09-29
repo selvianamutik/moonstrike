@@ -1,6 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
+import { Trash2 } from "lucide-react";
 import { PlaceholderAsset } from "@/components/asset-image";
+
+type VoucherDiscount = {
+  code: string
+  discountAmount: string
+  discountPercentage: number
+}
 
 type OrderSummaryProps = {
   ctaHref?: string;
@@ -19,10 +26,14 @@ type OrderSummaryProps = {
   serviceName: string;
   serviceMeta: string;
   total: string;
+  voucher?: VoucherDiscount | null;
+  vouchers?: VoucherDiscount[];
+  onVoucherRemoved?: (index: number) => void;
 };
 
-export function OrderSummary({ ctaHref, ctaLabel, items, rows, serviceName, serviceMeta, total }: OrderSummaryProps) {
+export function OrderSummary({ ctaHref, ctaLabel, items, rows, serviceName, serviceMeta, total, voucher, vouchers, onVoucherRemoved }: OrderSummaryProps) {
   const ctaClassName = "ms-button mt-8 flex h-14 w-full items-center justify-center rounded-md text-lg font-black";
+  const voucherList = vouchers && vouchers.length > 0 ? vouchers : (voucher ? [voucher] : []);
 
   return (
     <aside className="ms-card h-fit rounded-xl p-8 shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
@@ -57,6 +68,31 @@ export function OrderSummary({ ctaHref, ctaLabel, items, rows, serviceName, serv
           ))}
         </div>
       ) : null}
+      {voucherList.length > 0 && (
+        <div className="mt-4 flex flex-col gap-2">
+          {voucherList.map((v, index) => (
+            <div
+              key={`${v.code}-${index}`}
+              className="flex items-center justify-between rounded-lg border border-green-500/20 bg-green-500/5 px-3 py-2"
+            >
+              <div className="flex items-center gap-2 text-green-400">
+                <span className="text-sm font-medium">Discount ({v.code}: {v.discountPercentage}%)</span>
+                <span className="text-sm font-bold">-{v.discountAmount}</span>
+              </div>
+              {onVoucherRemoved ? (
+                <button
+                  type="button"
+                  onClick={() => onVoucherRemoved(index)}
+                  className="inline-flex items-center justify-center rounded-md border border-red-500/30 bg-red-500/10 p-1.5 text-red-400 transition-colors hover:bg-red-500/20"
+                  aria-label="Remove voucher"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
       <div className="mt-8 flex items-center justify-between border-t border-[var(--ms-border)] pt-7">
         <span className="font-bold">Total</span>
         <span className="text-4xl font-black text-[var(--ms-price)] drop-shadow-[0_0_12px_rgba(34,211,238,0.45)]">

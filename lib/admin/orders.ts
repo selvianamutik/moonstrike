@@ -38,6 +38,7 @@ type AdminOrderRow = {
   base_price: number | string | null;
   tax_amount: number | string | null;
   refund_amount: number | string | null;
+  voucher_discount: number | string | null;
   created_at: string;
   updated_at: string;
   order_items: AdminOrderItemRow[] | null;
@@ -84,6 +85,7 @@ export type AdminOrderRecord = {
   total: number;
   basePrice: number;
   taxAmount: number;
+  voucherDiscount: number;
   refundAmount: number;
   currency: "USD" | "EUR";
   status: AdminOrderStatus;
@@ -207,6 +209,7 @@ function mapOrder(row: AdminOrderRow, user: AdminCustomer | undefined, transacti
   const serviceName = items.length === 1 ? items[0].serviceName : `${items.length} services`;
   const gameName = items.length === 1 ? items[0].gameName : Array.from(new Set(items.map((item) => item.gameName))).join(", ");
   const optionsSummary = items.length === 1 ? items[0].optionsSummary : items.map((item) => `${item.serviceName}: ${item.optionsSummary}`).join(" / ");
+  const voucherDiscount = Number(row.voucher_discount) || 0;
 
   return {
     id: row.id,
@@ -225,6 +228,7 @@ function mapOrder(row: AdminOrderRow, user: AdminCustomer | undefined, transacti
     total,
     basePrice: Number(row.base_price ?? 0),
     taxAmount: Number(row.tax_amount ?? 0),
+    voucherDiscount,
     refundAmount: Number(row.refund_amount ?? 0),
     currency,
     status: row.status,
@@ -244,9 +248,9 @@ function mapOrder(row: AdminOrderRow, user: AdminCustomer | undefined, transacti
 }
 
 const orderSelectFull =
-  "id, order_ref, user_id, checkout_session_id, status, refund_previous_status, base_price, tax_amount, refund_amount, created_at, updated_at, order_items(id, service_id, selected_options_snapshot, total, currency, services(title, image, games(name), service_categories(name)))";
+  "id, order_ref, user_id, checkout_session_id, status, refund_previous_status, base_price, tax_amount, refund_amount, voucher_discount, created_at, updated_at, order_items(id, service_id, selected_options_snapshot, total, currency, services(title, image, games(name), service_categories(name)))";
 const orderSelectBase =
-  "id, order_ref, user_id, checkout_session_id, status, refund_previous_status, created_at, updated_at, order_items(id, service_id, selected_options_snapshot, total, currency, services(title, image, games(name), service_categories(name)))";
+  "id, order_ref, user_id, checkout_session_id, status, refund_previous_status, voucher_discount, created_at, updated_at, order_items(id, service_id, selected_options_snapshot, total, currency, services(title, image, games(name), service_categories(name)))";
 
 async function trySelectOrders(supabase: ReturnType<typeof createAdminClient>, select: string) {
   const { data, error } = await supabase

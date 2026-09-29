@@ -3,6 +3,7 @@ import { cartItemToCheckoutProduct } from "@/lib/checkout/product";
 import { snapshotFromCartItem } from "@/lib/checkout/snapshot";
 import { createNowPaymentsInvoice } from "@/lib/nowpayments";
 import { createPayPalOrder, refundPayPalCapture, isPayPalConfigured } from "@/lib/paypal";
+import { calculateDiscount } from "@/lib/vouchers/calculator";
 import type {
   PaymentCheckoutInput,
   PaymentCheckoutResult,
@@ -29,6 +30,26 @@ function checkoutTotal(input: PaymentCheckoutInput) {
   );
 }
 
+function checkoutVoucherDiscount(input: PaymentCheckoutInput) {
+  const voucher = input.voucher ?? input.vouchers?.[0];
+  if (!voucher) return 0;
+  return Math.min(checkoutTotal(input), calculateDiscount(checkoutTotal(input), voucher.discountPercentage));
+}
+
+function checkoutVoucherCodes(input: PaymentCheckoutInput) {
+  const voucher = input.voucher ?? input.vouchers?.[0];
+  return voucher?.code ?? null;
+}
+
+function checkoutVoucherIds(input: PaymentCheckoutInput) {
+  const voucher = input.voucher ?? input.vouchers?.[0];
+  return voucher?.id ? [voucher.id] : [];
+}
+
+function discountedCheckoutTotal(input: PaymentCheckoutInput) {
+  return Math.max(0, checkoutTotal(input) - checkoutVoucherDiscount(input));
+}
+
 function applyTax(amount: number, input: PaymentCheckoutInput) {
   if (!input.taxRate) return 0;
   return Number((amount * input.taxRate).toFixed(2));
@@ -37,10 +58,15 @@ function applyTax(amount: number, input: PaymentCheckoutInput) {
 
 async function createNowPaymentsCheckout(input: PaymentCheckoutInput): Promise<PaymentCheckoutResult> {
   const checkoutSessionId = `np_${randomUUID()}`;
-  const subtotal = checkoutTotal(input);
-  const taxAmount = applyTax(subtotal, input);
-  const total = subtotal + taxAmount;
+  const discountedSubtotal = discountedCheckoutTotal(input);
+  const taxAmount = applyTax(discountedSubtotal, input);
+  const total = discountedSubtotal + taxAmount;
   const serviceNames = input.snapshotItems.map((item) => item.product.name).join(", ");
+  const voucherCodes = checkoutVoucherCodes(input);
+  const voucherIds = checkoutVoucherIds(input);
+  const orderDescription = voucherCodes
+    ? `${serviceNames || "Moon Strike services"} - Vouchers: ${voucherCodes}`
+    : serviceNames || "Moon Strike services";
 
   const { error: snapshotError } = await input.supabase.from("checkout_sessions").upsert({
     id: checkoutSessionId,
@@ -50,6 +76,9 @@ async function createNowPaymentsCheckout(input: PaymentCheckoutInput): Promise<P
     provider: "nowpayments",
     status: "creating_invoice",
     items: input.snapshotItems,
+    voucher_code: voucherCodes,
+    voucher_discount: checkoutVoucherDiscount(input),
+    voucher_ids: voucherIds.length > 0 ? voucherIds.join(",") : null,
   });
 
   if (snapshotError) throw snapshotError;
@@ -61,7 +90,7 @@ async function createNowPaymentsCheckout(input: PaymentCheckoutInput): Promise<P
       priceAmount: total,
       priceCurrency: input.currency.toLowerCase() as "usd" | "eur",
       orderId: checkoutSessionId,
-      orderDescription: serviceNames || "Moon Strike services",
+      orderDescription,
       ipnCallbackUrl: `${input.origin}/api/v1/webhooks/nowpayments`,
       successUrl: `${input.origin}/order-confirmed?session=${checkoutSessionId}`,
       cancelUrl: `${input.origin}/checkout?canceled=1`,
@@ -92,6 +121,7 @@ async function createPayPalCheckout(input: PaymentCheckoutInput): Promise<Paymen
   }
 
   const checkoutSessionId = `pp_${randomUUID()}`;
+  const voucherIds = checkoutVoucherIds(input);
 
   const { error: snapshotError } = await input.supabase.from("checkout_sessions").upsert({
     id: checkoutSessionId,
@@ -101,6 +131,9 @@ async function createPayPalCheckout(input: PaymentCheckoutInput): Promise<Paymen
     provider: "paypal",
     status: "creating_order",
     items: input.snapshotItems,
+    voucher_code: checkoutVoucherCodes(input),
+    voucher_discount: checkoutVoucherDiscount(input),
+    voucher_ids: voucherIds.length > 0 ? voucherIds.join(",") : null,
   });
 
   if (snapshotError) throw snapshotError;
@@ -108,22 +141,22 @@ async function createPayPalCheckout(input: PaymentCheckoutInput): Promise<Paymen
   let order;
 
   try {
-    const itemTotal = input.snapshotItems.reduce(
-      (sum, item) => sum + (input.currency === "EUR" ? (item.priceEUR ?? 0) : (item.priceUSD ?? 0)),
-      0,
-    );
-    const taxAmount = applyTax(itemTotal, input);
+    const discountedSubtotal = discountedCheckoutTotal(input);
+    const taxAmount = applyTax(discountedSubtotal, input);
+    let remainingVoucherDiscount = checkoutVoucherDiscount(input);
     const paypalItems = input.snapshotItems.map((item) => {
       const price = input.currency === "EUR" ? item.priceEUR : item.priceUSD;
-      const priceValue = typeof price === 'number' && !isNaN(price) ? price : 0;
-      
+      const priceValue = typeof price === 'number' && !isNaN(price) ? Number(price.toFixed(2)) : 0;
+      const itemVoucherDiscount = Math.min(priceValue, remainingVoucherDiscount);
+      remainingVoucherDiscount = Math.max(0, remainingVoucherDiscount - itemVoucherDiscount);
+
       return {
         name: item.product.name,
         description: item.product.description || undefined,
         quantity: "1",
         unit_amount: {
           currency_code: input.currency,
-          value: priceValue.toFixed(2),
+          value: Math.max(0, priceValue - itemVoucherDiscount).toFixed(2),
         },
       };
     });
@@ -149,6 +182,7 @@ async function createPayPalCheckout(input: PaymentCheckoutInput): Promise<Paymen
         checkoutSessionId,
         cartId: input.cartId,
         userId: input.user.id,
+        ...(checkoutVoucherCodes(input) ? { voucherCode: checkoutVoucherCodes(input) as string } : {}),
       },
     });
   } catch (error) {

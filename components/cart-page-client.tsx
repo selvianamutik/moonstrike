@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PlaceholderAsset } from "@/components/asset-image";
+import { VoucherInput } from "@/components/cart/voucher-input";
 import { OrderSummary } from "@/components/order-summary";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { CartListSkeleton } from "@/components/storefront-skeletons";
 import { useCurrency } from "@/hooks/useCurrency";
 import { notifyCartUpdated, subscribeToCartUpdates } from "@/lib/cart-events";
+import { calculateDiscount, calculateTotalDiscount } from "@/lib/vouchers/calculator";
+import type { AppliedVoucher } from "@/lib/vouchers/types";
 
 type CartApiItem = {
   id: string;
@@ -53,6 +56,20 @@ export function CartPageClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [removingId, setRemovingId] = useState("");
+  const [vouchers, setVouchers] = useState<AppliedVoucher[]>([]);
+
+  function handleVoucherApplied(nextVoucher: AppliedVoucher) {
+    setVouchers([nextVoucher]);
+  }
+
+  async function handleVoucherRemoved() {
+    try {
+      await fetch("/api/cart/voucher", { method: "DELETE" });
+    } catch {
+      // ignore
+    }
+    setVouchers([]);
+  }
 
   async function loadCart({ showLoading = true }: { showLoading?: boolean } = {}) {
     if (showLoading) setIsLoading(true);
@@ -68,6 +85,14 @@ export function CartPageClient() {
       }
 
       setItems(Array.isArray(payload.items) ? payload.items : []);
+      if (payload.voucher) {
+        setVouchers([{
+          code: payload.voucher.code,
+          discountPercentage: payload.voucher.discountPercentage,
+        }]);
+      } else {
+        setVouchers([]);
+      }
     } catch {
       setError("Unable to reach the cart service.");
     } finally {
@@ -120,6 +145,11 @@ export function CartPageClient() {
     () => items.reduce((total, item) => total + (currency === "EUR" ? item.priceEUR : item.priceUSD), 0),
     [currency, items],
   );
+  const voucherDiscount = useMemo(
+    () => calculateTotalDiscount(subtotal, vouchers),
+    [subtotal, vouchers],
+  );
+  const discountedSubtotal = Math.max(0, subtotal - voucherDiscount);
   const summaryItems = useMemo(
     () =>
       items.map((item) => ({
@@ -221,15 +251,30 @@ export function CartPageClient() {
           )}
         </div>
 
-        <OrderSummary
-          ctaHref={items.length > 0 ? "/checkout" : undefined}
-          ctaLabel={items.length > 0 ? "Proceed to Checkout" : undefined}
-          items={summaryItems}
-          rows={[]}
-          serviceName={`${items.length} configured services`}
-          serviceMeta={`Cart priced in ${currency}`}
-          total={formatMoney(subtotal, currency)}
-        />
+        <div className="space-y-4">
+          {items.length > 0 ? (
+            <VoucherInput
+              appliedVouchers={vouchers}
+              onVoucherApplied={handleVoucherApplied}
+              onVoucherRemoved={handleVoucherRemoved}
+            />
+          ) : null}
+          <OrderSummary
+            ctaHref={items.length > 0 ? "/checkout" : undefined}
+            ctaLabel={items.length > 0 ? "Proceed to Checkout" : undefined}
+            items={summaryItems}
+            rows={[{ label: "Subtotal", value: formatMoney(subtotal, currency) }]}
+            serviceName={`${items.length} configured services`}
+            serviceMeta={`Cart priced in ${currency}`}
+            total={formatMoney(discountedSubtotal, currency)}
+            vouchers={vouchers.map((v) => ({
+              code: v.code,
+              discountAmount: formatMoney(calculateDiscount(subtotal, v.discountPercentage), currency),
+              discountPercentage: v.discountPercentage,
+            }))}
+            onVoucherRemoved={handleVoucherRemoved}
+          />
+        </div>
       </section>
       <SiteFooter />
     </main>

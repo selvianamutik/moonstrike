@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { CalendarDays, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminButton } from "@/components/admin/AdminButton";
@@ -11,9 +11,9 @@ import {
   normalizeLandingBenefitsData,
   normalizeLandingHeroData,
   normalizeLandingStepsData,
+  type BenefitsImage,
   type ContentBlockRow,
   type LandingBenefitItem,
-  type LandingStepsData,
 } from "@/lib/cms/landing";
 
 type LocalStepItem = { title: string; description: string };
@@ -24,6 +24,15 @@ type UploadedImage = {
   storagePath: string;
   thumbnailPath: string;
 };
+
+/** A single benefits slide entry during editing.
+ *  `draft` holds a locally selected file not yet uploaded. */
+type BenefitsSlide = BenefitsImage & {
+  draft?: { file: File; previewUrl: string };
+};
+
+const MAX_BENEFITS_SLIDES = 8;
+
 
 function toLocalParts(value: string | null) {
   if (!value) return "";
@@ -120,12 +129,29 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
   const [heroThumbnailPath, setHeroThumbnailPath] = useState(hero.thumbnailPath);
   const [benefitsTitle, setBenefitsTitle] = useState(benefits.title);
   const [benefitsAccent, setBenefitsAccent] = useState(benefits.accent);
-  const [imageUrl, setImageUrl] = useState(benefits.imageUrl);
-  const [thumbnailUrl, setThumbnailUrl] = useState(benefits.thumbnailUrl);
-  const [storagePath, setStoragePath] = useState(benefits.storagePath);
-  const [thumbnailPath, setThumbnailPath] = useState(benefits.thumbnailPath);
   const [imageAlt, setImageAlt] = useState(benefits.imageAlt);
   const [benefitItems, setBenefitItems] = useState<LandingBenefitItem[]>(benefits.items);
+
+  // Initialize slides from images[], falling back to legacy single imageUrl
+  const [benefitsSlides, setBenefitsSlides] = useState<BenefitsSlide[]>(() => {
+    const imgs = benefits.images ?? [];
+    if (imgs.length > 0) {
+      return [...imgs]
+        .sort((a, b) => a.displayOrder - b.displayOrder)
+        .map((img, i) => ({ ...img, displayOrder: i }));
+    }
+    if (benefits.imageUrl) {
+      return [{
+        imageUrl: benefits.imageUrl,
+        thumbnailUrl: benefits.thumbnailUrl,
+        storagePath: benefits.storagePath,
+        thumbnailPath: benefits.thumbnailPath,
+        displayOrder: 0,
+      }];
+    }
+    return [];
+  });
+
   const [stepsTitle, setStepsTitle] = useState(steps.title);
   const [stepsAccent, setStepsAccent] = useState(steps.accent);
   const [stepsSubtitle, setStepsSubtitle] = useState(steps.subtitle);
@@ -137,7 +163,6 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [draftHeroImage, setDraftHeroImage] = useState<{ file: File; previewUrl: string } | null>(null);
-  const [draftBenefitsImage, setDraftBenefitsImage] = useState<{ file: File; previewUrl: string } | null>(null);
   const scheduledDateInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -146,11 +171,17 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
     };
   }, [draftHeroImage]);
 
+  // Revoke any draft preview URLs on unmount to avoid memory leaks
   useEffect(() => {
     return () => {
-      if (draftBenefitsImage?.previewUrl) URL.revokeObjectURL(draftBenefitsImage.previewUrl);
+      for (const slide of benefitsSlides) {
+        if (slide.draft?.previewUrl) URL.revokeObjectURL(slide.draft.previewUrl);
+      }
     };
-  }, [draftBenefitsImage]);
+    // Run once on unmount only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   function updateBenefit(index: number, field: keyof LandingBenefitItem, value: string) {
     setBenefitItems((current) =>
@@ -187,17 +218,57 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
     setStepItems((current) => current.filter((_, i) => i !== index));
   }
 
-  function selectImage(file: File, usage: "hero" | "benefits") {
+  function selectHeroImage(file: File) {
     setError("");
     const previewUrl = URL.createObjectURL(file);
+    if (draftHeroImage?.previewUrl) URL.revokeObjectURL(draftHeroImage.previewUrl);
+    setDraftHeroImage({ file, previewUrl });
+  }
 
-    if (usage === "hero") {
-      if (draftHeroImage?.previewUrl) URL.revokeObjectURL(draftHeroImage.previewUrl);
-      setDraftHeroImage({ file, previewUrl });
-    } else {
-      if (draftBenefitsImage?.previewUrl) URL.revokeObjectURL(draftBenefitsImage.previewUrl);
-      setDraftBenefitsImage({ file, previewUrl });
-    }
+  /** Stage a file for the slide at `index`. Does NOT upload yet. */
+  function selectSlideFile(index: number, file: File) {
+    setError("");
+    setBenefitsSlides((current) =>
+      current.map((slide, i) => {
+        if (i !== index) return slide;
+        if (slide.draft?.previewUrl) URL.revokeObjectURL(slide.draft.previewUrl);
+        return { ...slide, draft: { file, previewUrl: URL.createObjectURL(file) } };
+      })
+    );
+  }
+
+  function addSlide() {
+    if (benefitsSlides.length >= MAX_BENEFITS_SLIDES) return;
+    setBenefitsSlides((current) => [
+      ...current,
+      {
+        imageUrl: "",
+        thumbnailUrl: "",
+        storagePath: "",
+        thumbnailPath: "",
+        displayOrder: current.length,
+      },
+    ]);
+  }
+
+  function removeSlide(index: number) {
+    setBenefitsSlides((current) => {
+      const removed = current[index];
+      if (removed?.draft?.previewUrl) URL.revokeObjectURL(removed.draft.previewUrl);
+      return current
+        .filter((_, i) => i !== index)
+        .map((slide, i) => ({ ...slide, displayOrder: i }));
+    });
+  }
+
+  function moveSlide(index: number, direction: -1 | 1) {
+    setBenefitsSlides((current) => {
+      const next = [...current];
+      const swapIndex = index + direction;
+      if (swapIndex < 0 || swapIndex >= next.length) return current;
+      [next[index], next[swapIndex]] = [next[swapIndex]!, next[index]!];
+      return next.map((slide, i) => ({ ...slide, displayOrder: i }));
+    });
   }
 
   function openDatePicker(input: HTMLInputElement | null) {
@@ -209,7 +280,7 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
     input.focus();
   }
 
-  async function uploadImage(file: File, usage: "hero" | "benefits") {
+  async function uploadImageFile(file: File, usage: string): Promise<UploadedImage> {
     setIsUploading(true);
 
     try {
@@ -251,14 +322,10 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
     let nextHeroThumbnailUrl = heroThumbnailUrl;
     let nextHeroStoragePath = heroStoragePath;
     let nextHeroThumbnailPath = heroThumbnailPath;
-    let nextBenefitsImageUrl = imageUrl;
-    let nextBenefitsThumbnailUrl = thumbnailUrl;
-    let nextBenefitsStoragePath = storagePath;
-    let nextBenefitsThumbnailPath = thumbnailPath;
 
     try {
       if (isHero && draftHeroImage) {
-        const uploadedHero = await uploadImage(draftHeroImage.file, "hero");
+        const uploadedHero = await uploadImageFile(draftHeroImage.file, "hero");
         nextHeroImageUrl = uploadedHero.imageUrl;
         nextHeroThumbnailUrl = uploadedHero.thumbnailUrl;
         nextHeroStoragePath = uploadedHero.storagePath;
@@ -266,13 +333,26 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
         uploadedPaths.push(uploadedHero.storagePath, uploadedHero.thumbnailPath);
       }
 
-      if (!isHero && !isSteps && draftBenefitsImage) {
-        const uploadedBenefits = await uploadImage(draftBenefitsImage.file, "benefits");
-        nextBenefitsImageUrl = uploadedBenefits.imageUrl;
-        nextBenefitsThumbnailUrl = uploadedBenefits.thumbnailUrl;
-        nextBenefitsStoragePath = uploadedBenefits.storagePath;
-        nextBenefitsThumbnailPath = uploadedBenefits.thumbnailPath;
-        uploadedPaths.push(uploadedBenefits.storagePath, uploadedBenefits.thumbnailPath);
+      // Upload any pending draft files for benefits slides
+      let nextSlides = benefitsSlides;
+      if (!isHero && !isSteps) {
+        const resolvedSlides: BenefitsSlide[] = [];
+        for (const slide of benefitsSlides) {
+          if (slide.draft?.file) {
+            const uploaded = await uploadImageFile(slide.draft.file, "benefits");
+            uploadedPaths.push(uploaded.storagePath, uploaded.thumbnailPath);
+            resolvedSlides.push({
+              imageUrl: uploaded.imageUrl,
+              thumbnailUrl: uploaded.thumbnailUrl,
+              storagePath: uploaded.storagePath,
+              thumbnailPath: uploaded.thumbnailPath,
+              displayOrder: slide.displayOrder,
+            });
+          } else {
+            resolvedSlides.push(slide);
+          }
+        }
+        nextSlides = resolvedSlides;
       }
 
       const data = isHero
@@ -298,12 +378,23 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
           : {
               title: benefitsTitle,
               accent: benefitsAccent,
-              imageUrl: nextBenefitsImageUrl,
-              thumbnailUrl: nextBenefitsThumbnailUrl,
-              storagePath: nextBenefitsStoragePath,
-              thumbnailPath: nextBenefitsThumbnailPath,
               imageAlt,
               items: benefitItems,
+              // Write new images[] format; keep legacy fields empty so normalizer
+              // always prefers images[] going forward
+              imageUrl: "",
+              thumbnailUrl: "",
+              storagePath: "",
+              thumbnailPath: "",
+              images: nextSlides
+                .filter((s) => s.imageUrl)
+                .map(({ imageUrl, thumbnailUrl, storagePath, thumbnailPath, displayOrder }) => ({
+                  imageUrl,
+                  thumbnailUrl,
+                  storagePath,
+                  thumbnailPath,
+                  displayOrder,
+                })),
             };
 
       const response = await fetch(`/api/admin/content/${content.id}`, {
@@ -329,14 +420,10 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
       setHeroThumbnailUrl(nextHeroThumbnailUrl);
       setHeroStoragePath(nextHeroStoragePath);
       setHeroThumbnailPath(nextHeroThumbnailPath);
-      setImageUrl(nextBenefitsImageUrl);
-      setThumbnailUrl(nextBenefitsThumbnailUrl);
-      setStoragePath(nextBenefitsStoragePath);
-      setThumbnailPath(nextBenefitsThumbnailPath);
+      // Clear draft state from slides after successful save
+      setBenefitsSlides(nextSlides.map((s) => ({ ...s, draft: undefined })));
       if (draftHeroImage?.previewUrl) URL.revokeObjectURL(draftHeroImage.previewUrl);
-      if (draftBenefitsImage?.previewUrl) URL.revokeObjectURL(draftBenefitsImage.previewUrl);
       setDraftHeroImage(null);
-      setDraftBenefitsImage(null);
       router.push("/admin/content");
       router.refresh();
     } catch (saveError) {
@@ -346,6 +433,7 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
       setIsSaving(false);
     }
   }
+
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-6">
@@ -399,7 +487,7 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
                   className={adminInputClass}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) selectImage(file, "hero");
+                    if (file) selectHeroImage(file);
                     e.target.value = "";
                   }}
                 />
@@ -422,26 +510,84 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
             <AdminFormField label="Image alt text">
               <input className={adminInputClass} value={imageAlt} onChange={(e) => setImageAlt(e.target.value)} required />
             </AdminFormField>
-            <AdminFormField label="Section image">
-              <div className="space-y-3">
-                {(draftBenefitsImage?.previewUrl || thumbnailUrl) && (
-                  <img src={draftBenefitsImage?.previewUrl || thumbnailUrl} alt="" className="h-28 w-full rounded-lg object-cover" />
-                )}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className={adminInputClass}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) selectImage(file, "benefits");
-                    e.target.value = "";
-                  }}
-                />
-                <p className="text-xs text-[var(--ms-text-secondary)]">
-                  Recommended: 1200 x 600 px or wider. Uploads are compressed and a thumbnail is generated automatically.
-                </p>
-              </div>
-            </AdminFormField>
+
+            {/* Carousel slide manager */}
+            <div className="space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-[var(--ms-text-secondary)]">
+                Carousel Slides ({benefitsSlides.length}/{MAX_BENEFITS_SLIDES})
+              </p>
+              <p className="text-xs text-[var(--ms-text-secondary)]">
+                Each slide becomes one frame in the Why Choose Us carousel. Reorder with the arrows. Images are uploaded on Save.
+              </p>
+              {benefitsSlides.map((slide, index) => {
+                const preview = slide.draft?.previewUrl || slide.thumbnailUrl || slide.imageUrl;
+                return (
+                  <div key={index} className="rounded-lg border border-[var(--ms-accent)] bg-[var(--ms-primary)] p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-bold uppercase tracking-wide text-[var(--ms-text-secondary)]">
+                        Slide {index + 1}
+                        {slide.draft ? " · pending upload" : slide.imageUrl ? " · saved" : " · no image"}
+                      </p>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => moveSlide(index, -1)}
+                          disabled={index === 0}
+                          className="p-1 text-[var(--ms-text-secondary)] hover:text-white disabled:opacity-30 transition-colors"
+                          aria-label={`Move slide ${index + 1} up`}
+                        >
+                          <ChevronUp size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveSlide(index, 1)}
+                          disabled={index === benefitsSlides.length - 1}
+                          className="p-1 text-[var(--ms-text-secondary)] hover:text-white disabled:opacity-30 transition-colors"
+                          aria-label={`Move slide ${index + 1} down`}
+                        >
+                          <ChevronDown size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeSlide(index)}
+                          className="p-1 text-red-400 hover:text-red-300 transition-colors"
+                          aria-label={`Remove slide ${index + 1}`}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    {preview && (
+                      <img src={preview} alt="" className="h-24 w-full rounded-md object-cover" />
+                    )}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className={adminInputClass}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) selectSlideFile(index, file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </div>
+                );
+              })}
+              {benefitsSlides.length < MAX_BENEFITS_SLIDES && (
+                <button
+                  type="button"
+                  onClick={addSlide}
+                  className="flex items-center gap-2 rounded-lg border border-dashed border-[var(--ms-accent)] px-4 py-3 text-sm text-[var(--ms-text-secondary)] hover:border-[var(--ms-gradient-start)] hover:text-white transition-colors w-full"
+                >
+                  <Plus size={16} />
+                  Add Slide
+                </button>
+              )}
+              <p className="text-xs text-[var(--ms-text-secondary)]">
+                Recommended: 1200 × 600 px or wider. Uploads are compressed and a thumbnail is generated automatically.
+              </p>
+            </div>
+
             {benefitItems.map((item, index) => (
               <div key={index} className="rounded-lg border border-[var(--ms-accent)] p-4 space-y-3">
                 <div className="flex items-center justify-between">
@@ -539,7 +685,9 @@ export function ContentEditForm({ content }: { content: ContentBlockRow }) {
             variant="secondary"
             onClick={() => {
               if (draftHeroImage?.previewUrl) URL.revokeObjectURL(draftHeroImage.previewUrl);
-              if (draftBenefitsImage?.previewUrl) URL.revokeObjectURL(draftBenefitsImage.previewUrl);
+              for (const slide of benefitsSlides) {
+                if (slide.draft?.previewUrl) URL.revokeObjectURL(slide.draft.previewUrl);
+              }
               router.push("/admin/content");
             }}
           >

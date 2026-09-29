@@ -19,6 +19,7 @@ export async function GET() {
       'orders',
       'transactions',
       'content',
+      'vouchers',
       'pages',
       'messages',
       'logs',

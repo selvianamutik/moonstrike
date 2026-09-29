@@ -4,6 +4,7 @@ import { enqueueGoogleSheetsSync } from "@/lib/admin/google-sheets-sync";
 import { notifyOrderCreated, notifyOrderPaymentConfirmed } from "@/lib/notifications";
 import { createOrderReference, createTransactionReference } from "@/lib/order-ref";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { redeemVoucher } from "@/lib/vouchers/service";
 
 export type NowPaymentsIpnPayload = {
   payment_id?: string | number;
@@ -65,7 +66,7 @@ export async function fulfillNowPaymentsCheckout(payload: NowPaymentsIpnPayload)
 
   const { data: checkoutSession, error: checkoutError } = await supabase
     .from("checkout_sessions")
-    .select("id, cart_id, user_id, currency, items, created_at")
+    .select("id, cart_id, user_id, currency, items, created_at, voucher_discount, voucher_ids")
     .eq("id", checkoutSessionId)
     .eq("provider", "nowpayments")
     .maybeSingle<{
@@ -75,6 +76,8 @@ export async function fulfillNowPaymentsCheckout(payload: NowPaymentsIpnPayload)
       currency: "USD" | "EUR";
       items: unknown;
       created_at: string;
+      voucher_discount: number | string | null;
+      voucher_ids: string | null;
     }>();
 
   if (checkoutError) throw checkoutError;
@@ -92,7 +95,9 @@ export async function fulfillNowPaymentsCheckout(payload: NowPaymentsIpnPayload)
   const currency = checkoutSession.currency;
   const referenceDate = new Date(checkoutSession.created_at);
   const orderRef = createOrderReference(referenceDate, checkoutSession.id);
-  const basePrice = checkoutSession.items.reduce((total, item) => total + (currency === "EUR" ? item.priceEUR : item.priceUSD), 0);
+  const itemSubtotal = checkoutSession.items.reduce((total, item) => total + (currency === "EUR" ? item.priceEUR : item.priceUSD), 0);
+  const voucherDiscount = Number(checkoutSession.voucher_discount ?? 0);
+  const basePrice = Math.max(0, itemSubtotal - voucherDiscount);
   const taxRate = await getPaymentTaxRate("nowpayments");
   const taxAmount = calculateTaxAmount(basePrice, taxRate);
   const orderTotal = basePrice + taxAmount;
@@ -128,15 +133,23 @@ export async function fulfillNowPaymentsCheckout(payload: NowPaymentsIpnPayload)
         status: "pending",
         base_price: basePrice,
         tax_amount: taxAmount,
+        voucher_discount: voucherDiscount,
       },
-      {
-        onConflict: "checkout_session_id",
-      },
+      { onConflict: "checkout_session_id" },
     )
     .select("id")
     .single<{ id: string }>();
 
   if (orderError) throw orderError;
+
+  // Record single-use voucher redemptions now that payment is confirmed.
+  const appliedVoucherIds = (checkoutSession.voucher_ids ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  for (const voucherId of appliedVoucherIds) {
+    await redeemVoucher(voucherId, checkoutSession.user_id, checkoutSession.id);
+  }
 
   const orderItemRows = checkoutSession.items.map((item: CheckoutSnapshotItem) => ({
     order_id: order.id,

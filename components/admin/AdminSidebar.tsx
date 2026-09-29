@@ -18,6 +18,7 @@ import {
   Sparkles,
   Shield,
   FlaskConical,
+  TicketPercent,
 } from "lucide-react";
 
 const navItems = [
@@ -29,7 +30,8 @@ const navItems = [
   { name: "Orders", href: "/admin/orders", icon: ShoppingBag, superAdminOnly: false },
   { name: "Transactions", href: "/admin/transactions", icon: ReceiptText, superAdminOnly: true },
   { name: "Test Payment", href: "/admin/test-payment", icon: FlaskConical, superAdminOnly: true },
-  { name: "Content", href: "/admin/content", icon: Layers, superAdminOnly: false },
+  // { name: "Content", href: "/admin/content", icon: Layers, superAdminOnly: false },
+  { name: "Vouchers", href: "/admin/vouchers", icon: TicketPercent, superAdminOnly: false },
   { name: "Pages", href: "/admin/pages", icon: FileText, superAdminOnly: false },
   { name: "Messages", href: "/admin/messages", icon: MessageSquare, superAdminOnly: false },
   { name: "Logs", href: "/admin/logs", icon: History, superAdminOnly: false },
@@ -105,8 +107,8 @@ export function AdminSidebar() {
     else if (item.href.startsWith("/admin/private-offers")) key = "services";
     else if (item.href.startsWith("/admin/orders")) key = "orders";
     else if (item.href.startsWith("/admin/transactions")) key = "transactions";
-    else if (item.href.startsWith("/admin/test-payment")) key = "transactions";
     else if (item.href.startsWith("/admin/content")) key = "content";
+    else if (item.href.startsWith("/admin/voucher")) key = "vouchers";
     else if (item.href.startsWith("/admin/pages")) key = "pages";
     else if (item.href.startsWith("/admin/messages")) key = "messages";
     else if (item.href.startsWith("/admin/logs")) key = "logs";

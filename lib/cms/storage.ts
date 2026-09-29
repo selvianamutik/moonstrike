@@ -11,17 +11,51 @@ export function getChangedStoragePaths(
     oldData && typeof oldData === 'object' ? oldData as Record<string, unknown> : {}
   const newRecord =
     newData && typeof newData === 'object' ? newData as Record<string, unknown> : {}
-  const oldPaths = [oldRecord.storagePath, oldRecord.thumbnailPath].filter(
-    (value): value is string => typeof value === 'string' && value.length > 0
-  )
-  const newPaths = new Set(
-    [newRecord.storagePath, newRecord.thumbnailPath].filter(
-      (value): value is string => typeof value === 'string' && value.length > 0
-    )
-  )
 
+  // Collect all paths currently referenced by the new data
+  const newPaths = new Set<string>()
+
+  // Single-image fields (legacy / hero)
+  for (const field of ['storagePath', 'thumbnailPath']) {
+    const v = newRecord[field]
+    if (typeof v === 'string' && v.length > 0) newPaths.add(v)
+  }
+
+  // images[] array (benefits_section carousel)
+  if (Array.isArray(newRecord.images)) {
+    for (const img of newRecord.images as Record<string, unknown>[]) {
+      if (img && typeof img === 'object') {
+        for (const field of ['storagePath', 'thumbnailPath']) {
+          const v = img[field]
+          if (typeof v === 'string' && v.length > 0) newPaths.add(v)
+        }
+      }
+    }
+  }
+
+  // Collect all paths previously held by the old data
+  const oldPaths: string[] = []
+
+  for (const field of ['storagePath', 'thumbnailPath']) {
+    const v = oldRecord[field]
+    if (typeof v === 'string' && v.length > 0) oldPaths.push(v)
+  }
+
+  if (Array.isArray(oldRecord.images)) {
+    for (const img of oldRecord.images as Record<string, unknown>[]) {
+      if (img && typeof img === 'object') {
+        for (const field of ['storagePath', 'thumbnailPath']) {
+          const v = img[field]
+          if (typeof v === 'string' && v.length > 0) oldPaths.push(v)
+        }
+      }
+    }
+  }
+
+  // Return old paths that are no longer referenced in the new data
   return oldPaths.filter((path) => !newPaths.has(path))
 }
+
 
 /**
  * Extracts the storage key/path from a public URL.

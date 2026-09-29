@@ -40,6 +40,7 @@ export function SiteFooter() {
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
   const [phone, setPhone] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
+  const [discord, setDiscord] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/public/pages?category=page", { cache: "no-store" })
@@ -51,11 +52,13 @@ export function SiteFooter() {
       .then((r) => r.json())
       .then((data) => {
         const links = Array.isArray(data) ? data : [];
-        setSocialLinks(links.filter((link: SocialLink) => link.platform !== "phone" && link.platform !== "email"));
+        setSocialLinks(links.filter((link: SocialLink) => link.platform !== "phone" && link.platform !== "email" && link.platform !== "discord"));
         const phoneEntry = links.find((link: SocialLink) => link.platform === "phone");
         const emailEntry = links.find((link: SocialLink) => link.platform === "email");
+        const discordEntry = links.find((link: SocialLink) => link.platform === "discord");
         setPhone(phoneEntry?.url || null);
         setEmail(emailEntry?.url || null);
+        setDiscord(discordEntry?.url || null);
       })
       .catch(() => {});
   }, []);
@@ -144,6 +147,19 @@ export function SiteFooter() {
                       <FontAwesomeIcon icon={faEnvelope} className="h-4 w-4" />
                       <a href={`mailto:${email}`} className="hover:text-[var(--ms-gradient-end)] transition-colors">
                         {email}
+                      </a>
+                    </p>
+                  )}
+                  {discord && (
+                    <p className="flex items-center gap-2">
+                      <FontAwesomeIcon icon={faDiscord} className="h-4 w-4" />
+                      <a
+                        href={discord}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-[var(--ms-gradient-end)] transition-colors"
+                      >
+                        moonstrike.pro
                       </a>
                     </p>
                   )}

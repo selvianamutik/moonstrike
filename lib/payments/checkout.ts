@@ -1,8 +1,9 @@
 import { getCurrentUser } from "@/lib/auth/session";
-import { getCurrentCartId, getPrivateOffer, getPrivateOfferGame, type CartItemRow } from "@/lib/cart";
+import { getCurrentCartId, getCurrentCartVoucher, getPrivateOffer, getPrivateOfferGame, type CartItemRow } from "@/lib/cart";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkoutSnapshotItems, getPaymentProvider } from "@/lib/payments/providers";
 import type { CheckoutCurrency, PaymentProviderId } from "@/lib/payments/types";
+import { validateVoucherCode, VoucherServiceError } from "@/lib/vouchers/service";
 
 export class CheckoutError extends Error {
   status: number;
@@ -16,6 +17,7 @@ export class CheckoutError extends Error {
 
 type CheckoutRequestBody = {
   currency?: string;
+  voucherCodes?: string[];
 };
 
 function checkoutCurrency(value: unknown): CheckoutCurrency {
@@ -69,6 +71,39 @@ export async function createPaymentCheckout(providerId: PaymentProviderId, reque
     throw new CheckoutError("Your cart is empty.", 400);
   }
 
+  const subtotal = cartItems.reduce(
+    (sum, item) => sum + (currency === "EUR" ? Number(item.price_eur) : Number(item.price_usd)),
+    0,
+  );
+
+  let voucher: { id: string; code: string; discountPercentage: number } | undefined;
+
+  // 1. First check server-side cart session voucher
+  const cartVoucher = await getCurrentCartVoucher(cartId);
+  if (cartVoucher) {
+    voucher = cartVoucher;
+  } else {
+    // 2. Fallback to voucherCodes from body (backwards compatibility / direct payloads)
+    const voucherCodes = Array.isArray(body.voucherCodes)
+      ? [...new Set(body.voucherCodes.filter((code): code is string => typeof code === "string").map((code) => code.trim()).filter(Boolean))]
+      : [];
+
+    if (voucherCodes.length > 1) {
+      throw new CheckoutError("Only one voucher can be applied per order.", 400);
+    }
+
+    if (voucherCodes.length === 1) {
+      try {
+        voucher = await validateVoucherCode(voucherCodes[0], user.id);
+      } catch (error) {
+        if (error instanceof VoucherServiceError) {
+          throw new CheckoutError(error.message, 400);
+        }
+        throw new CheckoutError("Unable to validate voucher.", 400);
+      }
+    }
+  }
+
   const taxSettings = await getPaymentTaxSettings(providerId);
 
   const provider = getPaymentProvider(providerId);
@@ -84,5 +119,6 @@ export async function createPaymentCheckout(providerId: PaymentProviderId, reque
     supabase,
     taxRate: taxSettings?.tax_rate ?? 0,
     taxLabel: taxSettings?.tax_label ?? "Tax",
+    voucher,
   });
 }

@@ -30,6 +30,7 @@ type TransactionOrderRow = {
   id: string;
   order_ref: string;
   status: string;
+  voucher_discount: number | string | null;
 };
 
 export type AdminTransactionRecord = {
@@ -56,6 +57,8 @@ export type AdminTransactionDetail = AdminTransactionRecord & {
   orderId: string | null;
   orderReference: string | null;
   orderStatus: string | null;
+  voucherCode: string | null;
+  voucherDiscount: number;
   refundStatus: string;
   refundedAt: string | null;
   providerRefundId: string | null;
@@ -201,12 +204,20 @@ export async function getAdminTransaction(transactionId: string) {
     getCustomersById([data.user_id]),
     supabase
       .from("orders")
-      .select("id, order_ref, status")
+      .select("id, order_ref, status, voucher_discount")
       .eq("checkout_session_id", data.checkout_session_id)
       .maybeSingle<TransactionOrderRow>(),
   ]);
 
   if (orderResult.error) throw orderResult.error;
+
+  const { data: checkoutSession, error: checkoutSessionError } = await supabase
+    .from("checkout_sessions")
+    .select("voucher_code, voucher_discount")
+    .eq("id", data.checkout_session_id)
+    .maybeSingle<{ voucher_code: string | null; voucher_discount: number | string | null }>();
+
+  if (checkoutSessionError) throw checkoutSessionError;
 
   const customer = customers.get(data.user_id);
   const name = customerName(customer);
@@ -238,6 +249,8 @@ export async function getAdminTransaction(transactionId: string) {
     orderId: orderResult.data?.id ?? null,
     orderReference: orderResult.data?.order_ref ?? null,
     orderStatus: orderResult.data?.status ?? null,
+    voucherCode: checkoutSession?.voucher_code ?? null,
+    voucherDiscount: Number(orderResult.data?.voucher_discount ?? checkoutSession?.voucher_discount ?? 0),
     refundStatus: data.refund_status,
     refundedAt: data.refunded_at ? formatDate(data.refunded_at) : null,
     providerRefundId: data.provider_refund_id,

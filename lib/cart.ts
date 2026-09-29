@@ -124,6 +124,60 @@ export async function getCurrentCartId() {
   return (data?.id as string | undefined) ?? null
 }
 
+export async function getCurrentCartVoucher(cartId: string) {
+  const supabase = createAdminClient()
+  const { data: cart, error: cartError } = await supabase
+    .from('carts')
+    .select('voucher_id, user_id, vouchers(id, code, discount_percentage, expires_at)')
+    .eq('id', cartId)
+    .maybeSingle()
+
+  if (cartError || !cart?.voucher_id) {
+    return null
+  }
+
+  if (!cart.vouchers) {
+    // Voucher was deleted from the vouchers table, auto-clear from cart
+    await supabase.from('carts').update({ voucher_id: null }).eq('id', cartId)
+    return null
+  }
+
+  const voucherData = Array.isArray(cart.vouchers) ? cart.vouchers[0] : cart.vouchers
+  if (!voucherData) {
+    await supabase.from('carts').update({ voucher_id: null }).eq('id', cartId)
+    return null
+  }
+
+  // Check expiration
+  if (new Date(voucherData.expires_at) <= new Date()) {
+    // Auto clear expired voucher from cart
+    await supabase.from('carts').update({ voucher_id: null }).eq('id', cartId)
+    return null
+  }
+
+  // Check single-use redemption for this specific user
+  if (cart.user_id) {
+    const { data: redemption } = await supabase
+      .from('voucher_redemptions')
+      .select('id')
+      .eq('voucher_id', voucherData.id)
+      .eq('user_id', cart.user_id)
+      .maybeSingle()
+
+    if (redemption) {
+      // Auto clear redeemed voucher for this user
+      await supabase.from('carts').update({ voucher_id: null }).eq('id', cartId)
+      return null
+    }
+  }
+
+  return {
+    id: voucherData.id as string,
+    code: voucherData.code as string,
+    discountPercentage: Number(voucherData.discount_percentage),
+  }
+}
+
 export async function refreshCurrentCartSession() {
   const cookieStore = await cookies()
   const sessionId = cookieStore.get(CART_COOKIE)?.value

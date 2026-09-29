@@ -55,6 +55,12 @@ export default async function AdminTransactionDetailPage({ params }: AdminTransa
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <InfoCell label="Provider" value={transaction.method} />
               <InfoCell label="Amount" value={transaction.amount} highlight />
+              <InfoCell
+                label={transaction.voucherCode ? `Voucher Discount (${transaction.voucherCode})` : "Voucher Discount"}
+                value={transaction.voucherDiscount > 0
+                  ? `-${new Intl.NumberFormat("en-US", { style: "currency", currency: transaction.currency }).format(transaction.voucherDiscount)}`
+                  : "None"}
+              />
               <InfoCell label="Payment Status" value={transaction.status.replace("_", " ")} />
               <InfoCell label="Refund Status" value={transaction.refundStatus.replace("_", " ")} />
               <InfoCell label="Created" value={transaction.date} />
@@ -113,6 +119,12 @@ export default async function AdminTransactionDetailPage({ params }: AdminTransa
             <div className="mt-6 space-y-3 text-sm">
               <SideRow label="Provider" value={transaction.method} />
               <SideRow label="Amount" value={transaction.amount} />
+              <SideRow
+                label="Discount"
+                value={transaction.voucherDiscount > 0
+                  ? `-${new Intl.NumberFormat("en-US", { style: "currency", currency: transaction.currency }).format(transaction.voucherDiscount)}`
+                  : "None"}
+              />
               <SideRow label="Order" value={transaction.orderReference ?? "Not created"} />
             </div>
           </section>

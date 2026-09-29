@@ -236,6 +236,9 @@ export default async function ProfileOrderDetailPage({ params }: ProfileOrderDet
               <h2 className="text-xl font-black">Price Breakdown</h2>
               <div className="mt-5 space-y-3">
                 <PriceRow label="Base price" value={formatOrderMoney(order.basePrice, order.currency)} />
+                {order.voucherDiscount > 0 ? (
+                  <PriceRow label="Voucher discount" value={`-${formatOrderMoney(order.voucherDiscount, order.currency)}`} valueClass="mono text-right text-emerald-400" />
+                ) : null}
                 <PriceRow label={`Tax (${formatPaymentProvider(order.paymentProvider)})`} value={formatOrderMoney(order.taxAmount, order.currency)} />
                 <PriceRow
                   label="Refunded"

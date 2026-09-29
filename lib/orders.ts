@@ -50,6 +50,7 @@ export type CustomerOrderRow = {
   base_price: number | string | null;
   tax_amount: number | string | null;
   refund_amount: number | string | null;
+  voucher_discount: number | string | null;
   created_at: string;
   order_items: CustomerOrderItemRow[] | null;
 };
@@ -87,6 +88,7 @@ export type CustomerOrder = {
   total: number;
   basePrice: number;
   taxAmount: number;
+  voucherDiscount: number;
   refundAmount: number;
   currency: OrderCurrency;
   paymentProvider: string;
@@ -136,6 +138,7 @@ function mapOrder(row: CustomerOrderRow, transaction?: CustomerOrderTransactionR
   const refundAmount = Number(row.refund_amount) || 0;
   const chargedTotal = transaction ? Number(transaction.amount) : fallbackTotal;
   const total = Math.max(0, chargedTotal - refundAmount);
+  const voucherDiscount = Number(row.voucher_discount) || 0;
 
   return {
     id: row.id,
@@ -145,6 +148,7 @@ function mapOrder(row: CustomerOrderRow, transaction?: CustomerOrderTransactionR
     total,
     basePrice: Number(row.base_price) || 0,
     taxAmount: Number(row.tax_amount) || 0,
+    voucherDiscount,
     refundAmount,
     currency,
     paymentProvider: transaction?.provider ?? "unknown",
@@ -162,7 +166,7 @@ function mapOrder(row: CustomerOrderRow, transaction?: CustomerOrderTransactionR
 }
 
 const orderSelect =
-  "id, order_ref, checkout_session_id, status, refund_previous_status, completed_at, delivered_at, base_price, tax_amount, refund_amount, created_at, order_items(id, service_id, selected_options_snapshot, total, currency, services(title, image, description, games(name), service_categories(name)))";
+  "id, order_ref, checkout_session_id, status, refund_previous_status, completed_at, delivered_at, base_price, tax_amount, refund_amount, voucher_discount, created_at, order_items(id, service_id, selected_options_snapshot, total, currency, services(title, image, description, games(name), service_categories(name)))";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

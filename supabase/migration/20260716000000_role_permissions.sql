@@ -6,8 +6,8 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 );
 
 INSERT INTO role_permissions (role, description, permissions) VALUES
-  ('super_admin', 'Full access to all features and settings', '["dashboard", "users", "games", "services", "orders", "transactions", "content", "messages", "logs", "settings", "admins"]'),
-  ('admin', 'Can manage services, orders, and content', '["dashboard", "games", "services", "orders", "content", "messages"]'),
+  ('super_admin', 'Full access to all features and settings', '["dashboard", "users", "games", "services", "orders", "transactions", "content", "vouchers", "pages", "messages", "logs", "settings", "admins"]'),
+  ('admin', 'Can manage services, orders, and content', '["dashboard", "games", "services", "orders", "content", "vouchers", "messages"]'),
   ('support', 'Can view orders and respond to messages', '["dashboard", "orders", "messages"]')
 ON CONFLICT (role) DO NOTHING;
 

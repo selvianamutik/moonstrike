@@ -5,6 +5,7 @@ import { notifyOrderCreated, notifyOrderPaymentConfirmed } from "@/lib/notificat
 import { createOrderReference, createTransactionReference } from "@/lib/order-ref";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { capturePayPalOrder, getPayPalOrder } from "@/lib/paypal";
+import { redeemVoucher } from "@/lib/vouchers/service";
 
 type FulfillmentResult =
   | { status: "existing"; orderCount: number; checkoutSessionId: string }
@@ -30,7 +31,7 @@ export async function fulfillPayPalCheckoutSession(checkoutSessionId: string, pa
   // Get checkout session
   const { data: checkoutSession, error: checkoutError } = await supabase
     .from("checkout_sessions")
-    .select("id, user_id, currency, items, cart_id")
+    .select("id, user_id, currency, items, cart_id, voucher_discount, voucher_ids")
     .eq("id", checkoutSessionId)
     .maybeSingle<{
       id: string;
@@ -38,6 +39,8 @@ export async function fulfillPayPalCheckoutSession(checkoutSessionId: string, pa
       currency: "USD" | "EUR";
       items: unknown;
       cart_id: string | null;
+      voucher_discount: number | string | null;
+      voucher_ids: string | null;
     }>();
 
   if (checkoutError) throw checkoutError;
@@ -82,10 +85,12 @@ export async function fulfillPayPalCheckoutSession(checkoutSessionId: string, pa
   // Create single order
   const items = checkoutSession.items as CheckoutSnapshotItem[];
   const orderRef = createOrderReference();
-  const basePrice = items.reduce(
+  const itemSubtotal = items.reduce(
     (sum, item) => sum + (checkoutSession.currency === "EUR" ? item.priceEUR : item.priceUSD),
     0,
   );
+  const voucherDiscount = Number(checkoutSession.voucher_discount ?? 0);
+  const basePrice = Math.max(0, itemSubtotal - voucherDiscount);
   const taxRate = await getPaymentTaxRate("paypal");
   const taxAmount = calculateTaxAmount(basePrice, taxRate);
 
@@ -99,6 +104,7 @@ export async function fulfillPayPalCheckoutSession(checkoutSessionId: string, pa
         status: "pending",
         base_price: basePrice,
         tax_amount: taxAmount,
+        voucher_discount: voucherDiscount,
       },
       {
         onConflict: "checkout_session_id",
@@ -108,6 +114,15 @@ export async function fulfillPayPalCheckoutSession(checkoutSessionId: string, pa
     .single<{ id: string }>();
 
   if (orderError) throw orderError;
+
+  // Record single-use voucher redemptions now that payment is confirmed.
+  const appliedVoucherIds = (checkoutSession.voucher_ids ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  for (const voucherId of appliedVoucherIds) {
+    await redeemVoucher(voucherId, checkoutSession.user_id, checkoutSessionId);
+  }
 
   // Create order items
   const orderItemRows = items.map((item) => ({

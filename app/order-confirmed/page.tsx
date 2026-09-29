@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Script from "next/script";
 import { PlaceholderAsset } from "@/components/asset-image";
+import { ClearAppliedVouchers } from "@/components/order-confirmed/ClearAppliedVouchers";
 import { LivePageRefresh } from "@/components/live-page-refresh";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -197,6 +198,7 @@ export default async function OrderConfirmedPage({ searchParams }: OrderConfirme
           });
         `}
       </Script>
+      <ClearAppliedVouchers />
       <SiteHeader />
       <section className="ms-shell py-16">
         <div className="mx-auto max-w-4xl text-center">
